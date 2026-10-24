@@ -83,6 +83,7 @@ class ReasonCode(StrEnum):
     SENSITIVE = "ASK:sensitive"
     DISAGREEMENT_EMPTY_LLM = "ASK:disagreement-empty-llm"
     DISAGREEMENT_FEW_PERSONS = "ASK:disagreement-few-persons"
+    QUASI_ID = "ASK:quasi-identifier"
     INJECTION_SIGNAL = "ASK:injection-signal"
     AMBIGUOUS_ENTITY = "ASK:ambiguous-entity"
     UNKNOWN_TOKEN = "RESTORE:unknown-token"

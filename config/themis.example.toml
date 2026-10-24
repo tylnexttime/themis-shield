@@ -114,6 +114,16 @@ finder_prompt = "v2"
 # Allow-list facts about your own organisation (never personal data).
 # The shipped "harbourline-demo" profile shows the format.
 institution_profile = ""
+# Detection behaviour: "v0.2" (default) or "v0.1" (the evaluated v0.1
+# detection, kept as a negative control).
+version = "v0.2"
+
+[policy]
+# Policy behaviour: "v0.2" (default) or "v0.1" (negative control).
+version = "v0.2"
+# Hold a document for ASK whenever a quasi-identifier is found. Off: found
+# quasi-identifiers are substituted (chosen on the v0.2 development set).
+quasi_id_ask = false
 
 [hooks]
 # Claude Code managed-hooks policy. Closed: prompts with personal data get a

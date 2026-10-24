@@ -106,6 +106,7 @@ POLICY = {
     "SENSITIVE": "Sensitive information requires confirmation and review.",
     "DISAGREEMENT_EMPTY_LLM": "The finders returned no findings despite contrary tracer evidence.",
     "DISAGREEMENT_FEW_PERSONS": "The finders found substantially fewer people than the tracer.",
+    "QUASI_ID": "A detail that can single someone out without naming them (a quasi-identifier) requires confirmation and review.",
     "INJECTION_SIGNAL": "Possible instruction injection requires confirmation and review.",
 }
 

@@ -34,6 +34,51 @@ STATUS_REASONS = {
 # stage's findings. Skipping and merely counting them was measured to let a leak through.
 UNMATCHED_ASK_MINIMUM = 3
 
+# Policy behaviour version, set at start-up from [policy] version. "v0.1" is the evaluated v0.1 policy, kept as the
+# negative control.
+POLICY_VERSIONS = ("v0.1", "v0.2")
+DEFAULT_POLICY_VERSION = "v0.2"
+DEFAULT_QUASI_ID_ASK = False
+_policy = {"version": DEFAULT_POLICY_VERSION, "quasi_id_ask": DEFAULT_QUASI_ID_ASK}
+
+
+def configure_policy(version: str | None = None, *, quasi_id_ask: bool | None = None) -> dict:
+    """Set the process-wide policy behaviour; ``None`` restores each default. Returns the active settings."""
+    version = DEFAULT_POLICY_VERSION if version is None else version
+    if version not in POLICY_VERSIONS:
+        raise ValueError("unknown policy version")
+    quasi = DEFAULT_QUASI_ID_ASK if quasi_id_ask is None else quasi_id_ask
+    if type(quasi) is not bool:
+        raise ValueError("invalid quasi_id_ask")
+    _policy.update(version=version, quasi_id_ask=quasi)
+    return dict(_policy)
+
+
+def policy_settings() -> dict:
+    return dict(_policy)
+
+
+# v0.2 empty-finder disagreement: when both LLM finders return nothing, only PII-Tracer findings that SURVIVE the
+# final allow-list count as contrary evidence, by their (normalised) tracer label. v0.1 counted the tracer's raw
+# findings, so an allow-listed role mailbox or a public date the tracer had called a date of birth held a clean
+# document. A date the tracer flags that is not a date of birth (OTHER_DATE after normalisation: a time stamp, a
+# weekday, a public date) is not contrary evidence on its own; every other label still is.
+# A tracer finding counts only when the tracer is confident in it (or gave no score): an unsure tracer span is still
+# redacted, but it does not hold a document that both finders read as clean.
+DISAGREEMENT_IGNORED_TRACER_LABELS = frozenset({Label.OTHER_DATE})
+DISAGREEMENT_TRACER_MIN_SCORE = 0.9
+
+
+def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
+    """Labels PII-Tracer attached to findings that are still present after the final allow-list (value-free)."""
+    return frozenset(
+        item.label
+        for found in evidence.findings
+        for item in found.evidence
+        if item.stage == "pii-tracer" and item.label not in DISAGREEMENT_IGNORED_TRACER_LABELS
+        and (item.score is None or item.score >= DISAGREEMENT_TRACER_MIN_SCORE)
+    )
+
 
 def decide(
     evidence: DetectionResult,
@@ -80,6 +125,9 @@ def decide(
         reasons.append(ReasonCode.SECRET)
     if labels.intersection(SENSITIVE_LABELS):
         reasons.append(ReasonCode.SENSITIVE)
+    v01 = _policy["version"] == "v0.1"
+    if not v01 and _policy["quasi_id_ask"] and Label.QUASI_ID in labels:
+        reasons.append(ReasonCode.QUASI_ID)
 
     if escalated:
         tracer = evidence.stage_status.get("pii-tracer")
@@ -88,7 +136,7 @@ def decide(
             llm_count = sum(item.finding_count for item in llms)
             llm_person_count = sum(item.person_count for item in llms)
             if llm_count == 0 and (
-                tracer.finding_count > 0
+                (tracer.finding_count > 0 if v01 else bool(surviving_tracer_labels(evidence)))
                 or evidence.doc_sensitivity >= EMPTY_LLM_SENSITIVITY_THRESHOLD
             ):
                 reasons.append(ReasonCode.DISAGREEMENT_EMPTY_LLM)

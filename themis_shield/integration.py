@@ -140,6 +140,24 @@ def configure_finder_prompt(config: Mapping[str, Any], institution: Mapping | No
     )
 
 
+def configure_versions(config: Mapping[str, Any]) -> dict:
+    """Apply ``[detection] version`` and ``[policy] version`` / ``quasi_id_ask`` (defaults: v0.2).
+
+    ``version = "v0.1"`` in both tables restores the evaluated v0.1 behaviour (kept as a negative control).
+    """
+    from .detectors.settings import configure_detection_version
+    from .policy import configure_policy
+
+    detection = config.get("detection") or {}
+    policy = dict(config.get("policy") or {})
+    if set(policy) - {"version", "quasi_id_ask"}:
+        raise ValueError("unknown [policy] settings")
+    return {
+        "detection": configure_detection_version(detection.get("version") or None),
+        "policy": configure_policy(policy.get("version") or None, quasi_id_ask=policy.get("quasi_id_ask")),
+    }
+
+
 HOOKS_KEYS = {
     "cloud_authorised", "roots", "allowed_tools", "drafts_dir",
     "destination_id", "model", "deployment_type",
@@ -249,6 +267,7 @@ def build_router(config_path):
     configure_rule_packs(config)
     institution = institution_profile(config)
     configure_finder_prompt(config, institution)
+    configure_versions(config)
     hooks = hooks_policy(config)
     reference = register_config.get("factory", DEFAULT_REGISTER_FACTORY)
     path = register_config.get("path") or None
