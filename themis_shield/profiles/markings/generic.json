@@ -1,0 +1,31 @@
+{
+  "name": "generic",
+  "description": "Default, organisation-neutral labels. Copy into your profiles_dir and edit to match your own scheme.",
+  "policy": {"confirm_at": "SENSITIVE", "local_only_at": "RESTRICTED"},
+  "caveat_floor": "RESTRICTED",
+  "legacy_floor": "SENSITIVE",
+  "rules": [
+    {"category": "CLASSIFICATION", "value": "TOP_SECRET", "phrase": "TOP SECRET"},
+    {"category": "CLASSIFICATION", "value": "RESTRICTED", "phrase": "STRICTLY CONFIDENTIAL"},
+    {"category": "CLASSIFICATION", "value": "RESTRICTED", "phrase": "DO NOT SHARE"},
+    {"category": "CLASSIFICATION", "value": "RESTRICTED", "phrase": "DO NOT DISTRIBUTE"},
+    {"category": "CLASSIFICATION", "value": "RESTRICTED", "phrase": "DO NOT FORWARD"},
+    {"category": "CLASSIFICATION", "value": "RESTRICTED", "phrase": "RESTRICTED"},
+    {"category": "CLASSIFICATION", "value": "SECRET", "phrase": "SECRET"},
+    {"category": "CLASSIFICATION", "value": "SENSITIVE", "phrase": "CONFIDENTIAL"},
+    {"category": "CLASSIFICATION", "value": "INTERNAL", "phrase": "INTERNAL USE ONLY"},
+    {"category": "CLASSIFICATION", "value": "INTERNAL", "phrase": "INTERNAL ONLY"},
+    {"category": "CAVEAT", "value": "EYES_ONLY", "regex": "EYES[ \\t]+ONLY"},
+    {"category": "CAVEAT", "value": "NO_EXTERNAL_AI", "regex": "NO[ \\t]+EXTERNAL[ \\t]+AI"},
+    {"category": "HANDLING", "value": "LEGAL_PRIVILEGE", "regex": "LEGAL(?:LY)?[ \\t]+PRIVILEGED?", "any_case_in_body": true},
+    {"category": "HANDLING", "value": "ATTORNEY_CLIENT", "regex": "ATTORNEY[- \\t]CLIENT[ \\t]+PRIVILEGED?", "any_case_in_body": true},
+    {"category": "HANDLING", "value": "PERSONAL_PRIVACY", "regex": "PERSONAL[ \\t]+PRIVACY", "any_case_in_body": true}
+  ],
+  "tier_labels": {
+    "INTERNAL": "INTERNAL",
+    "SENSITIVE": "CONFIDENTIAL",
+    "RESTRICTED": "RESTRICTED",
+    "SECRET": "SECRET",
+    "TOP_SECRET": "TOP SECRET"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "_comment": "Example: a local OpenAI-compatible server (llama.cpp, vLLM). Loopback http is allowed.",
+  "base_url": "http://127.0.0.1:8080/v1",
+  "model": "local-model",
+  "api_key_env": "THEMIS_LOCAL_SERVER_KEY",
+  "auth_style": "bearer",
+  "destination_id": "local-server",
+  "deployment_type": "regional-standard"
+}

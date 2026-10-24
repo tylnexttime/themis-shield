@@ -1,0 +1,44 @@
+{
+  "name": "au-pspf",
+  "description": "Example profile for the Australian Government Protective Security Policy Framework markings: classifications, caveats, information management markers and legacy dissemination limiting markers.",
+  "policy": {"confirm_at": "SENSITIVE", "local_only_at": "RESTRICTED"},
+  "caveat_floor": "RESTRICTED",
+  "legacy_floor": "SENSITIVE",
+  "rules": [
+    {"category": "CLASSIFICATION", "value": "TOP_SECRET", "phrase": "TOP SECRET"},
+    {"category": "CLASSIFICATION", "value": "SENSITIVE", "phrase": "OFFICIAL: SENSITIVE"},
+    {"category": "CLASSIFICATION", "value": "RESTRICTED", "phrase": "PROTECTED"},
+    {"category": "CLASSIFICATION", "value": "SECRET", "phrase": "SECRET"},
+    {"category": "CLASSIFICATION", "value": "INTERNAL", "phrase": "OFFICIAL"},
+    {"category": "CAVEAT", "value": "AUSTEO", "regex": "AUSTEO"},
+    {"category": "CAVEAT", "value": "AGAO", "regex": "AGAO"},
+    {"category": "CAVEAT", "value": "REL", "regex": "REL[ \\t]+(?:TO[ \\t]+)?[A-Z]{2,3}(?![A-Z])(?:[ \\t]*(?:,|/|[ \\t])[ \\t]*[A-Z]{2,3}(?![A-Z]))*"},
+    {"category": "CAVEAT", "value": "CABINET", "regex": "CABINET"},
+    {"category": "CAVEAT", "value": "EXCLUSIVE_FOR", "regex": "EXCLUSIVE[ \\t]+FOR"},
+    {"category": "HANDLING", "value": "LEGAL_PRIVILEGE", "regex": "LEGAL[ \\t]+PRIVILEGE", "any_case_in_body": true},
+    {"category": "HANDLING", "value": "LEGISLATIVE_SECRECY", "regex": "LEGISLATIVE[ \\t]+SECRECY", "any_case_in_body": true},
+    {"category": "HANDLING", "value": "PERSONAL_PRIVACY", "regex": "PERSONAL[ \\t]+PRIVACY", "any_case_in_body": true},
+    {"category": "LEGACY", "value": "FOR_OFFICIAL_USE_ONLY", "regex": "FOR[ \\t]+OFFICIAL[ \\t]+USE[ \\t]+ONLY", "any_case_in_body": true},
+    {"category": "LEGACY", "value": "SENSITIVE_PERSONAL", "regex": "SENSITIVE[ \\t]*:[ \\t]*PERSONAL", "any_case_in_body": true},
+    {"category": "LEGACY", "value": "SENSITIVE_LEGAL", "regex": "SENSITIVE[ \\t]*:[ \\t]*LEGAL", "any_case_in_body": true},
+    {"category": "LEGACY", "value": "SENSITIVE_CABINET", "regex": "SENSITIVE[ \\t]*:[ \\t]*CABINET", "any_case_in_body": true},
+    {"category": "LEGACY", "value": "SENSITIVE", "regex": "SENSITIVE"}
+  ],
+  "paragraph_markers": [
+    {"marker": "TS", "tier": "TOP_SECRET"},
+    {"marker": "O:S", "tier": "SENSITIVE"},
+    {"marker": "P", "tier": "RESTRICTED"},
+    {"marker": "S", "tier": "SECRET"},
+    {"marker": "O", "tier": "INTERNAL"}
+  ],
+  "paragraph_full_names": true,
+  "strict_tail_markers": ["P", "S"],
+  "metadata_keys": ["SEC"],
+  "tier_labels": {
+    "INTERNAL": "OFFICIAL",
+    "SENSITIVE": "OFFICIAL: Sensitive",
+    "RESTRICTED": "PROTECTED",
+    "SECRET": "SECRET",
+    "TOP_SECRET": "TOP SECRET"
+  }
+}

@@ -1,0 +1,9 @@
+themis-shield
+Copyright 2026 tylnexttime
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party components are used as dependencies and are not redistributed in
+this repository. Model weights (for example Gemma and PII-Tracer) and the
+llama.cpp engine are provisioned separately by the user under their own
+licences and terms.

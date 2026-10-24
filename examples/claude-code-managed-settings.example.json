@@ -1,0 +1,86 @@
+{
+  "_comment": "Synthetic only. The administrator must pin Claude Code >= 2.1.295 to an exact regression-tested build (onFailure: block needs it), replace bare python with its protected executable, and verify package provenance and effective telemetry controls. Hook clients call the running IPv4-loopback gate: start `themis serve` first and provision the gate token once (`themis serve --provision-token`). The server's [hooks] config section is the hook policy and defaults to preparation-only: prompts with personal data are blocked and a de-identified draft is written for you to paste; other prompts are refused; file tools are denied. To let clean prompts and tools through, set [hooks] cloud_authorised = true and list the workspace roots in [hooks] roots, with [gate] synthetic_cloud_authorised = true (see config/rehearsal.example.toml). SessionStart and Stop cannot block; their failures still exit non-zero. MessageDisplay failure leaves canonical placeholder text visible.",
+  "allowManagedHooksOnly": true,
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "OTEL_SDK_DISABLED": "true"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m themis_shield.hooks UserPromptSubmit",
+            "timeout": 30,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m themis_shield.hooks PreToolUse",
+            "timeout": 30,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m themis_shield.hooks PostToolUse",
+            "timeout": 30,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m themis_shield.hooks MessageDisplay",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m themis_shield.hooks SessionStart",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -m themis_shield.hooks Stop",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

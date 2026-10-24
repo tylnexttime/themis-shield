@@ -1,0 +1,255 @@
+{
+ "_about": "Institution profile for the fictional Harbourline Institute of the synthetic evaluation set, converted from eval/profiles/harbourline.json by eval/convert_profile.py (do not edit by hand). Every value is institutional and invented; none is personal information.",
+ "institution": "Harbourline Institute",
+ "institution_forms": [
+  "Harbourline",
+  "the Institute"
+ ],
+ "email_domain": "harbourline.example",
+ "campuses": [
+  {
+   "town": "Saltmere",
+   "forms": [
+    "Saltmere campus",
+    "Saltmere Campus",
+    "Harbourline Saltmere",
+    "1 Lighthouse Road, Saltmere"
+   ],
+   "reception": "(02) 5550 0141"
+  },
+  {
+   "town": "Kestrel Bay",
+   "forms": [
+    "Kestrel Bay station",
+    "Kestrel Bay Research Station",
+    "Harbourline Kestrel Bay",
+    "88 Spit Road, Kestrel Bay"
+   ],
+   "reception": "(02) 5550 0142"
+  },
+  {
+   "town": "Wyndhollow",
+   "forms": [
+    "Wyndhollow centre",
+    "Wyndhollow Training Centre",
+    "Harbourline Wyndhollow",
+    "40 Mill Race Lane, Wyndhollow"
+   ],
+   "reception": "(07) 5550 0143"
+  },
+  {
+   "town": "Greyfen Quay",
+   "forms": [
+    "Greyfen Quay office",
+    "Greyfen Quay City Office",
+    "Harbourline Greyfen Quay",
+    "Level 6, 210 Quayside Parade, Greyfen Quay"
+   ],
+   "reception": "(08) 7010 0144"
+  },
+  {
+   "town": "Larkspur Ridge",
+   "forms": [
+    "Larkspur Ridge field station",
+    "Larkspur Ridge Field Station",
+    "Larkspur Ridge Road, Larkspur Ridge"
+   ],
+   "reception": "(07) 5550 0145"
+  }
+ ],
+ "buildings": [
+  "Tidewater Building",
+  "Lantern Hall",
+  "Anchor Labs",
+  "Driftwood Library",
+  "Lovelace Lecture Theatre",
+  "Breakwater Workshop",
+  "Salt Store Gallery"
+ ],
+ "role_mailboxes": [
+  "enquiries@harbourline.example",
+  "admissions@harbourline.example",
+  "servicedesk@harbourline.example",
+  "privacy@harbourline.example",
+  "payroll@harbourline.example",
+  "people@harbourline.example",
+  "research.office@harbourline.example",
+  "ethics@harbourline.example",
+  "safety@harbourline.example",
+  "facilities@harbourline.example",
+  "wellbeing@harbourline.example",
+  "library@harbourline.example",
+  "procurement@harbourline.example",
+  "media@harbourline.example",
+  "accessibility@harbourline.example",
+  "security@harbourline.example"
+ ],
+ "main_lines": [
+  {
+   "purpose": "General enquiries",
+   "number": "1300 975 707"
+  },
+  {
+   "purpose": "IT service desk",
+   "number": "1300 975 709"
+  },
+  {
+   "purpose": "After-hours wellbeing line",
+   "number": "1800 975 711"
+  }
+ ],
+ "reception_numbers": [
+  "(02) 5550 0141",
+  "(02) 5550 0142",
+  "(07) 5550 0143",
+  "(08) 7010 0144",
+  "(07) 5550 0145",
+  "1300 975 707",
+  "1300 975 709",
+  "1800 975 711"
+ ],
+ "role_titles": [
+  "Chief Executive",
+  "Privacy Officer",
+  "Director of Research",
+  "Head of People and Culture",
+  "Research Integrity Officer",
+  "Site Manager",
+  "Accessibility Adviser",
+  "Wellbeing Coordinator",
+  "Chair of the Ethics Committee",
+  "Facilities Manager",
+  "Chief Information Officer",
+  "Safety Coordinator"
+ ],
+ "programmes": [
+  {
+   "code": "HLP-2041",
+   "title": "Graduate Certificate in Coastal Data Science"
+  },
+  {
+   "code": "HLP-1187",
+   "title": "Certificate in Laboratory Operations"
+  },
+  {
+   "code": "HLP-3302",
+   "title": "Diploma of Marine Engineering Practice"
+  },
+  {
+   "code": "HLP-1450",
+   "title": "Short Course in Workplace First Aid"
+  },
+  {
+   "code": "HLP-2216",
+   "title": "Certificate in Applied Project Management"
+  },
+  {
+   "code": "HLP-1903",
+   "title": "Foundation Skills in Digital Literacy"
+  },
+  {
+   "code": "HLP-1460",
+   "title": "Mental Health First Aid Refresher"
+  },
+  {
+   "code": "HLP-1475",
+   "title": "Auslan for Beginners"
+  }
+ ],
+ "projects": [
+  {
+   "code": "RP-2026-014",
+   "title": "Seagrass Recovery Monitoring"
+  },
+  {
+   "code": "RP-2026-031",
+   "title": "Low-cost Tide Sensors"
+  },
+  {
+   "code": "RP-2025-118",
+   "title": "Fatigue in Shift Workers"
+  }
+ ],
+ "committees": [
+  "Diversity and Inclusion Committee",
+  "Health and Safety Committee",
+  "Reconciliation Working Group",
+  "Staff Pride Network",
+  "Faith and Wellbeing Group"
+ ],
+ "initiatives": [
+  "Workplace Health and Safety Audit",
+  "Mental Health Week",
+  "Harmony Day lunch",
+  "Ramadan iftar evening",
+  "Wear It Purple Day",
+  "Accessibility Action Plan",
+  "Enterprise Agreement consultation",
+  "Respectful Relationships workshop"
+ ],
+ "code_formats": {
+  "programme": "HLP-\\d{4}",
+  "module": "HLM\\d{3}[A-Z]",
+  "research project": "RP-20\\d{2}-\\d{3}"
+ },
+ "reference_number_formats": {
+  "service request": "SR-\\d{6}",
+  "change request": "CHG-\\d{5}",
+  "purchase order": "PO-[56]\\d{7}",
+  "invoice": "INV-HL-\\d{5}",
+  "asset tag": "HLA-\\d{5}",
+  "ethics approval": "HREC-20\\d{2}-\\d{3}",
+  "room booking": "RB-\\d{6}"
+ },
+ "public_dates": [
+  {
+   "event": "Open Day",
+   "date": "22/08/2026"
+  },
+  {
+   "event": "Research Symposium",
+   "date": "17/09/2026"
+  },
+  {
+   "event": "Council meeting",
+   "date": "15/10/2026"
+  },
+  {
+   "event": "Council meeting",
+   "date": "19/11/2026"
+  },
+  {
+   "event": "Graduation ceremony",
+   "date": "11/12/2026"
+  },
+  {
+   "event": "End-of-year closure starts",
+   "date": "24/12/2026"
+  },
+  {
+   "event": "Sites reopen",
+   "date": "05/01/2027"
+  },
+  {
+   "event": "Term 1 starts",
+   "date": "08/02/2027"
+  }
+ ],
+ "abn": "96 444 148 279",
+ "abn_forms": [
+  "96 444 148 279",
+  "96444148279"
+ ],
+ "finder_do_not_flag": [
+  "the organisation's own name (Harbourline Institute, Harbourline, the Institute)",
+  "site and campus names used as places of work (Saltmere campus, Kestrel Bay station)",
+  "building and room names (Tidewater Building, Lantern Hall)",
+  "programme, course and project codes and titles (HLP-2041, Graduate Certificate in Coastal Data Science)",
+  "committee, staff-network and initiative names, even when they contain words such as health, pride, faith or union (Staff Pride Network, Faith and Wellbeing Group, Workplace Health and Safety Audit)",
+  "role titles without a person's name (Chief Executive, Privacy Officer)",
+  "shared role mailboxes (enquiries@harbourline.example, admissions@harbourline.example)",
+  "reception, switchboard and enquiry numbers",
+  "the organisation's own business number",
+  "dates of public events (open days, ceremonies, closures)"
+ ]
+}

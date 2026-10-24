@@ -1,0 +1,103 @@
+# themis-shield synthetic rehearsal configuration (example).
+#
+# A complete configuration that reaches a working gated chat on SYNTHETIC
+# data. It switches on what the minimal config/themis.example.toml keeps off,
+# and says why next to each switch. Copy it, read every comment, then run:
+#
+#   themis serve --provision-token                       # once: the local gate token
+#   themis serve --config <your copy> --open             # opens the browser on 127.0.0.1:8742
+#
+# The approval step: every request that would leave the device is held until
+# a second, configured identity (the Operator) approves it. With the Operator
+# console on (below), open the Operator tab, approve the held job, then go back
+# to the chat and re-send: approval never sends anything by itself. The
+# register CLI can do the same (`themis register list`, then
+# `themis register approve <job id> --reason ROUTINE_APPROVED --identity
+# synthetic-operator-01`); its roles are assertions, not authentication.
+#
+# This file never holds a credential: the cloud API key and the vault
+# passphrase live in environment variables whose NAMES are configured here.
+
+[gate]
+# Rehearsal safeguard: the gate refuses to start unless this is true. It is a
+# switch you set deliberately, not a detector: only use synthetic data.
+synthetic_only = true
+requester_identity = "synthetic-requester-01"
+# Authorise the configured cloud destination for synthetic rehearsal. Without
+# it every cloud request is refused (DESTINATION_NOT_AUTHORISED).
+synthetic_cloud_authorised = true
+# Authorise answering on the local model (the "local" route) as well.
+local_authorised = true
+# Automatic approval fixture: keep it off, so a person approves each job.
+pilot_fixture_enabled = false
+# The Operator console in the web app: the queue of held jobs and the
+# approve / refuse / escalate actions.
+operator_console_enabled = true
+# Who approves. It must differ from requester_identity: the gate refuses to
+# start otherwise, and the register refuses self-approval.
+operator_identity = "synthetic-operator-01"
+allowed_local_tools = []
+
+[profiles]
+# Empty = the profiles shipped with the package (see `themis profiles`).
+dir = ""
+
+[markings]
+# "generic" recognises CONFIDENTIAL, RESTRICTED and DO NOT SHARE banners.
+profile = "generic"
+
+[cloud]
+# Any OpenAI-compatible endpoint. Put the API key in the environment variable
+# named by api_key_env before starting; the file only holds its name.
+# profile = "openai-example"      # or a shipped/external cloud profile
+base_url = "https://api.openai.com/v1"
+model = "your-model-name"
+api_key_env = "THEMIS_CLOUD_API_KEY"
+auth_style = "bearer"                  # or "api-key" (Azure OpenAI)
+destination_id = "cloud"
+deployment_type = "global-standard"
+max_tokens = 32768
+timeout_seconds = 1800
+
+[register]
+factory = "themis_shield.integration:register_factory"
+# path = "~/.local/share/themis-shield/register.db"
+business_timezone = "UTC"            # IANA name used for approval deadlines
+
+[runtime]
+# Empty uses the per-user defaults: <app data>/engine/llama-server and the
+# GGUF files in <app data>/models (see `themis runtime list`).
+settings_file = ""
+catalogue = ""
+
+[detection]
+# Empty uses <app data>/models/pii-tracer.
+tracer_model_directory = ""
+# A label for the PII-Tracer weights you reviewed (recorded with results).
+tracer_artefact_manifest_id = "synthetic-rehearsal"
+# The evaluated pipeline: core rules plus the Australian (TFN, Medicare, ABN,
+# USI, phones) and international (E.164 phones, IBAN) identifier packs.
+rule_packs = ["core", "au", "intl"]
+# The evaluated finder context and the fictional institute's allow-list.
+finder_context = "a training and research institute"
+finder_prompt = "v2"
+institution_profile = "harbourline-eval"
+
+[hooks]
+# Claude Code managed hooks (examples/claude-code-managed-settings.example.json).
+# Closed by default: prompts with personal data are blocked and a
+# de-identified draft is written for you to paste; other prompts are refused;
+# file tools are denied. To let clean prompts and tool calls through, set
+# cloud_authorised = true (it also needs [gate] synthetic_cloud_authorised)
+# and list the workspace directories tools may touch.
+cloud_authorised = false
+roots = []                           # e.g. ["C:/work/synthetic-project"]
+# drafts_dir = ""                    # empty = <app data>/hooks
+
+[vault]
+# "auto" = Windows DPAPI on Windows. Elsewhere set "passphrase" and put a
+# passphrase of at least 12 characters in the variable named by passphrase_env.
+protector = "auto"
+passphrase_env = "THEMIS_VAULT_PASSPHRASE"
+insecure_test_only = false
+# path = "~/.local/share/themis-shield/vault.db"

@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "themis-shield"
+version = "0.1.0"
+description = "A local-first privacy gate in front of cloud AI: detect, de-identify, decide, restore."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "tylnexttime" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "cryptography>=42",
+    "httpx>=0.27",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "psutil>=5.9",
+    "tzdata>=2024.1; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+tracer = [
+    "torch>=2.2",
+    "transformers>=5.2",
+]
+dev = [
+    "pytest>=8",
+]
+# Optional launch planner for llama.cpp entries ("planner": "marian").
+# Marian is not on PyPI (an unrelated package uses that name), so it is a
+# direct reference to its repository.
+marian = [
+    "marian @ git+https://github.com/tylnexttime/marian",
+]
+
+[project.urls]
+Homepage = "https://github.com/tylnexttime/themis-shield"
+Source = "https://github.com/tylnexttime/themis-shield"
+Issues = "https://github.com/tylnexttime/themis-shield/issues"
+Changelog = "https://github.com/tylnexttime/themis-shield/blob/main/CHANGELOG.md"
+
+[project.scripts]
+themis = "themis_shield.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["themis_shield*"]
+
+[tool.setuptools.package-data]
+themis_shield = [
+    "web/static/*",
+    "profiles/*/*.json",
+]
+
+[tool.pytest.ini_options]
+markers = ["slow: needs real local models (PII-Tracer weights, llama-server, a running Strata, saved Marian profiles); run with --run-slow"]
+testpaths = ["tests"]
+addopts = "-ra"

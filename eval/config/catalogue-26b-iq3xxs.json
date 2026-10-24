@@ -1,0 +1,15 @@
+{
+ "version": 1,
+ "models": [
+  {
+   "id": "gemma4-26b-a4b",
+   "display_name": "Gemma 4 26B-A4B UD-IQ3_XXS",
+   "file": "gemma-4-26B-A4B-it-UD-IQ3_XXS.gguf",
+   "args": ["-ngl", "99", "-ncmoe", "18", "-c", "16384"],
+   "variants": [
+    {"mode": "mmap", "est_ram_gb": 8.5, "est_vram_gb": 7.1, "min_vram_gb": 7.1,
+     "expected_prompt_tok_s": 29.0, "expected_tok_s": 7.3}
+   ]
+  }
+ ]
+}

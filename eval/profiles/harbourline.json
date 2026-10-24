@@ -1,0 +1,263 @@
+{
+ "_about": "ENTIRELY FICTIONAL deployment profile. Harbourline Institute does not exist. Its sites, buildings, phone numbers, mailboxes, business number, programme codes and dates are invented for the themis-shield evaluation set. Every value listed here is INSTITUTIONAL and is NOT personal information: a gate is configured from this file (allow-list), never from gold labels. Phone numbers are in the Australian ranges reserved for fiction (ACMA: (0x) 5550 xxxx, (0x) 7010 xxxx, 1300/1800 975 707-711). The domain uses the reserved .example top-level domain (RFC 2606). The ABN is invented and passes the ABN mod-89 checksum; it was not checked against any register.",
+ "organisation": "Harbourline Institute",
+ "organisation_forms": [
+  "Harbourline Institute",
+  "Harbourline",
+  "the Institute"
+ ],
+ "description": "A fictional mid-sized training and research institute with five sites.",
+ "business_identifier": {
+  "scheme": "ABN",
+  "value": "96 444 148 279",
+  "forms": [
+   "96 444 148 279",
+   "96444148279"
+  ]
+ },
+ "email_domain": "harbourline.example",
+ "sites": [
+  {
+   "name": "Saltmere",
+   "kind": "main campus",
+   "forms": [
+    "Saltmere campus",
+    "Saltmere Campus",
+    "Harbourline Saltmere"
+   ],
+   "reception": "(02) 5550 0141",
+   "address": "1 Lighthouse Road, Saltmere"
+  },
+  {
+   "name": "Kestrel Bay",
+   "kind": "research station",
+   "forms": [
+    "Kestrel Bay station",
+    "Kestrel Bay Research Station",
+    "Harbourline Kestrel Bay"
+   ],
+   "reception": "(02) 5550 0142",
+   "address": "88 Spit Road, Kestrel Bay"
+  },
+  {
+   "name": "Wyndhollow",
+   "kind": "training centre",
+   "forms": [
+    "Wyndhollow centre",
+    "Wyndhollow Training Centre",
+    "Harbourline Wyndhollow"
+   ],
+   "reception": "(07) 5550 0143",
+   "address": "40 Mill Race Lane, Wyndhollow"
+  },
+  {
+   "name": "Greyfen Quay",
+   "kind": "city office",
+   "forms": [
+    "Greyfen Quay office",
+    "Greyfen Quay City Office",
+    "Harbourline Greyfen Quay"
+   ],
+   "reception": "(08) 7010 0144",
+   "address": "Level 6, 210 Quayside Parade, Greyfen Quay"
+  },
+  {
+   "name": "Larkspur Ridge",
+   "kind": "field station",
+   "forms": [
+    "Larkspur Ridge field station",
+    "Larkspur Ridge Field Station"
+   ],
+   "reception": "(07) 5550 0145",
+   "address": "Larkspur Ridge Road, Larkspur Ridge"
+  }
+ ],
+ "site_note": "Bare site names (Saltmere, Kestrel Bay, ...) are also the suburbs where staff and learners live, so a gate must NOT allow-list them bare; only the phrases in 'forms' are institutional.",
+ "buildings": [
+  "Tidewater Building",
+  "Lantern Hall",
+  "Anchor Labs",
+  "Driftwood Library",
+  "Lovelace Lecture Theatre",
+  "Breakwater Workshop",
+  "Salt Store Gallery"
+ ],
+ "role_mailboxes": [
+  "enquiries@harbourline.example",
+  "admissions@harbourline.example",
+  "servicedesk@harbourline.example",
+  "privacy@harbourline.example",
+  "payroll@harbourline.example",
+  "people@harbourline.example",
+  "research.office@harbourline.example",
+  "ethics@harbourline.example",
+  "safety@harbourline.example",
+  "facilities@harbourline.example",
+  "wellbeing@harbourline.example",
+  "library@harbourline.example",
+  "procurement@harbourline.example",
+  "media@harbourline.example",
+  "accessibility@harbourline.example",
+  "security@harbourline.example"
+ ],
+ "main_lines": [
+  {
+   "purpose": "General enquiries",
+   "number": "1300 975 707"
+  },
+  {
+   "purpose": "IT service desk",
+   "number": "1300 975 709"
+  },
+  {
+   "purpose": "After-hours wellbeing line",
+   "number": "1800 975 711"
+  }
+ ],
+ "reception_numbers": [
+  "(02) 5550 0141",
+  "(02) 5550 0142",
+  "(07) 5550 0143",
+  "(08) 7010 0144",
+  "(07) 5550 0145",
+  "1300 975 707",
+  "1300 975 709",
+  "1800 975 711"
+ ],
+ "role_titles": [
+  "Chief Executive",
+  "Privacy Officer",
+  "Director of Research",
+  "Head of People and Culture",
+  "Research Integrity Officer",
+  "Site Manager",
+  "Accessibility Adviser",
+  "Wellbeing Coordinator",
+  "Chair of the Ethics Committee",
+  "Facilities Manager",
+  "Chief Information Officer",
+  "Safety Coordinator"
+ ],
+ "programmes": [
+  {
+   "code": "HLP-2041",
+   "title": "Graduate Certificate in Coastal Data Science"
+  },
+  {
+   "code": "HLP-1187",
+   "title": "Certificate in Laboratory Operations"
+  },
+  {
+   "code": "HLP-3302",
+   "title": "Diploma of Marine Engineering Practice"
+  },
+  {
+   "code": "HLP-1450",
+   "title": "Short Course in Workplace First Aid"
+  },
+  {
+   "code": "HLP-2216",
+   "title": "Certificate in Applied Project Management"
+  },
+  {
+   "code": "HLP-1903",
+   "title": "Foundation Skills in Digital Literacy"
+  },
+  {
+   "code": "HLP-1460",
+   "title": "Mental Health First Aid Refresher"
+  },
+  {
+   "code": "HLP-1475",
+   "title": "Auslan for Beginners"
+  }
+ ],
+ "research_projects": [
+  {
+   "code": "RP-2026-014",
+   "title": "Seagrass Recovery Monitoring"
+  },
+  {
+   "code": "RP-2026-031",
+   "title": "Low-cost Tide Sensors"
+  },
+  {
+   "code": "RP-2025-118",
+   "title": "Fatigue in Shift Workers"
+  }
+ ],
+ "committees": [
+  "Diversity and Inclusion Committee",
+  "Health and Safety Committee",
+  "Reconciliation Working Group",
+  "Staff Pride Network",
+  "Faith and Wellbeing Group"
+ ],
+ "initiatives": [
+  "Workplace Health and Safety Audit",
+  "Mental Health Week",
+  "Harmony Day lunch",
+  "Ramadan iftar evening",
+  "Wear It Purple Day",
+  "Accessibility Action Plan",
+  "Enterprise Agreement consultation",
+  "Respectful Relationships workshop"
+ ],
+ "committee_note": "Committee, network and initiative names contain sensitive-sounding words (health, pride, faith, Ramadan, union-negotiated agreement) but name no person: they are institutional.",
+ "code_formats": {
+  "programme": "HLP-\\d{4}",
+  "module": "HLM\\d{3}[A-Z]",
+  "research project": "RP-20\\d{2}-\\d{3}"
+ },
+ "reference_number_formats": {
+  "service request": "SR-\\d{6}",
+  "change request": "CHG-\\d{5}",
+  "purchase order": "PO-[56]\\d{7}",
+  "invoice": "INV-HL-\\d{5}",
+  "asset tag": "HLA-\\d{5}",
+  "ethics approval": "HREC-20\\d{2}-\\d{3}",
+  "room booking": "RB-\\d{6}"
+ },
+ "public_dates": [
+  {
+   "event": "Open Day",
+   "date": "22/08/2026"
+  },
+  {
+   "event": "Research Symposium",
+   "date": "17/09/2026"
+  },
+  {
+   "event": "Council meeting",
+   "date": "15/10/2026"
+  },
+  {
+   "event": "Council meeting",
+   "date": "19/11/2026"
+  },
+  {
+   "event": "Graduation ceremony",
+   "date": "11/12/2026"
+  },
+  {
+   "event": "End-of-year closure starts",
+   "date": "24/12/2026"
+  },
+  {
+   "event": "Sites reopen",
+   "date": "05/01/2027"
+  },
+  {
+   "event": "Term 1 starts",
+   "date": "08/02/2027"
+  }
+ ],
+ "personal_identifier_formats_issued": {
+  "_note": "These are issued TO PEOPLE and are personal information. Listed so a gate can find them, never to allow-list them.",
+  "staff number": "HL\\d{5}",
+  "learner number": "[56]\\d{7}",
+  "staff email": "<given>.<family>@harbourline.example",
+  "learner email": "<given><family initial><nn>@learner.harbourline.example",
+  "research participant code": "P-\\d{3}-[A-Z]{2}"
+ }
+}

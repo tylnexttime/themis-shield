@@ -1,0 +1,132 @@
+# themis-shield gate configuration (minimal, closed example).
+#
+# Everything that could release data is switched off here: with this file the
+# gate starts, but every chat request is refused (DESTINATION_NOT_AUTHORISED).
+# For a synthetic rehearsal that reaches a working chat, start from
+# config/rehearsal.example.toml instead; it explains each switch it turns on
+# and the approval step.
+#
+# Copy to config/local.toml (gitignored) or anywhere you like and point the
+# gate at it with `themis serve --config <path>` or THEMIS_CONFIG=<path>.
+# This file never holds a credential: the cloud API key and the vault
+# passphrase live in environment variables whose NAMES are configured here.
+
+[gate]
+# Rehearsal safeguard: the gate refuses to start unless this is true.
+synthetic_only = true
+requester_identity = "synthetic-requester-01"
+synthetic_cloud_authorised = false
+local_authorised = false
+pilot_fixture_enabled = false        # automatic approval fixture; keep off
+operator_console_enabled = false
+operator_identity = "named-synthetic-operator"   # must differ from requester
+allowed_local_tools = []
+
+[profiles]
+# External, deployment-owned profiles directory. Profiles are looked up here
+# first (<dir>/<kind>/<name>.json, kinds: markings, institution, catalogue,
+# cloud), then among the profiles shipped with the package. Empty = shipped only.
+# THEMIS_PROFILES_DIR is used when this is empty.
+dir = ""
+
+[markings]
+# Marking scheme: "generic" (default) or "au-pspf" (shipped), or your own.
+profile = "generic"
+# Optional policy override; defaults come from the profile.
+# confirm_at = "SENSITIVE"       # tiers from here ask for confirmation before cloud
+# local_only_at = "RESTRICTED"   # tiers from here never leave the device
+
+[cloud]
+# Either name a cloud profile (see `themis profiles`) ...
+# profile = "openai-example"
+# ... or set the endpoint directly. Values here override the profile's.
+base_url = "https://api.openai.com/v1"
+model = "your-model-name"
+api_key_env = "THEMIS_CLOUD_API_KEY"   # the NAME of the env var holding the key
+auth_style = "bearer"                  # or "api-key" (Azure OpenAI)
+# api_version = "2024-10-21"           # Azure OpenAI only
+destination_id = "cloud"
+deployment_type = "global-standard"
+max_tokens = 32768
+timeout_seconds = 1800
+
+# Azure OpenAI example:
+# base_url = "https://your-resource.openai.azure.com/openai/deployments/your-deployment"
+# model = "your-deployment"
+# api_key_env = "AZURE_OPENAI_API_KEY"
+# auth_style = "api-key"
+# api_version = "2024-10-21"
+
+[register]
+factory = "themis_shield.integration:register_factory"
+# path = "~/.local/share/themis-shield/register.db"
+business_timezone = "UTC"            # IANA name used for approval deadlines
+
+[runtime]
+# Optional JSON runtime settings (engine_path, models_dir, catalogue_file,
+# data_dir, gpu_index, role_models, ...). Empty uses per-user defaults.
+settings_file = ""
+# Optional catalogue profile name (<profiles dir>/catalogue/<name>.json).
+# Strata and Marian-planned entries are declared there; see the shipped
+# "example" catalogue profile (themis_shield/profiles/catalogue/example.json).
+catalogue = ""
+
+# --- Optional back ends (empty = default; these override the settings file) ---
+#
+# Alternative engines: a catalogue entry may set "engine_path" (relative, e.g.
+# "patched/llama-server") to run a different llama-server build, such as one
+# with Marian's expert-cache patches. It is resolved inside this directory.
+# Empty = the directory of the default engine (<app data>/engine).
+engines_dir = ""
+#
+# Marian planner (optional extra: pip install "themis-shield[marian]"; Marian
+# itself comes from https://github.com/tylnexttime/marian). Entries with "planner": "marian" get their
+# llama.cpp arguments from Marian's SAVED profiles before each load; themis
+# never runs a profile itself. Without Marian, a profile or a fitting plan,
+# the catalogue's own arguments are used and the reason is logged.
+# Empty = the profiles directory Marian itself uses.
+marian_profiles_dir = ""
+# "tg" = fastest generation; "pp" = fastest prompt reading (read-heavy work).
+marian_objective = "tg"
+#
+# Strata attach: themis never starts, installs or updates Strata. Start it
+# yourself, then declare it in the catalogue ("runtime": "strata", "endpoint":
+# "http://127.0.0.1:<port>/v1", "served_model": "<id>"). Loopback only.
+# If you started Strata with an API key, put the NAME of the environment
+# variable holding it here (never the key itself).
+strata_api_key_env = "STRATA_API_KEY"
+
+[detection]
+# Empty uses <models dir>/pii-tracer.
+tracer_model_directory = ""
+tracer_artefact_manifest_id = "<your-reviewed-artefact-manifest>"
+# Identifier rule packs: "core" is always on; add "au" (TFN, Medicare, ABN,
+# USI, Australian phones) and/or "intl" (E.164 phones, IBAN) as needed.
+rule_packs = ["core"]
+# Where the text comes from, for the local LLM finders' prompt (a noun phrase).
+# The synthetic evaluation (eval/) used "a training and research institute".
+finder_context = "an organisation"
+# Finder prompt version: "v2" (default; fixed system prefix that llama-server's
+# prompt cache reuses) or "v1" (the original prompt, for reproducing old runs).
+# The prompt's "do not list" examples come from the institution profile's
+# finder_do_not_flag list, never from code.
+finder_prompt = "v2"
+# Allow-list facts about your own organisation (never personal data).
+# The shipped "harbourline-demo" profile shows the format.
+institution_profile = ""
+
+[hooks]
+# Claude Code managed-hooks policy. Closed: prompts with personal data get a
+# de-identified draft to paste, other prompts are refused, file tools denied.
+# See config/rehearsal.example.toml for how to open it.
+cloud_authorised = false
+roots = []
+
+[vault]
+# "auto" = Windows DPAPI on Windows; elsewhere the vault refuses to start
+# unless "passphrase" is configured. "null" is NOT protection and requires
+# insecure_test_only = true.
+protector = "auto"
+passphrase_env = "THEMIS_VAULT_PASSPHRASE"
+insecure_test_only = false
+# path = "~/.local/share/themis-shield/vault.db"

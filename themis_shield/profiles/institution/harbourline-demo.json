@@ -1,0 +1,327 @@
+{
+ "_about": "Synthetic deployment profile for an invented organisation, Harbourline Institute, a coastal training and research institute with four sites: a main campus, a marine research station, a regional training centre and a city office. All towns, sites, phone numbers (reserved fictional ranges), mailboxes, programme, unit and project codes and the ABN (checksum-valid but invented) are invented. Everything listed here is institutional and is NOT personal information.",
+ "institution": "Harbourline Institute",
+ "institution_forms": [
+  "Harbourline Institute",
+  "Harbourline",
+  "the Institute"
+ ],
+ "abn": "51 824 750 770",
+ "abn_forms": [
+  "51 824 750 770",
+  "51824750770"
+ ],
+ "abn_note": "Invented and checksum-valid (ABR mod 89).",
+ "email_domain": "harbourline.example",
+ "campuses": [
+  {
+   "town": "Quillbridge",
+   "kind": "main campus",
+   "forms": [
+    "Quillbridge campus",
+    "Quillbridge Campus",
+    "Quillbridge",
+    "Harbourline Quillbridge"
+   ],
+   "reception": "(02) 5550 0101"
+  },
+  {
+   "town": "Fenmarch",
+   "kind": "regional training centre",
+   "forms": [
+    "Fenmarch centre",
+    "Fenmarch Training Centre",
+    "Fenmarch",
+    "Harbourline Fenmarch"
+   ],
+   "reception": "(07) 5550 0103"
+  }
+ ],
+ "campus_note": "Bare town names (Quillbridge, Fenmarch) are also where people live, so the adapter never allow-lists them bare; only the longer forms are institutional.",
+ "other_sites": [
+  {
+   "name": "Ostrey Marine Research Station",
+   "forms": [
+    "Ostrey Marine Research Station",
+    "Ostrey station"
+   ],
+   "reception": "(07) 5550 0102",
+   "kind": "research station"
+  },
+  {
+   "name": "Northgate City Office",
+   "forms": [
+    "Northgate City Office",
+    "Northgate office"
+   ],
+   "reception": "(08) 7010 0104",
+   "kind": "city office"
+  }
+ ],
+ "buildings": [
+  "Tidepool Laboratories",
+  "Anchor Engineering Centre",
+  "Learning Commons",
+  "Lighthouse Health Sciences Centre",
+  "Seawall Data Lab",
+  "Rigging Workshop"
+ ],
+ "role_mailboxes": [
+  "enquiries@harbourline.example",
+  "admissions@harbourline.example",
+  "studentservices@harbourline.example",
+  "research.office@harbourline.example",
+  "ethics@harbourline.example",
+  "international@harbourline.example",
+  "wellbeing@harbourline.example",
+  "library@harbourline.example",
+  "itservicedesk@harbourline.example",
+  "privacy@harbourline.example",
+  "payroll@harbourline.example",
+  "feedback@harbourline.example",
+  "exams@harbourline.example",
+  "accessibility@harbourline.example",
+  "communityliaison@harbourline.example",
+  "security@harbourline.example"
+ ],
+ "main_lines": [
+  {
+   "purpose": "General enquiries",
+   "number": "1300 975 707"
+  },
+  {
+   "purpose": "International office",
+   "number": "1300 975 708"
+  },
+  {
+   "purpose": "IT service desk",
+   "number": "1300 975 709"
+  },
+  {
+   "purpose": "Research office",
+   "number": "1800 975 710"
+  },
+  {
+   "purpose": "After-hours wellbeing line",
+   "number": "1800 975 711"
+  }
+ ],
+ "reception_numbers": [
+  "(02) 5550 0101",
+  "(07) 5550 0102",
+  "(07) 5550 0103",
+  "(08) 7010 0104",
+  "1300 975 707",
+  "1300 975 708",
+  "1300 975 709",
+  "1800 975 710",
+  "1800 975 711"
+ ],
+ "role_titles": [
+  "Chief Executive Officer",
+  "Privacy Officer",
+  "Director of Research",
+  "Manager, Student Services",
+  "Community Liaison Officer",
+  "Accessibility Adviser",
+  "Student Wellbeing Coordinator",
+  "Site Manager",
+  "Board Chair",
+  "Head of School, Health Sciences",
+  "Research Integrity Officer",
+  "Executive Director, Education"
+ ],
+ "courses": [
+  {
+   "code": "HX-BUS-310",
+   "title": "Bachelor of Business Analytics"
+  },
+  {
+   "code": "HX-CMP-320",
+   "title": "Bachelor of Computing"
+  },
+  {
+   "code": "HX-HSC-210",
+   "title": "Bachelor of Health Sciences"
+  },
+  {
+   "code": "HX-MAR-420",
+   "title": "Bachelor of Marine Science"
+  },
+  {
+   "code": "HX-NUR-501",
+   "title": "Master of Clinical Nursing"
+  },
+  {
+   "code": "HX-EDR-520",
+   "title": "Master of Education Research"
+  },
+  {
+   "code": "HX-RES-710",
+   "title": "Master of Research (Ocean Data)"
+  },
+  {
+   "code": "HX-PHD-610",
+   "title": "Doctor of Philosophy (Coastal Ecology)"
+  },
+  {
+   "code": "HX-TCH-410",
+   "title": "Graduate Certificate in Tertiary Teaching"
+  },
+  {
+   "code": "HX-FIN-230",
+   "title": "Short Course in Bookkeeping Essentials"
+  },
+  {
+   "code": "HX-SCF-110",
+   "title": "Short Course in Coastal Field Safety"
+  },
+  {
+   "code": "HX-SCW-120",
+   "title": "Short Course in Water Quality Sampling"
+  }
+ ],
+ "units": [
+  {
+   "code": "HXU-2105",
+   "title": "Communication in health settings"
+  },
+  {
+   "code": "HXU-2110",
+   "title": "Infection control essentials"
+  },
+  {
+   "code": "HXU-1120",
+   "title": "Laboratory safety induction"
+  },
+  {
+   "code": "HXU-1130",
+   "title": "Inclusive practice at work"
+  },
+  {
+   "code": "HXU-1140",
+   "title": "Working across cultures"
+  },
+  {
+   "code": "HXU-1009",
+   "title": "CPR and basic life support"
+  },
+  {
+   "code": "HXU-2301",
+   "title": "Workplace health and safety basics"
+  },
+  {
+   "code": "HXU-2315",
+   "title": "Workshop safety for engineering"
+  },
+  {
+   "code": "HXU-4120",
+   "title": "Research methods and ethics"
+  },
+  {
+   "code": "HXU-1001",
+   "title": "Small-boat field safety"
+  },
+  {
+   "code": "HXU-1102",
+   "title": "Sensor networks in practice"
+  },
+  {
+   "code": "HXU-3110",
+   "title": "Financial transactions and reporting"
+  }
+ ],
+ "projects": [
+  {
+   "code": "HXR-2026-07",
+   "title": "Estuary Sediment Mapping"
+  },
+  {
+   "code": "HXR-2025-12",
+   "title": "Rip Current Early Warning"
+  }
+ ],
+ "code_formats": {
+  "course": "^HX-[A-Z]{3}-\\d{3}$",
+  "unit": "^HXU-\\d{4}$",
+  "project": "^HXR-20\\d{2}-\\d{2}$"
+ },
+ "reference_number_formats": {
+  "service desk ticket": "^INC\\d{7}$",
+  "change request": "^CHG\\d{7}$",
+  "purchase order": "^PO-[23]\\d{7}$",
+  "invoice": "^INV-20\\d{2}-\\d{5}$",
+  "fleet booking": "^FB-\\d{6}$"
+ },
+ "public_dates": [
+  {
+   "event": "Open Day",
+   "date": "15/08/2026"
+  },
+  {
+   "event": "Research Showcase",
+   "date": "31/08/2026"
+  },
+  {
+   "event": "Wellbeing Day",
+   "date": "10/09/2026"
+  },
+  {
+   "event": "Coastal Science Week starts",
+   "date": "05/07/2026"
+  },
+  {
+   "event": "Coastal Science Week ends",
+   "date": "12/07/2026"
+  },
+  {
+   "event": "Spring intake starts",
+   "date": "05/10/2026"
+  },
+  {
+   "event": "Applications for 2027 open",
+   "date": "02/11/2026"
+  },
+  {
+   "event": "Graduation ceremony, Quillbridge",
+   "date": "04/12/2026"
+  },
+  {
+   "event": "End-of-year closure starts",
+   "date": "24/12/2026"
+  },
+  {
+   "event": "Sites reopen",
+   "date": "04/01/2027"
+  },
+  {
+   "event": "Council meeting",
+   "date": "31/03/2027"
+  },
+  {
+   "event": "Board meeting",
+   "date": "17/09/2026"
+  },
+  {
+   "event": "Board meeting",
+   "date": "19/11/2026"
+  }
+ ],
+ "personal_identifier_formats_issued": {
+  "_note": "These are issued to PEOPLE and are personal information; listed so a gate can find them.",
+  "student_number": "^[23][0-9]{7}$ (invented format for the synthetic sets)",
+  "staff_email": "<name>@harbourline.example",
+  "student_email": "<name>@student.harbourline.example"
+ },
+ "finder_do_not_flag_note": "Examples the local finders must not list for this demo organisation (opt-in, organisation-specific). With finder_prompt = \"v1\" this list renders the v1 prompt pinned in tests/test_finder_prompt.py.",
+ "finder_do_not_flag": [
+  "programme and unit codes (e.g. HX-BUS-310, HXU-2301)",
+  "research project codes (e.g. HXR-2026-07)",
+  "site and building names",
+  "public role titles without a name (\"the CEO\", \"the Finance Manager\")",
+  "the institute's own ABN",
+  "public reception or switchboard numbers",
+  "field and column names from internal systems",
+  "dates of public events"
+ ]
+}

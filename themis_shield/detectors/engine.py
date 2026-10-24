@@ -1,0 +1,272 @@
+"""Tiered detection, ordered by model across a batch.
+
+A residency belongs to one complete finder tier, including gaps between calls.
+Per-document timings include preparation/finalisation and the first document
+in each finder tier is charged that tier's residency acquisition time.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from contextlib import nullcontext
+from dataclasses import dataclass, field, replace
+import logging
+from math import isfinite
+import os
+from pathlib import Path
+from time import perf_counter
+from types import MappingProxyType
+from typing import Callable
+
+from ..types import Label
+from .allowlist import AllowList, apply_allowlist, compile_profile
+from .contracts import (
+    DetectionFinding, DetectionResult, DetectionTargets, StageReport,
+    StageResult, Status, sensitivity, validate_findings,
+)
+from .escalation import INJECTION, EscalationInput, escalation_reasons
+from .llm_finder import FinderModel, LLMFinder
+from .pii_tracer import PIITracerDetector, PIITracerSpec
+from .propagate import propagate
+from .rules import RulesDetector
+from .union import union_findings
+
+
+TIER1_STAGES = ("rules", "pii-tracer", "propagate-tier1", "allowlist-tier1")
+FINAL_STAGES = ("union-final", "propagate-final", "allowlist-final")
+LLM_STAGES = ("gemma4-e4b", "gemma4-26b-a4b")
+_LOG = logging.getLogger("themis_shield.detection")
+
+
+def _simple(stage, findings):
+    return StageResult(findings, StageReport(stage, Status.OK))
+
+
+def _run(text: str, stage: str, call: Callable[[], StageResult]) -> StageResult:
+    began = perf_counter()
+    try:
+        result = call()
+        if not isinstance(result, StageResult) or not isinstance(result.report, StageReport):
+            raise ValueError("invalid-stage-output")
+        validate_findings(text, result.findings)
+        report = result.report
+        if not isinstance(report.status, Status):
+            raise ValueError("invalid-stage-status")
+        score = sensitivity(report.doc_sensitivity)
+        if type(report.values_not_found) is not int or report.values_not_found < 0:
+            raise ValueError("invalid-stage-count")
+        errors = {
+            Status.FAILED: "stage-failed",
+            Status.TIMEOUT: "stage-timeout",
+            Status.MALFORMED: (
+                "unmatched-llm-value" if report.values_not_found else "malformed-output"
+            ),
+        }
+        return StageResult(result.findings, StageReport(
+            stage, report.status, len(result.findings),
+            sum(Label.PERSON in item.labels for item in result.findings),
+            score, report.values_not_found, errors.get(report.status),
+        ))
+    except TimeoutError:
+        return StageResult((), StageReport(stage, Status.TIMEOUT, error_code="stage-timeout"))
+    except (ValueError, TypeError, KeyError, IndexError):
+        return StageResult((), StageReport(stage, Status.MALFORMED, error_code="malformed-output"))
+    except Exception:
+        return StageResult((), StageReport(stage, Status.FAILED, error_code="stage-failed"))
+    finally:
+        if os.environ.get("THEMIS_DEBUG") == "1":
+            # Fixed stage identifier and duration only. No exception formatting.
+            _LOG.info("stage=%s duration_ms=%.3f", stage, (perf_counter() - began) * 1000)
+
+
+@dataclass
+class _Document:
+    text: str = field(repr=False)
+    statuses: dict = field(default_factory=dict)
+    timings: dict = field(default_factory=dict)
+    compiled: AllowList | None = None
+    raw: tuple = ()
+    tracer: StageReport | None = None
+    injection: bool = False
+    reasons: tuple = ()
+    tiers: list = field(default_factory=lambda: [1])
+    llm_findings: list = field(default_factory=list)
+
+
+def _tier1(document, profile, targets):
+    text = document.text
+    began = perf_counter()
+    rules = _run(text, "rules", lambda: RulesDetector().detect(text))
+    tracer = _run(text, "pii-tracer", lambda: targets.tracer.detect(text))
+    document.statuses.update({"rules": rules.report, "pii-tracer": tracer.report})
+    document.tracer = tracer.report
+    document.raw = union_findings(rules.findings, tracer.findings)
+    propagated = _run(
+        text, "propagate-tier1",
+        lambda: _simple("propagate-tier1", propagate(text, document.raw)),
+    )
+    document.statuses["propagate-tier1"] = propagated.report
+
+    def project():
+        document.compiled = compile_profile(profile)
+        return _simple(
+            "allowlist-tier1",
+            apply_allowlist(text, propagated.findings, document.compiled),
+        )
+
+    projected = _run(text, "allowlist-tier1", project)
+    document.statuses["allowlist-tier1"] = projected.report
+    findings = (
+        projected.findings if projected.report.status == Status.OK
+        else propagated.findings
+    )
+    document.injection = bool(INJECTION.search(text))
+    document.reasons = escalation_reasons(EscalationInput(
+        len(text), bool(findings), tracer.report.doc_sensitivity,
+        targets.has_attachment, document.injection, targets.thorough,
+    ))
+    if targets.local_only:
+        document.reasons = ()
+    document.timings[1] = (perf_counter() - began) * 1000
+
+
+def _raise(error):
+    raise error
+
+
+def _finder_tier(documents, targets, tier, model):
+    selected = [document for document in documents if document.reasons]
+    if not selected:
+        return
+    for document in selected:
+        document.tiers.append(tier)
+
+    client = targets.llm_client
+    residency = getattr(client, "residency", None)
+    began = perf_counter()
+    try:
+        if client is None:
+            raise RuntimeError("required-llm-client-unavailable")
+        context = residency(model.value) if residency is not None else nullcontext(client)
+        with context as resident:
+            acquisition_ms = (perf_counter() - began) * 1000
+            for index, document in enumerate(selected):
+                start = perf_counter()
+                result = _run(
+                    document.text, model.value,
+                    lambda document=document: LLMFinder(
+                        model, resident, targets.llm_max_tokens,
+                    ).detect(document.text),
+                )
+                document.statuses[model.value] = result.report
+                document.llm_findings.append(result.findings)
+                document.timings[tier] = (
+                    (perf_counter() - start) * 1000
+                    + (acquisition_ms if index == 0 else 0)
+                )
+    except Exception as error:
+        # Entry/exit failures invalidate this tier for every affected document.
+        # Tier 3 still runs following a tier-2 failure.
+        elapsed = (perf_counter() - began) * 1000
+        for index, document in enumerate(selected):
+            result = _run(
+                document.text, model.value,
+                lambda error=error: _raise(error),
+            )
+            document.statuses[model.value] = result.report
+            document.timings.setdefault(tier, elapsed if index == 0 else 0.0)
+
+
+def _finish(document):
+    text = document.text
+    began = perf_counter()
+    merged = _run(
+        text, "union-final",
+        lambda: _simple("union-final", union_findings(document.raw, *document.llm_findings)),
+    )
+    document.statuses["union-final"] = merged.report
+    tier = document.tiers[-1]
+    propagated = _run(
+        text, "propagate-final",
+        lambda: _simple(
+            "propagate-final",
+            propagate(text, merged.findings, "propagate-final", tier),
+        ),
+    )
+    document.statuses["propagate-final"] = propagated.report
+
+    def project():
+        if document.compiled is None:
+            raise ValueError("invalid-deployment-profile")
+        return _simple(
+            "allowlist-final",
+            apply_allowlist(text, propagated.findings, document.compiled),
+        )
+
+    final = _run(text, "allowlist-final", project)
+    document.statuses["allowlist-final"] = final.report
+    findings = (
+        final.findings if final.report.status == Status.OK
+        else union_findings(merged.findings, propagated.findings)
+    )
+    document.timings[tier] += (perf_counter() - began) * 1000
+    if any(not isfinite(value) or value < 0 for value in document.timings.values()):
+        raise RuntimeError("invalid-timing")
+    result = DetectionResult(
+        findings=findings,
+        doc_sensitivity=document.tracer.doc_sensitivity,
+        tiers_run=tuple(document.tiers),
+        escalation_reasons=document.reasons,
+        stage_status=MappingProxyType(document.statuses),
+        timings_ms=MappingProxyType(document.timings),
+        redaction_counts=MappingProxyType(dict(Counter(
+            label for item in findings for label in item.labels
+        ))),
+        injection_signal=document.injection,
+    )
+    from ..policy import decide
+    return replace(result, policy_result=decide(result))
+
+
+def detect_batch(texts, profile, targets=None, *, thorough):
+    """Return results in input order, without reducing requested tier coverage.
+
+    `thorough=False` cannot weaken `targets.thorough=True`.
+    LOCAL_ONLY retains the existing trusted local-preview semantics.
+    A client without the optional residency context remains a supported fake
+    or adapter; the application-owned client implements residency explicitly.
+    """
+    if isinstance(texts, (str, bytes)):
+        raise TypeError("detection-input-must-be-text-sequence")
+    texts = tuple(texts)
+    if any(not isinstance(text, str) for text in texts):
+        raise TypeError("detection-input-must-be-text")
+    if type(thorough) is not bool:
+        raise TypeError("invalid-request-metadata")
+    targets = DetectionTargets() if targets is None else targets
+    if not isinstance(targets, DetectionTargets):
+        raise TypeError("invalid-detection-targets")
+    if any(type(getattr(targets, name)) is not bool for name in (
+        "has_attachment", "thorough", "local_only",
+    )):
+        raise TypeError("invalid-request-metadata")
+    if not texts:
+        return []
+    targets = replace(targets, thorough=targets.thorough or thorough)
+    if targets.tracer is None:
+        targets = replace(targets, tracer=PIITracerDetector(PIITracerSpec(
+            Path(targets.tracer_model_directory),
+            targets.tracer_artefact_manifest_id,
+            targets.tracer_cpu_threads,
+        )))
+    documents = [_Document(text) for text in texts]
+    for document in documents:
+        _tier1(document, profile, targets)
+    _finder_tier(documents, targets, 2, FinderModel.E4B)
+    _finder_tier(documents, targets, 3, FinderModel.GEMMA_26B_A4B)
+    return [_finish(document) for document in documents]
+
+
+def detect(text, profile, targets=None):
+    """Inspect one complete original textual surface."""
+    return detect_batch([text], profile, targets, thorough=False)[0]

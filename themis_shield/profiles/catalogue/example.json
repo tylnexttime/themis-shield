@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "comment": "Example catalogue profile. Entries patch a built-in (same id) or add a complete new entry. 'comment' keys are ignored. Select it with [runtime] catalogue = \"example\", or copy it into your profiles directory under another name.",
+  "models": [
+    {"id": "gemma4-e4b", "display_name": "Gemma 4 E4B Q4_K_M (example override)"},
+    {
+      "comment": "The shipped 26B finder, spelled out (it matches the built-in default): UD-IQ3_XXS with 18 expert layers on the CPU and an mmap fallback for low RAM, as adopted by the frozen evaluation (same recall as UD-IQ4_XS, about 1.5x faster generation). Alternative: the larger UD-IQ4_XS weights, file \"gemma-4-26B-A4B-it-UD-IQ4_XS.gguf\" with args [\"-ngl\", \"99\", \"-ncmoe\", \"20\", \"-c\", \"16384\"], as the two answer-model entries below use.",
+      "id": "gemma4-26b-a4b",
+      "display_name": "Gemma 4 26B-A4B UD-IQ3_XXS",
+      "file": "gemma-4-26B-A4B-it-UD-IQ3_XXS.gguf",
+      "args": ["-ngl", "99", "-ncmoe", "18", "-c", "16384"],
+      "variants": [
+        {"mode": "mmap", "est_ram_gb": 8.5, "est_vram_gb": 7.1, "min_vram_gb": 7.1,
+         "expected_prompt_tok_s": 29.0, "expected_tok_s": 7.3}
+      ]
+    },
+    {
+      "comment": "Strata attach. themis never starts, installs or updates Strata: start it yourself first. 'endpoint' must be http on 127.0.0.1 (loopback only; anything else is refused). 'served_model' must match the id Strata lists at /v1/models; attaching checks /health (loaded) and /v1/models. 'min_max_tokens' is a floor for this thinking model, whose reasoning counts against max_tokens. Strata is an answering model only (role 'answer'); it is not evaluated as a PII finder. While Strata is attached, est_vram_gb counts as occupied GPU memory, so no llama-server is started beside it that cannot fit. Use it as model themis/local:strata-qwen3.8-flash-next, or make it the default 'answer' model with role_models in the runtime settings.",
+      "id": "strata-qwen3.8-flash-next",
+      "endpoint": "http://127.0.0.1:8095/v1",
+      "served_model": "qwen3.8-flash-next-gyro-s",
+      "min_max_tokens": 8192
+    },
+    {
+      "comment": "Marian-planned llama.cpp entry. Before each load, themis asks Marian (optional extra, from https://github.com/tylnexttime/marian) for the fastest measured configuration at this entry's ctx, from SAVED profiles only (running 'python -m marian profile' is up to you, when the GPU is free). The plan replaces 'args' and 'ctx' and passes the same allow-list. If Marian is missing, has no profile for this machine and model, or nothing measured fits, the 'args' below are used and the runtime log says why. The memory estimates stay mandatory; a plan's measured VRAM peak can only raise est_vram_gb. Kept to the 'answer' role: the finder roles were evaluated with fixed arguments.",
+      "id": "gemma4-26b-a4b-planned",
+      "display_name": "Gemma 4 26B-A4B UD-IQ4_XS (Marian-planned)",
+      "runtime": "llamacpp",
+      "planner": "marian",
+      "file": "gemma-4-26B-A4B-it-UD-IQ4_XS.gguf",
+      "args": ["-ngl", "99", "-ncmoe", "20", "-c", "16384"],
+      "ctx": 16384,
+      "roles": ["answer"],
+      "est_vram_gb": 7.1, "est_ram_gb": 16.0, "min_vram_gb": 7.1,
+      "expected_tok_s": 23.6, "expected_prompt_tok_s": 658.0, "expected_load_s": 13.6
+    },
+    {
+      "comment": "Alternative engine. 'engine_path' is relative to the engines directory ([runtime] engines_dir, default <app data>/engine): here a llama-server built with Marian's expert-cache patches (drop .exe outside Windows). 'engine_args' are extra flags for that engine, allow-listed: --moe-cache-mib, --moe-tier-mib, --moe-ring-mib (numbers) and --moe-miss-source (mmap, ring or tier). Endpoint, logging, file and network flags are always refused.",
+      "id": "gemma4-26b-a4b-patched",
+      "display_name": "Gemma 4 26B-A4B UD-IQ4_XS (patched engine, pinned RAM tier)",
+      "runtime": "llamacpp",
+      "engine_path": "marian-patched/llama-server.exe",
+      "engine_args": ["--moe-miss-source", "tier", "--moe-tier-mib", "6144"],
+      "file": "gemma-4-26B-A4B-it-UD-IQ4_XS.gguf",
+      "args": ["-ngl", "99", "-ncmoe", "20", "-c", "16384"],
+      "ctx": 16384,
+      "roles": ["answer"],
+      "est_vram_gb": 7.1, "est_ram_gb": 16.0, "min_vram_gb": 7.1,
+      "expected_tok_s": 23.6, "expected_prompt_tok_s": 658.0
+    }
+  ]
+}

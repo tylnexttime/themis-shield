@@ -1,0 +1,15 @@
+{
+  "_about": "Synthetic checksum regression vectors; no identifiers checked against any register. The USI vector is also a supplied worked example.",
+  "valid": {
+    "USI": "223456789N",
+    "TFN": "731 842 658",
+    "MEDICARE": "3456 78908 1",
+    "ABN": "51 824 750 770"
+  },
+  "invalid": {
+    "USI": "223456789P",
+    "TFN": "731 842 659",
+    "MEDICARE": "3456 78909 1",
+    "ABN": "51 824 750 771"
+  }
+}

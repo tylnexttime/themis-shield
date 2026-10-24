@@ -1,0 +1,15 @@
+{
+  "_comment": "Illustrative policy intent, not a verified current Kilo schema. The administrator must translate and validate this against the deployed extension, then lock the custom provider through %ProgramData%/kilo/kilo.json. The API key is the per-install local gate token, provisioned separately, never a Claude subscription or cloud key. The administrator must also set KILO_DISABLE_SESSION_INGEST=true and VS Code TelemetryLevel=off. Disable the Kilo gateway and Claude Code providers and disable autocomplete: autocomplete uses Kilo's own gateway and bypasses this gate. Windows has no Kilo sandbox.",
+  "custom_provider": {
+    "apiProvider": "openai",
+    "openAiBaseUrl": "http://127.0.0.1:8742/v1",
+    "openAiModelId": "themis/auto"
+  },
+  "disabled_providers": [
+    "kilocode",
+    "claude-code"
+  ],
+  "autocomplete": {
+    "enabled": false
+  }
+}

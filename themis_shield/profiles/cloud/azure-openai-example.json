@@ -1,0 +1,10 @@
+{
+  "_comment": "Example: Azure OpenAI deployment. base_url ends with the deployment path; the key goes in an api-key header.",
+  "base_url": "https://your-resource.openai.azure.com/openai/deployments/your-deployment",
+  "model": "your-deployment",
+  "api_key_env": "AZURE_OPENAI_API_KEY",
+  "auth_style": "api-key",
+  "api_version": "2024-10-21",
+  "destination_id": "azure-openai",
+  "deployment_type": "regional-standard"
+}

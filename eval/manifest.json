@@ -1,0 +1,409 @@
+{
+ "name": "themis-shield synthetic de-identification evaluation set",
+ "licence": "Apache-2.0",
+ "synthetic": true,
+ "seeds": {
+  "generator_a": 73102026,
+  "generator_b": 44179031
+ },
+ "cases": {
+  "total": 521,
+  "A/dev": 114,
+  "A/test": 150,
+  "B/dev": 111,
+  "B/test": 146,
+  "dev": 225,
+  "test": 296,
+  "no_personal_information": 60,
+  "with_injection": 73
+ },
+ "gold_spans": 4483,
+ "hard_negative_markers": 1096,
+ "labels": {
+  "PERSON": {
+   "spans": 1466,
+   "cases": 394,
+   "A/dev": 359,
+   "A/test": 453,
+   "B/dev": 263,
+   "B/test": 391
+  },
+  "USERNAME": {
+   "spans": 164,
+   "cases": 44,
+   "A/dev": 33,
+   "A/test": 35,
+   "B/dev": 63,
+   "B/test": 33
+  },
+  "INTERNAL_ID": {
+   "spans": 229,
+   "cases": 106,
+   "A/dev": 20,
+   "A/test": 30,
+   "B/dev": 46,
+   "B/test": 133
+  },
+  "TFN": {
+   "spans": 111,
+   "cases": 39,
+   "A/dev": 19,
+   "A/test": 44,
+   "B/dev": 21,
+   "B/test": 27
+  },
+  "MEDICARE": {
+   "spans": 96,
+   "cases": 28,
+   "A/dev": 19,
+   "A/test": 37,
+   "B/dev": 18,
+   "B/test": 22
+  },
+  "ABN": {
+   "spans": 89,
+   "cases": 26,
+   "A/dev": 16,
+   "A/test": 29,
+   "B/dev": 21,
+   "B/test": 23
+  },
+  "NATIONAL_ID": {
+   "spans": 84,
+   "cases": 21,
+   "A/dev": 19,
+   "A/test": 25,
+   "B/dev": 16,
+   "B/test": 24
+  },
+  "DRIVER_LICENCE": {
+   "spans": 92,
+   "cases": 29,
+   "A/dev": 22,
+   "A/test": 26,
+   "B/dev": 19,
+   "B/test": 25
+  },
+  "PASSPORT": {
+   "spans": 88,
+   "cases": 25,
+   "A/dev": 16,
+   "A/test": 26,
+   "B/dev": 18,
+   "B/test": 28
+  },
+  "BANK_ACCOUNT": {
+   "spans": 96,
+   "cases": 35,
+   "A/dev": 25,
+   "A/test": 38,
+   "B/dev": 26,
+   "B/test": 7
+  },
+  "PAYMENT_CARD": {
+   "spans": 100,
+   "cases": 30,
+   "A/dev": 19,
+   "A/test": 30,
+   "B/dev": 26,
+   "B/test": 25
+  },
+  "EMAIL": {
+   "spans": 177,
+   "cases": 112,
+   "A/dev": 52,
+   "A/test": 62,
+   "B/dev": 14,
+   "B/test": 49
+  },
+  "PHONE": {
+   "spans": 220,
+   "cases": 183,
+   "A/dev": 55,
+   "A/test": 70,
+   "B/dev": 29,
+   "B/test": 66
+  },
+  "ADDRESS": {
+   "spans": 83,
+   "cases": 59,
+   "A/dev": 24,
+   "A/test": 33,
+   "B/dev": 13,
+   "B/test": 13
+  },
+  "DATE_OF_BIRTH": {
+   "spans": 142,
+   "cases": 76,
+   "A/dev": 40,
+   "A/test": 50,
+   "B/dev": 23,
+   "B/test": 29
+  },
+  "OTHER_DATE": {
+   "spans": 294,
+   "cases": 160,
+   "A/dev": 45,
+   "A/test": 66,
+   "B/dev": 90,
+   "B/test": 93
+  },
+  "URL_PERSONAL": {
+   "spans": 95,
+   "cases": 26,
+   "A/dev": 19,
+   "A/test": 29,
+   "B/dev": 19,
+   "B/test": 28
+  },
+  "SECRET": {
+   "spans": 96,
+   "cases": 42,
+   "A/dev": 18,
+   "A/test": 36,
+   "B/dev": 13,
+   "B/test": 29
+  },
+  "QUASI_ID": {
+   "spans": 92,
+   "cases": 54,
+   "A/dev": 20,
+   "A/test": 32,
+   "B/dev": 19,
+   "B/test": 21
+  },
+  "HEALTH": {
+   "spans": 118,
+   "cases": 110,
+   "A/dev": 28,
+   "A/test": 27,
+   "B/dev": 27,
+   "B/test": 36
+  },
+  "DISABILITY": {
+   "spans": 74,
+   "cases": 71,
+   "A/dev": 14,
+   "A/test": 23,
+   "B/dev": 19,
+   "B/test": 18
+  },
+  "ETHNICITY": {
+   "spans": 79,
+   "cases": 78,
+   "A/dev": 16,
+   "A/test": 25,
+   "B/dev": 16,
+   "B/test": 22
+  },
+  "SEXUALITY": {
+   "spans": 81,
+   "cases": 80,
+   "A/dev": 15,
+   "A/test": 25,
+   "B/dev": 19,
+   "B/test": 22
+  },
+  "RELIGION": {
+   "spans": 83,
+   "cases": 82,
+   "A/dev": 14,
+   "A/test": 27,
+   "B/dev": 20,
+   "B/test": 22
+  },
+  "CRIMINAL": {
+   "spans": 79,
+   "cases": 77,
+   "A/dev": 16,
+   "A/test": 27,
+   "B/dev": 18,
+   "B/test": 18
+  },
+  "FAMILY_VIOLENCE": {
+   "spans": 76,
+   "cases": 76,
+   "A/dev": 14,
+   "A/test": 22,
+   "B/dev": 19,
+   "B/test": 21
+  },
+  "UNION": {
+   "spans": 79,
+   "cases": 64,
+   "A/dev": 21,
+   "A/test": 25,
+   "B/dev": 9,
+   "B/test": 24
+  }
+ },
+ "genres": {
+  "assistant_request": {
+   "B/dev": 6,
+   "B/test": 7
+  },
+  "case_notes": {
+   "A/dev": 14,
+   "A/test": 16,
+   "B/dev": 14,
+   "B/test": 14
+  },
+  "chat": {
+   "B/dev": 3,
+   "B/test": 3
+  },
+  "chat_log": {
+   "A/dev": 3,
+   "A/test": 6
+  },
+  "code_config": {
+   "A/dev": 6,
+   "A/test": 8,
+   "B/dev": 3,
+   "B/test": 5
+  },
+  "email": {
+   "A/dev": 6,
+   "A/test": 13,
+   "B/dev": 6,
+   "B/test": 11
+  },
+  "form": {
+   "A/dev": 9,
+   "A/test": 8
+  },
+  "hard_negative": {
+   "A/dev": 6,
+   "A/test": 10,
+   "B/dev": 7,
+   "B/test": 10
+  },
+  "hr_case": {
+   "B/dev": 5,
+   "B/test": 6
+  },
+  "hr_letter": {
+   "A/dev": 6,
+   "A/test": 6
+  },
+  "identity_records": {
+   "A/dev": 3,
+   "A/test": 4,
+   "B/dev": 3,
+   "B/test": 4
+  },
+  "incident_report": {
+   "A/dev": 3,
+   "A/test": 6
+  },
+  "injection": {
+   "A/dev": 14,
+   "A/test": 20,
+   "B/dev": 10,
+   "B/test": 16
+  },
+  "injection_contextual": {
+   "B/dev": 2,
+   "B/test": 4
+  },
+  "injection_negative": {
+   "B/dev": 3,
+   "B/test": 4
+  },
+  "long_document": {
+   "A/dev": 1,
+   "A/test": 2,
+   "B/dev": 1,
+   "B/test": 2
+  },
+  "meeting_notes": {
+   "A/dev": 3,
+   "A/test": 3
+  },
+  "minutes": {
+   "B/dev": 3,
+   "B/test": 3
+  },
+  "multilingual": {
+   "A/dev": 8,
+   "A/test": 9,
+   "B/dev": 8,
+   "B/test": 11
+  },
+  "negative": {
+   "A/dev": 4,
+   "A/test": 5,
+   "B/dev": 3,
+   "B/test": 5
+  },
+  "obfuscation": {
+   "A/dev": 3,
+   "A/test": 3
+  },
+  "partial_coverage": {
+   "B/dev": 3,
+   "B/test": 4
+  },
+  "quasi_identifier": {
+   "A/dev": 10,
+   "A/test": 12,
+   "B/dev": 10,
+   "B/test": 10
+  },
+  "research": {
+   "B/dev": 3,
+   "B/test": 3
+  },
+  "safety": {
+   "B/dev": 3,
+   "B/test": 3
+  },
+  "sensitive": {
+   "A/dev": 6,
+   "A/test": 6
+  },
+  "service_desk": {
+   "B/dev": 6,
+   "B/test": 6
+  },
+  "support_ticket": {
+   "A/dev": 3,
+   "A/test": 7
+  },
+  "tabular": {
+   "A/dev": 6,
+   "A/test": 6,
+   "B/dev": 6,
+   "B/test": 9
+  },
+  "wellbeing": {
+   "B/dev": 3,
+   "B/test": 6
+  }
+ },
+ "sensitive_categories": {
+  "criminal": 77,
+  "disability": 71,
+  "ethnicity": 78,
+  "family_violence": 76,
+  "health": 110,
+  "religion": 82,
+  "sexuality": 80,
+  "union": 64
+ },
+ "templates": {
+  "A": 101,
+  "B": 104,
+  "shared_between_dev_and_test": []
+ },
+ "sha256": {
+  "cases/dev.jsonl": "d663cca97191640518d93ed12938722285100e94666c57c56cc196d9d3568c25",
+  "cases/test.jsonl": "f1fbcb4311eb7579c1f309c3b9595e55b7dc253d73d7c0592196e0be258db792",
+  "generate_a.py": "ef2d6f9310a09a5ea88e1bdd54c166616294d8e3e1ab3faa06b2fe89b75ed4bb",
+  "generate_b.py": "92a88860dce8de3e8e89419dccb2b6203201c4d88a7b389939171e5d1967d741",
+  "build.py": "fe6432bf30874a39c7b445fba0ebabd4f891840b98ba877aaadf1cd09788a15d",
+  "score.py": "72f5bf07c7c60d062e513b9cb1371aad91f51c1d55a56bd1a75e1fb9db5372e4",
+  "taxonomy.md": "90611d0a05963e08cceea7dbb22f2a32bceec65a957b3765818b53de931a5159",
+  "profiles/harbourline.json": "a4a787aa0f0730fc546a47951288c5cf5884c8d426040a0fc8df32c94d444f04"
+ }
+}
