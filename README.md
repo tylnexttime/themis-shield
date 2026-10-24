@@ -151,6 +151,15 @@ Read this section before you rely on anything above.
   the context around a placeholder can still single someone out. ASK exists because of this; it doesn't make the
   risk zero ([OAIC](https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/handling-personal-information/de-identification-and-the-privacy-act);
   [NIST SP 800-188](https://csrc.nist.gov/pubs/sp/800/188/final)).
+- **v0.2's exemptions have known costs:**
+  - when both finders find nothing, a PII-Tracer finding below 0.9 confidence no longer holds the document. That
+    floor was fitted on one development case, and the narrowed rule hasn't yet been shown to catch a real double
+    miss;
+  - a bare weekday or time is cancelled whichever detector found it (on split C this removed the only touch on one
+    union statement, in a held document);
+  - a date of birth that falls on one of the organisation's public dates is cancelled;
+  - requiring a digit in a USI also drops about 1 in 18 genuine USIs from the rule (the LLM finders remain the
+    backstop), in exchange for no longer matching about 1 in 32 ordinary ten-letter words.
 - **Quasi-identifiers are substituted, not held.** A found quasi-identifier is replaced, but it doesn't hold the
   document for a human (`[policy] quasi_id_ask = true` changes that). v0.2's table pass finds rare values in
   "anonymised" tables (97.6% recall on our fresh split), but it also flags common job titles, so tables get
@@ -178,7 +187,7 @@ Read this section before you rely on anything above.
   skeleton.
 - **Windows-tested only.** The code is written to be portable (paths, the passphrase vault), but no Linux or macOS
   run has been done.
-- **Slow on purpose.** Every document goes through both finders, taking a median of 10 seconds (mean 14) on an
+- **Slow on purpose.** Every document goes through both finders, taking a median of 12.6 seconds (mean 14.2) on an
   8 GB laptop GPU. It is built for careful work, not for high volume.
 - **No recorded run against a commercial cloud model since this rebuild.** The cloud leg is tested against a stand-in
   endpoint.
@@ -371,7 +380,8 @@ union, allow-list, policy), and `eval/score.py` scores it. Each release follows 
 | Decisions RELEASE / ASK / BLOCK | 97 / 211 / 63 | 82 / 226 / 63 |
 
 **Verdict: v0.2 failed its pass rule on friction**, 0.200 against a limit of 0.15. It met every other condition,
-including being no worse than the control on each of them.
+staying within the rule's margin of the control on each of them (sensitive R_any 0.954 against 0.955, inside
+the 0.005 allowed).
 - **The rule v0.2 changed** accounts for only 6 of the 19 holds (down from 21).
 - **The rest** come from causes that never appeared in a clean development case:
   - fiction and a policy FAQ read as sensitive statements (7);

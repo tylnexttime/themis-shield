@@ -21,6 +21,17 @@ and every site, building, committee, mailbox and code in `profiles/harbourline.j
 | `build.py` | Runs both generators, validates everything with its own checksum code, writes the cases and manifest. |
 | `score.py` | Scorer, with `--self-test`. |
 
+## Split C: the v0.2 held-out test
+
+`cases/test-c.jsonl` (371 cases, 3,686 gold spans, 95 clean, 42 injection cases; sha256
+`39ea2f9595c959f19f2d15607003159f42349ce9ca485f0cf2777d674f2e9ab9`) was written for v0.2 by a separate author, a
+different Claude model, who saw only `taxonomy.md`, the format sections of this README, `score.py`'s format and
+`profiles/harbourline.json`. Its generator is in [`generator_c/`](generator_c/README_C.md). With v0.2 the original
+521 cases above became development data, because their test split had been opened. Results:
+[`RESULTS-v0.2.md`](RESULTS-v0.2.md); plan: [`FROZEN-PLAN-v0.2.md`](FROZEN-PLAN-v0.2.md). The runner takes any case
+file with `--cases`, can capture and replay finder answers (`--capture-finders`, `--replay-finders`), and selects
+v0.1 or v0.2 behaviour with `--gate-version`.
+
 ## How it was built
 
 **Two independent generators.** A and B share no templates, no name pools (the build fails if a name token appears

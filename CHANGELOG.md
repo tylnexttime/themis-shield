@@ -9,21 +9,28 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
   policy: 0.358). Fails its own pass rule on friction (limit 0.15); see eval/RESULTS-v0.2.md.
 
 - Policy: when both LLM finders return nothing, only PII-Tracer findings that
-  survive the allow-list count as contrary evidence, by label; a date the
+  survive the allow-list, with a confidence of at least 0.9 (a floor fitted on
+  one development case), count as contrary evidence, by label; a tracer
+  document sensitivity of 0.5 or more still holds the document; a date the
   tracer flags that cannot be a date of birth no longer holds a document.
   `[policy] quasi_id_ask` makes a found quasi-identifier hold the document
   for ASK.
 - Detection: a column-aware pass marks rare categorical values (role, title,
   team, site, attribute) as quasi-identifiers in tables with identifier-like
   columns or an "anonymised" label; tracer dates with a time of day, bare
-  weekdays and the organisation's public dates become OTHER_DATE; trailing
+  weekdays and the organisation's public dates become OTHER_DATE, and a bare
+  weekday or time is cancelled whichever stage found it (known cost: a
+  personal date on a public date, or a weekday that was the only touch on a
+  statement, goes unredacted); trailing
   punctuation no longer defeats the role-mailbox allow-list; a USI must
-  contain a digit; the organisation's own ABN is allow-listed even when
+  contain a digit (this drops about 1 in 18 genuine USIs from the rule, in
+  exchange for about 1 in 32 ordinary ten-letter words no longer matching); the organisation's own ABN is allow-listed even when
   checksum-valid.
 - `[detection] version` and `[policy] version` (`v0.2` default; `v0.1`
   restores the evaluated v0.1 behaviour as a negative control).
 - Evaluation runner: `--cases`, `--capture-finders` / `--replay-finders`
-  (refuses a changed prompt or model), `--gate-version`; timings moved to
+  (refuses a changed prompt, or a changed model file name, launch arguments
+  or context; the weights' content is not hashed), `--gate-version`; timings moved to
   `timings.jsonl`. Development log in `eval/V02-DEV-LOG.md`.
 
 ## 0.1.0 (24/10/2026)

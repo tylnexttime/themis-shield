@@ -169,7 +169,7 @@ iteration-3 plan above ("accepted if ... released leaks and friction do not rise
 and would have changed the rule; the rule written first stands.
 
 **Iteration 3 is not adopted for v0.2** (decided before the freeze, keeping the rule written first). Its change is
-kept, unmerged, as a **v0.3 candidate** on branch `v0.2-it3-date-exemptions` (one commit, based on the pre-rewrite
+kept, unmerged, as a **v0.3 candidate** on a branch kept privately (`v0.2-it3-date-exemptions`, not published) (one commit, based on the pre-rewrite
 history): it closes a recall hole (a person's date on a public day is cancelled when the tracer's label was
 normalised) at the cost of four touched public dates. The v0.2 test runs do not include it.
 

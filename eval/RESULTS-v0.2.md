@@ -130,6 +130,14 @@ list (so in the prompt) and that split C's author used as a hard negative. The t
 verbatim from do-not-flag items; every other shared 8-gram still fails it. No detector, policy, prompt, profile or
 scorer change.
 
+**Errata (recorded after the run; the frozen plan itself is not edited).**
+- `FROZEN-PLAN-v0.2.md` says split C's author was "another model family". That is wrong: it was a different model
+  of the same family (Claude, Fable 5.1). The author also read the format sections of `eval/README.md`, besides the
+  taxonomy, the scorer's format and the profile.
+- The plan names the iteration-3 branch; that branch is kept privately and is not published.
+- `eval/generator_c/generate_c.py` writes `cases_c.jsonl`; the same bytes are published as `eval/cases/test-c.jsonl`.
+  To reproduce, copy the generator next to a copy of the file under that name, or run it and compare.
+
 ## 7. Limitations
 
 1. One run per arm on one machine. Finder output is not bit-for-bit reproducible between live runs; the control's
@@ -139,3 +147,8 @@ scorer change.
 3. 95 clean cases: one case moves friction by 0.011.
 4. The empty-finder rule's safety purpose remains untested on real misses.
 5. Not cleared for real personal data: `[gate] synthetic_only = true` still applies.
+5. 183 of split C's 371 cases come from the Harbourline profile, whose hard negatives are all profile values. On
+   that half, friction and over-redaction measure the allow-list mechanism, not generalisation to organisations no
+   profile describes.
+6. The control column is v0.1's detection and policy replayed on v0.2's captured finder output, not the released
+   v0.1 run live.
