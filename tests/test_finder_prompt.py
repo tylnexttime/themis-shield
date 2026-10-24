@@ -86,13 +86,19 @@ def test_v2_prompt_shares_no_8_gram_with_any_evaluation_case():
                 case_grams |= _ngrams(json.loads(line)["text"])
     assert case_grams
     rendered = [llm_finder.V2_USER.replace("{text}", " ")]
+    # The institution profile's own public terms (course names, sites) are deployment data: the prompt lists them
+    # as "do not flag" items and the evaluation cases use them as hard negatives, by design. Overlap there is not
+    # contamination; any other shared 8-gram is.
+    profile_grams = set()
     for profile in (None, "harbourline-eval", "harbourline-demo"):
+        do_not_flag = _profile(profile)["finder_do_not_flag"] if profile else None
         llm_finder.configure_finder(
-            context="a training and research institute", prompt_version="v2",
-            do_not_flag=_profile(profile)["finder_do_not_flag"] if profile else None,
+            context="a training and research institute", prompt_version="v2", do_not_flag=do_not_flag,
         )
         rendered.append(llm_finder.v2_system_prompt())
-    shared = set().union(*(_ngrams(text) & case_grams for text in rendered))
+        for item in do_not_flag or ():
+            profile_grams |= _ngrams(item)
+    shared = set().union(*(_ngrams(text) & case_grams for text in rendered)) - profile_grams
     assert not shared, sorted(" ".join(gram) for gram in shared)[:5]
 
 
