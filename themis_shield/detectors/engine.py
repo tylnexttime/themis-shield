@@ -25,10 +25,13 @@ from .contracts import (
     StageResult, Status, sensitivity, validate_findings,
 )
 from .escalation import INJECTION, EscalationInput, escalation_reasons
+from .labels import normalise_tracer_dates
 from .llm_finder import FinderModel, LLMFinder
 from .pii_tracer import PIITracerDetector, PIITracerSpec
+from .profile_adapter import adapt
 from .propagate import propagate
 from .rules import RulesDetector
+from .settings import v02
 from .union import union_findings
 
 
@@ -93,11 +96,25 @@ class _Document:
     llm_findings: list = field(default_factory=list)
 
 
+def _public_dates(profile) -> tuple[str, ...]:
+    """The deployment's public dates for tracer date normalisation; none when the profile cannot be read (the
+    allow-list stage reports an invalid profile itself)."""
+    try:
+        values = adapt(profile).get("date_literals", [])
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return ()
+    return tuple(value for value in values if isinstance(value, str))
+
+
 def _tier1(document, profile, targets):
     text = document.text
     began = perf_counter()
     rules = _run(text, "rules", lambda: RulesDetector().detect(text))
     tracer = _run(text, "pii-tracer", lambda: targets.tracer.detect(text))
+    if v02() and tracer.report.status == Status.OK:
+        tracer = StageResult(
+            normalise_tracer_dates(text, tracer.findings, _public_dates(profile)), tracer.report,
+        )
     document.statuses.update({"rules": rules.report, "pii-tracer": tracer.report})
     document.tracer = tracer.report
     document.raw = union_findings(rules.findings, tracer.findings)

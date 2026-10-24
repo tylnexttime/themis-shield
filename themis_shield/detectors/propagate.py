@@ -10,6 +10,7 @@ import re
 
 from ..types import Label, Span
 from .contracts import DetectionFinding, FindingEvidence, finding
+from .settings import v02
 from .union import union_findings
 
 
@@ -176,6 +177,111 @@ def extra_spans(
     return tuple(out)
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# v0.2: column-aware quasi-identifier pass for tables.
+#
+# A table that carries identifier-like columns (date of birth, age, postcode, dates) or is labelled anonymised or
+# de-identified can single a person out through a rare categorical value: the only "Fleet controller" next to a
+# redacted DOB and postcode is still one person. In such tables, a value of a categorical column (role, title, team,
+# site, attribute and close synonyms) that occurs at most QUASI_MAX_COUNT times in its column becomes QUASI_ID.
+# Deterministic and bounded; header vocabulary only, no learned model and nothing from any evaluation set.
+# ----------------------------------------------------------------------------------------------------------------------
+TABLE_QUASI_STAGE = "table-quasi"
+QUASI_MAX_COUNT = 2
+QUASI_MAX_ROWS = 5000
+QUASI_MAX_VALUE_CHARS = 80
+QUASI_CONTEXT_LINES = 3
+IDENTIFIER_HDR = re.compile(
+    r"(?i)\b(?:dob|d\s?o\s?b|date\s?of\s?birth|birth\s?date|birthdate|birthday|born|birth\s?year|"
+    r"year\s?of\s?birth|yob|age|ages|age\s?band|age\s?group|age\s?range|postcode|postcodes|post\s?code|"
+    r"postal\s?code|zip|zipcode|zip\s?code|date|dates)\b"
+)
+CATEGORY_HDR = re.compile(
+    r"(?i)\b(?:role|roles|job|job\s?title|title|position|occupation|profession|team|department|dept|division|"
+    r"section|unit|site|campus|location|branch|office|workplace|attribute|attributes|group|shift|grade|gender|"
+    r"sex|language|nationality|country)\b"
+)
+ANONYMISED = re.compile(
+    r"(?i)\b(?:anonymi[sz]ed|anonymous|de-?identified|deidentified|pseudonymi[sz]ed|names?\s+removed|"
+    r"names?\s+redacted|identifiers?\s+removed)\b"
+)
+_ALIGN_ROW = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$")
+_NOT_CATEGORICAL = re.compile(r"[\d\s\-./:,%$+()#]*")
+
+
+def _header_name(raw: str) -> str:
+    return re.sub(r"[\s_\-]+", " ", raw).strip()
+
+
+def table_quasi_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
+    lines = text.splitlines(keepends=True)
+    offsets, position = [], 0
+    for line in lines:
+        offsets.append(position)
+        position += len(line)
+    out, index = [], 0
+    while index < len(lines):
+        raw = lines[index].rstrip("\r\n")
+        header = raw.lstrip("﻿")
+        separator = max(SEPS, key=header.count)
+        if header.count(separator) < (2 if separator == "|" else 1):
+            index += 1
+            continue
+        try:
+            cells = _cells(header, separator)
+        except (csv.Error, ValueError, StopIteration):
+            index += 1
+            continue
+        names = [_header_name(header[a:b]) for a, b in cells]
+        identifier = {j for j, name in enumerate(names) if name and IDENTIFIER_HDR.search(name)}
+        category = {
+            j for j, name in enumerate(names)
+            if name and CATEGORY_HDR.search(name) and j not in identifier
+        }
+        if not category:
+            index += 1
+            continue
+        rows, row_index = [], index + 1
+        while row_index < len(lines) and len(rows) < QUASI_MAX_ROWS:
+            row = lines[row_index].rstrip("\r\n")
+            if separator == "|" and _ALIGN_ROW.fullmatch(row):
+                row_index += 1
+                continue
+            if not row.strip() or separator not in row:
+                break
+            try:
+                row_cells = _cells(row, separator)
+            except (csv.Error, ValueError, StopIteration):
+                break
+            if len(row_cells) != len(cells):
+                break
+            rows.append((row_index, row, row_cells))
+            row_index += 1
+        context = "".join(lines[max(0, index - QUASI_CONTEXT_LINES):index + 1])
+        if rows and (identifier or ANONYMISED.search(context)):
+            for column in sorted(category):
+                values = []
+                for line_no, row, row_cells in rows:
+                    a, b = row_cells[column]
+                    value = row[a:b]
+                    if (
+                        not value.strip() or len(value) > QUASI_MAX_VALUE_CHARS
+                        or _NOT_CATEGORICAL.fullmatch(value)
+                        or not any(ch.isalpha() for ch in value)
+                    ):
+                        continue
+                    values.append((offsets[line_no] + a, offsets[line_no] + b,
+                                   " ".join(value.split()).casefold()))
+                counts = {}
+                for _, _, key in values:
+                    counts[key] = counts.get(key, 0) + 1
+                for start, end, key in values:
+                    if counts[key] <= QUASI_MAX_COUNT:
+                        out.append(finding(start, end, Label.QUASI_ID, TABLE_QUASI_STAGE, tier))
+        index = row_index if rows else index + 1
+    return tuple(out)
+
+
 def propagate(
     text: str,
     spans: tuple[DetectionFinding, ...],
@@ -183,4 +289,6 @@ def propagate(
     tier: int = 1,
 ) -> tuple[DetectionFinding, ...]:
     base = union_findings(spans, table_spans(text, stage, tier))
+    if v02():
+        base = union_findings(base, table_quasi_spans(text, tier))
     return union_findings(base, extra_spans(text, base, stage, tier))

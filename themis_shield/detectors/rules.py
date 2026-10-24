@@ -25,6 +25,7 @@ import unicodedata
 
 from ..types import Label
 from .contracts import StageReport, StageResult, Status, finding
+from .settings import v02
 
 
 USI_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -261,6 +262,10 @@ class RulesDetector:
                     if validate_identifier(label, match.group()).checksum_valid:
                         emit(match.start(), match.end(), label, True)
             for match in USI_PATTERN.finditer(view):
+                # v0.2: the USI check character alone matches about one ordinary 10-letter word in 32
+                # ("Breakwater"), so a USI must also contain at least one digit.
+                if v02() and not any(ch.isdigit() for ch in match.group()):
+                    continue
                 if validate_identifier(Label.USI, match.group()).checksum_valid:
                     emit(match.start(), match.end(), Label.USI, True)
         patterns = [
