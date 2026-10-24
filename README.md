@@ -18,17 +18,18 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.1.0, preview.**
-- **Evaluation:** detection and policy were evaluated on a public synthetic data set, with 5 released leaks in 2,601
-  gold spans on the held-out split. It still **failed our own pre-registered pass rule**, because it asks too often on
-  clean documents (see [Evaluation](#evaluation)).
+**Status: v0.2.0, preview.**
+- **Evaluation:** detection and policy are tested on held-out synthetic splits, under a pass rule written before
+  each test. On a fresh split from an independent author, v0.2 released **0 leaks in 3,686 gold spans** and caught
+  97.6% of quasi-identifiers (v0.1: 73.8%). It still **failed its own friction rule**: 19 of 95 clean documents were
+  held for a human (0.200 against 0.15), down from 34 under v0.1's policy. See [Evaluation](#evaluation).
 - **The round trip** (de-identify, send, restore) is covered by automated tests against a stand-in cloud endpoint.
-- **Not cleared for real personal data.** By design, v0.1 refuses to start unless it is configured for synthetic
-  data.
+- **Not cleared for real personal data.** By design, themis-shield refuses to start unless it is configured for
+  synthetic data.
 
 ---
 
-- [Why](#why) · [So what](#so-what) · [Words we use](#words-we-use) · [What v0.1 lets you do](#what-v01-lets-you-do) ·
+- [Why](#why) · [So what](#so-what) · [Words we use](#words-we-use) · [What v0.2 lets you do](#what-v02-lets-you-do) ·
   [What it does not do yet](#what-it-does-not-do-yet)
 - [How it works](#how-it-works) · [Quick start](#quick-start) · [Claude Code hooks](#claude-code-hooks) ·
   [Evaluation](#evaluation) · [Back ends](#back-ends-llamacpp-marian-strata) · [Next](#next)
@@ -81,7 +82,7 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
 
 - **Gate:** themis-shield itself: the local check every prompt passes before it may leave.
 - **Tier 1 / tier 2:** the cheap detectors (rules and PII-Tracer, on the CPU) and the local LLM finders (on the GPU).
-  In v0.1 every document goes through both tiers ("thorough mode").
+  For now, every document goes through both tiers ("thorough mode").
 - **Quasi-identifier:** a detail that isn't a name but can single someone out, such as a rare job title next to a
   postcode.
 - **Released leak:** a piece of personal data left unprotected in a document the gate let through to the cloud.
@@ -91,7 +92,7 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
   `-ncmoe N` keeps the experts of N layers in system RAM, which is how a 26B model fits an 8 GB GPU. The KV cache is
   the model's working memory for the context.
 
-## What v0.1 lets you do
+## What v0.2 lets you do
 
 - **Run a privacy-gated chat assistant locally.** `themis serve` starts a web app on `127.0.0.1`, opened with a
   one-use code. It shows what was found and what was sent, holds each cloud job until a second, configured identity
@@ -142,19 +143,26 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
 
 Read this section before you rely on anything above.
 
-- **It is not cleared for real personal data.** v0.1 refuses to start unless `[gate] synthetic_only = true`. That is
-  a switch you set deliberately, not a detector. Everything published here was measured on synthetic text written by
-  two generators that share one author family. Before anyone points it at real data, run the evaluation on a sample
+- **It is not cleared for real personal data.** themis-shield refuses to start unless `[gate] synthetic_only = true`.
+  That is a switch you set deliberately, not a detector. Everything published here was measured on synthetic text
+  written by three generators that share one model family (all Claude models). Before anyone points it at real data, run the evaluation on a sample
   of your own documents, labelled by people, with the same frozen-kit discipline.
 - **De-identified is not anonymous.** Pseudonymised text is still personal data under the GDPR (Recital 26), and
   the context around a placeholder can still single someone out. ASK exists because of this; it doesn't make the
   risk zero ([OAIC](https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/handling-personal-information/de-identification-and-the-privacy-act);
   [NIST SP 800-188](https://csrc.nist.gov/pubs/sp/800/188/final)).
-- **Quasi-identifiers don't trigger ASK.** When the detectors find one it is replaced, but the policy doesn't hold
-  the document for a human. A rare job title the detectors miss in an "anonymised" table goes out. All five leaks on
-  our test split were of this kind.
-- **Too much friction.** On our test split, 11 of 36 documents with no personal data were held for ASK, which fails
-  our own pass rule (see [Evaluation](#evaluation)). About a third of institutional look-alikes are still redacted.
+- **Quasi-identifiers are substituted, not held.** A found quasi-identifier is replaced, but it doesn't hold the
+  document for a human (`[policy] quasi_id_ask = true` changes that). v0.2's table pass finds rare values in
+  "anonymised" tables (97.6% recall on our fresh split), but it also flags common job titles, so tables get
+  over-redacted.
+- **Still too much friction.** On our fresh test split, 19 of 95 documents with no personal data were held, which
+  fails our own pass rule. The causes:
+  - the 26B finder reads fiction, a holiday notice or a policy FAQ as sensitive statements;
+  - the secret rule blocks vault placeholders such as `${VAULT:…}` in clean configuration files;
+  - PII-Tracer flags mailboxes of organisations no profile describes, public figures in news, and durations read as
+    dates of birth.
+
+  About a fifth of institutional look-alikes are still redacted.
 - **Sensitive statements depend on the LLM finders.** They scored well on synthetic text thanks to prompt v2, but
   real writing is more varied. A dedicated sentence-level classifier is on the roadmap.
 - **Prompt injection against the detectors** is tested only with our own synthetic injection cases. We found no
@@ -190,7 +198,7 @@ Read this section before you rely on anything above.
  │                      │     PII-Tracer token classifier
  │                      │     propagate: the same name in tables, initials, other casing
  │                      │     allow-list from your organisation profile
- │                      │   tier 2 (GPU; every document in v0.1)
+ │                      │   tier 2 (GPU; every document, for now)
  │                      │     Gemma 4 E4B and Gemma 4 26B-A4B finders via llama-server
  │                      │     union of everything, then propagate and allow-list again
  └──────────┬───────────┘
@@ -326,13 +334,63 @@ your Claude credentials; the hooks talk only to the local gate.
 
 ## Evaluation
 
-themis-shield ships a fully synthetic evaluation set ([`eval/`](eval/README.md)): 521 cases (225 dev, 296 test) with
-4,483 gold spans in 27 labels, hard negatives (institutional look-alikes that must *not* be redacted), and
-prompt-injection cases. The organisation in it, "Harbourline Institute", is invented, and every identifier is
-invented, and checksum-valid where its format has a checksum. Two independent generators wrote it. It is split by
-template, so no sentence frame is shared between dev and test. `eval/run_eval.py` runs the real detection and policy
-(rules, PII-Tracer, Gemma 4 E4B and 26B-A4B through llama.cpp, union, allow-list, policy), and `eval/score.py`
-scores it.
+themis-shield ships synthetic evaluation data ([`eval/`](eval/README.md)), all about invented organisations:
+- **The v0.1 set:** 521 cases from two independent generators.
+- **Split C:** 371 cases, the v0.2 held-out test. A separate author (a different Claude model) wrote it, seeing only
+  the label taxonomy, the scorer's format and the fictional Harbourline profile, never the gate or the other cases.
+
+`eval/run_eval.py` runs the real detection and policy (rules, PII-Tracer, Gemma 4 E4B and 26B-A4B through llama.cpp,
+union, allow-list, policy), and `eval/score.py` scores it. Each release follows the same discipline:
+1. Tune on development data only.
+2. Write a pass rule and a negative control into a frozen plan.
+3. Open the test split once.
+4. Change nothing afterwards.
+
+### v0.2 (current)
+
+**Method.**
+- **Development data:** all 521 v0.1 cases.
+- **Cached finders:** the LLM finders ran once over them and their answers were captured, so each tuning round
+  replayed identical finder output and changed only the code after the finders. We showed the replay was byte-exact
+  first.
+- **Two tuning rounds.** A third was better by one measure but lost under the rule written beforehand, so we didn't
+  adopt it.
+- **Plan:** [`eval/FROZEN-PLAN-v0.2.md`](eval/FROZEN-PLAN-v0.2.md).
+- **Control:** v0.1's policy replaying v0.2's own captured finder answers, so the two arms differ only in v0.2's
+  changes.
+
+| Split C (371 cases, 3,686 gold spans, 95 clean) | v0.2 | v0.1 policy (control) |
+|---|---|---|
+| **Released leaks** | **0** | 0 |
+| R_any / R_full | **0.990** / 0.979 | 0.982 / 0.970 |
+| Quasi-identifiers, R_any | **0.976** | 0.738 |
+| Sensitive statements, R_any | 0.954 | 0.955 |
+| Over-redaction (hard negatives touched) | **0.203** | 0.214 |
+| Clean documents held (of 95) | **19** | 34 |
+| Released leaks in the 42 injection cases | 0 | 0 |
+| Decisions RELEASE / ASK / BLOCK | 97 / 211 / 63 | 82 / 226 / 63 |
+
+**Verdict: v0.2 failed its pass rule on friction**, 0.200 against a limit of 0.15. It met every other condition,
+including being no worse than the control on each of them.
+- **The rule v0.2 changed** accounts for only 6 of the 19 holds (down from 21).
+- **The rest** come from causes that never appeared in a clean development case:
+  - fiction and a policy FAQ read as sensitive statements (7);
+  - vault placeholders in config files matched as secrets (4);
+  - injection signals (2, by design).
+- **Precision:** any-label precision on split C is 0.76. Its author labels differently, and the table pass also flags
+  common job titles that author left unlabelled.
+- **One kit change** was recorded before the run: the prompt-overlap test now exempts terms taken verbatim from the
+  profile's own "do not flag" list.
+
+Details: [`eval/RESULTS-v0.2.md`](eval/RESULTS-v0.2.md). Speed: median 12.6 s and mean 14.2 s per document; 371
+cases took 88 minutes.
+
+### v0.1 (previous release)
+
+The v0.1 set: 521 cases (225 dev, 296 test) with 4,483 gold spans in 27 labels, hard negatives (institutional
+look-alikes that must *not* be redacted), and prompt-injection cases. Every identifier in it is invented, and
+checksum-valid where its format has a checksum. Two independent generators wrote it, and it is split by template, so
+no sentence frame is shared between dev and test.
 
 **Method.** We chose the 26B quantisation with a rule written before the baselines ran, and tuned prompt v2 on dev
 only, in two iterations. Then we froze the kit. The pass rule and a negative control are in
@@ -438,29 +496,30 @@ attachment live against Strata serving Qwen3.8-Flash-Next on the same laptop.
 
 ## Next
 
-Each item below is a known gap from our own runs, in the order we plan to work on them. A fix that changes detection
-or policy needs a **fresh test split**: v0.1's test split has been seen and can't be used to validate it.
+Each item is a known gap from our own runs, roughly in order. A change to detection or policy needs a test split
+nobody has seen: both published splits have now been opened.
 
-Items 1 to 3 are implemented for v0.2 (`eval/V02-DEV-LOG.md`). On a fresh held-out split they removed every
-released leak and most empty-finder holds, but v0.2 still failed its pass rule on friction (0.200 > 0.15): clean
-fiction excerpts, policy FAQs and configuration placeholders were held for reasons outside these items
-([`eval/RESULTS-v0.2.md`](eval/RESULTS-v0.2.md)).
-
-1. **Friction.** Stop the empty-finder rule from holding clean documents: when both LLM finders return nothing,
-   weigh what PII-Tracer flagged by label and allow-list, instead of asking every time.
-2. **Quasi-identifiers.** Let them count in the policy, and add a column-aware pass that treats rare values in
-   "anonymised" tables (job titles, small-group attributes) as quasi-identifiers.
-3. **Tier-1 false positives:**
-   - PII-Tracer labels public meeting times as dates of birth;
-   - a trailing full stop lets a role mailbox escape the allow-list;
-   - the USI checksum matches ordinary ten-letter words about one time in 32;
-   - the organisation's own checksum-valid ABN is never allow-listed.
-4. **A sentence-level sensitive-statement classifier**, fine-tuned on synthetic data, alongside the span finders.
-5. **A fast path.** Tier 1 alone for short, low-sensitivity text, evaluated before it is offered.
-6. **A real-data evaluation protocol:** how to sample, label and score your own documents with the frozen-kit
+1. **Friction, round three:**
+   - tell fiction, news and policy text apart from statements about real people before the sensitive rule fires;
+   - exempt vault and template placeholders (`${VAULT:…}`, `<set …>`) from the secret rule;
+   - handle mailboxes and switchboard numbers of organisations no profile describes, public figures in news, and
+     durations ("24 hours") read as dates of birth.
+2. **Table-pass precision:** stop flagging common job titles as quasi-identifiers.
+3. **Prove the empty-finder rule:** designed cases where both finders miss real personal data, to show the narrowed
+   rule still catches them.
+4. **Indirect statements.** On split C, union membership, criminal history and ethnicity written indirectly are the
+   most-missed spans; all were in held documents, so none was released. A sentence-level sensitive-statement
+   classifier, fine-tuned on synthetic data, would sit alongside the span finders.
+5. **A test author from another model family.** All three generators so far come from one; the next test split
+   should not.
+6. **A fast path:** tier 1 alone for short, low-sensitivity text, evaluated before it is offered.
+7. **A real-data evaluation protocol:** how to sample, label and score your own documents with the frozen-kit
    discipline, before unlocking `synthetic_only`.
-7. **Platform and reach:** Linux and macOS runs, file inputs (PDF, Word), a native Anthropic Messages leg, a central
+8. **Platform and reach:** Linux and macOS runs, file inputs (PDF, Word), a native Anthropic Messages leg, a central
    register service.
+
+Done in v0.2: a narrower empty-finder rule, a column-aware quasi-identifier pass, and fixes for the four tier-1
+false positives found in v0.1 (see [CHANGELOG.md](CHANGELOG.md)).
 
 Contributions, critiques and independent evaluations are welcome. To report a bypass or a leak privately, see
 [SECURITY.md](SECURITY.md).
@@ -528,6 +587,12 @@ app, and Claude Code hooks for people who work in a terminal.
 - a passphrase-protected vault for macOS and Linux;
 - two independent reviews, one for accuracy and one for anything that shouldn't be published;
 - this README.
+
+**Then v0.2, the same night.** The whole v0.1 set became development data, and a different author (another Claude
+model) wrote a fresh test split without ever seeing the gate or the old cases. Caching the finders' answers turned
+each two-hour tuning round into minutes. The fixes worked where they were aimed: no released leaks, quasi-identifiers
+in tables caught, most empty-finder holds gone. And v0.2 failed its friction rule anyway, for reasons no development
+case had shown us. That's the point of a fresh split.
 
 ## Sources and acknowledgements
 

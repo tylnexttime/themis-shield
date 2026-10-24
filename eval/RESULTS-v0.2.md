@@ -9,7 +9,7 @@ the commands are in the plan. The v0.1 results are in [`RESULTS.md`](RESULTS.md)
 
 - **Frozen kit:** tag `eval-kit-v0.2-frozen`. Test split C: `eval/cases/test-c.jsonl`, sha256
   `39ea2f9595c959f19f2d15607003159f42349ce9ca485f0cf2777d674f2e9ab9`, 371 cases, 3,686 gold spans, 95 clean cases,
-  42 injection cases, 2,983 hard negatives. Written by an independent author (another model family) who saw only
+  42 injection cases, 2,983 hard negatives. Written by an independent author (a different Claude model, Fable 5.1) who saw only
   the taxonomy, the scorer's format and the Harbourline profile; its generator is in `eval/generator_c/`.
 - **Arms:** v0.2 (the candidate, run live with every finder response captured) and a **v0.1 negative control**
   (the same tag with `--gate-version v0.1`, replaying v0.2's capture), so both arms saw identical finder output and

@@ -2,7 +2,11 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
-## Unreleased (v0.2, in development; not yet tested on a held-out split)
+## 0.2.0 (25/10/2026)
+
+- Tested once on a fresh held-out split written by an independent author (another Claude model): 0 released
+  leaks in 3,686 gold spans, quasi-identifier R_any 0.976 (v0.1 policy: 0.738), clean friction 0.200 (v0.1
+  policy: 0.358). Fails its own pass rule on friction (limit 0.15); see eval/RESULTS-v0.2.md.
 
 - Policy: when both LLM finders return nothing, only PII-Tracer findings that
   survive the allow-list count as contrary evidence, by label; a date the
