@@ -166,9 +166,12 @@ By the criteria written before the first fix run, **iteration 2 is selected**: i
 leaks (0) and clean friction (3/60) and wins on over-redaction (306 vs 310). R_any is a guardrail, not an optimised
 metric, so iteration 3's recall gain does not count under the rule as written. The acceptance line in the
 iteration-3 plan above ("accepted if ... released leaks and friction do not rise") was written after iteration 2
-and would have changed the rule; the rule written first stands. The iteration-3 change is kept as a separate commit
-on branch `v0.2-it3-date-exemptions` for a decision before the freeze: it closes a recall hole (a person's date on
-a public day is cancelled when the tracer's label was normalised) at the cost of four touched public dates.
+and would have changed the rule; the rule written first stands.
+
+**Iteration 3 is not adopted for v0.2** (decided before the freeze, keeping the rule written first). Its change is
+kept, unmerged, as a **v0.3 candidate** on branch `v0.2-it3-date-exemptions` (one commit, based on the pre-rewrite
+history): it closes a recall hole (a person's date on a public day is cancelled when the tracer's label was
+normalised) at the cost of four touched public dates. The v0.2 test runs do not include it.
 
 `v02-final` (the selected code with every switch at its default: detection v0.2, policy v0.2, `quasi_id_ask` off)
 reproduces `v02-it2` byte for byte (predictions sha256 `1496dea0...4fef`, decisions `e0805385...c3f6`).
