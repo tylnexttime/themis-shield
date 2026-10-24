@@ -1,5 +1,8 @@
 # themis-shield evaluation results
 
+> **v0.2:** the v0.2 changes were tested on a fresh held-out split (split C) and failed their pass rule on
+> friction (0.200 > 0.15), with 0 released leaks. See [`RESULTS-v0.2.md`](RESULTS-v0.2.md). This file covers v0.1.
+
 24/10/2026. Per-run outputs (predictions, decisions, per-call finder timings, prompts with the document text masked,
 config snapshots, score reports) were kept outside the repository; the commands to reproduce every run are in
 [`FROZEN-PLAN.md`](FROZEN-PLAN.md) and [`README.md`](README.md).
