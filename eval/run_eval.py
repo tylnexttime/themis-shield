@@ -11,12 +11,25 @@ real policy (`themis_shield.policy.decide`). Nothing here reads gold spans or ha
 
 Outputs (in <runs-dir>/<run-name>/, never inside the repository):
   predictions.jsonl  one line per case in score.py's format (gate labels; the label map is applied by the scorer)
-  decisions.jsonl    decision, reason codes, stage statuses and per-tier timings per case
+  decisions.jsonl    decision, reason codes and stage statuses per case
+  timings.jsonl      per-tier timings per case (kept apart so predictions and decisions reproduce byte for byte)
   llm_calls.jsonl    one line per finder call: model, case id, wall time, llama-server timings (no text)
   prompt-<model>.txt the finder messages with the case text replaced by <<TEXT>>, as sent
   config.json        arguments, git commit, case-file hashes, runtime settings, finder catalogue entries
   score.json / score.txt / summary.json   the scorer's report and the headline numbers
   run.log            progress
+
+Case files: --cases FILE [FILE ...] runs those files instead of the split's bundled file (for example the v0.2
+development set, dev.jsonl plus the retired v0.1 test.jsonl). A file holding cases marked "test" runs only as
+--split test, under the guard below; the retired v0.1 test file is the one exception, pinned by its sha256.
+
+Finder capture and replay: --capture-finders DIR writes every finder response (the decoded payload, or the error
+kind), with the case id, the model, the prompt hash and the model identity (weights file, arguments, context).
+--replay-finders DIR serves those responses instead of starting llama-server and refuses any call whose prompt hash
+or model identity differs from the capture. Rules, PII-Tracer, union, propagation, allow-list and policy still run.
+
+Gate versions: --gate-version v0.1 restores the evaluated v0.1 detection and policy (the negative control);
+--detection-version, --policy-version and --quasi-id-ask set them one at a time. The default is v0.2.
 
 The test split is guarded: it runs only from a clean tree whose HEAD carries the frozen tag named with
 --frozen-tag, and never into a run directory that already holds a score (a crash may be resumed with --resume).
@@ -85,9 +98,11 @@ class RecordingClient:
     residency belongs to the k-th document of the batch (every document is selected when detection is thorough).
     """
 
-    def __init__(self, inner, sink=None):
+    def __init__(self, inner, sink=None, capture=None, replay=None):
         self.inner = inner
         self.sink = sink
+        self.capture = capture  # FinderCapture: writes every finder response for later replay
+        self.replay = replay  # FinderReplay: serves captured responses instead of calling a model
         self.case_ids: list[str] = []
         self.texts: list[str] = []
         self.calls: list[dict] = []
@@ -145,10 +160,24 @@ class _RecordingTarget:
         prefix_sha = hashlib.sha256(json.dumps(prefix, ensure_ascii=False).encode()).hexdigest() if prefix else None
         owner.templates.setdefault(model_role, set()).add(key)
         owner.first_messages.setdefault(model_role, templated)
+        prompt_sha = prompt_sha256(messages, schema, max_tokens)
         began = time.perf_counter()
         status = "ok"
         try:
-            return self.target.chat_json(model_role, messages, schema, max_tokens)
+            if owner.replay is not None:
+                status = "replayed"
+                return owner.replay.serve(case_id, model_role, prompt_sha)
+            try:
+                payload = self.target.chat_json(model_role, messages, schema, max_tokens)
+            except Exception as error:
+                if owner.capture is not None:
+                    owner.capture.write(case_id, model_role, prompt_sha, error=error,
+                                        timings=getattr(self.target, "last_timings", None))
+                raise
+            if owner.capture is not None:
+                owner.capture.write(case_id, model_role, prompt_sha, payload=payload,
+                                    timings=getattr(self.target, "last_timings", None))
+            return payload
         except Exception as error:  # recorded, then re-raised for the engine's fail-closed handling
             status = type(error).__name__
             raise
@@ -158,13 +187,150 @@ class _RecordingTarget:
                 "wall_ms": round((time.perf_counter() - began) * 1000, 1),
                 "acquire_ms": round(self.acquire_ms, 1) if index == 0 else 0.0,
                 "timings": dict(getattr(self.target, "last_timings", {}) or {}),
-                "template_sha256": key, "system_prefix_sha256": prefix_sha,
+                "template_sha256": key, "system_prefix_sha256": prefix_sha, "prompt_sha256": prompt_sha,
                 "text_chars": len(text) if text else None,
             }
             owner.calls.append(record)
             if owner.sink is not None:
                 owner.sink.write(json.dumps(record) + "\n")
                 owner.sink.flush()
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Finder capture and replay. Most v0.2 changes sit after the LLM finders and the finder prompt does not change, so a
+# run can record every finder response once (on the GPU) and later runs can serve those responses instead of calling
+# llama-server. Replay refuses a call whose prompt (messages, schema, max_tokens) or model identity differs from the
+# capture, so a replayed run is the live run with only the post-finder code changed.
+# --------------------------------------------------------------------------------------------------------------------
+CAPTURE_FILE = "finders.jsonl"
+CAPTURE_MANIFEST = "manifest.json"
+
+
+class ReplayRefused(SystemExit):
+    """A replayed call does not match its capture. Not an Exception: the engine must not turn it into a stage result."""
+
+
+def prompt_sha256(messages, schema, max_tokens) -> str:
+    """Everything a finder call depends on besides the model: the exact messages, schema and token limit."""
+    body = json.dumps({"messages": messages, "schema": schema, "max_tokens": max_tokens},
+                      ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+def finder_identities(catalogue) -> dict:
+    """Model identity per finder role: the weights file, launch arguments and context size from the catalogue."""
+    out = {}
+    for model_id in FINDER_IDS:
+        entry = catalogue.get(model_id)
+        out[model_id] = {"file": entry.file, "args": list(entry.args), "ctx": entry.ctx}
+    return out
+
+
+def _error_kind(error: BaseException) -> str:
+    # The engine maps TimeoutError to TIMEOUT, these four to MALFORMED and anything else to FAILED.
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    if isinstance(error, (ValueError, TypeError, KeyError, IndexError)):
+        return "malformed"
+    return "failed"
+
+
+class FinderCapture:
+    """Appends one line per finder call: case id, model, prompt hash, model identity and the decoded response.
+
+    The response is what the gate's client returned to the finder (the schema payload), which is the finder's whole
+    input from the model. Contains document values: keep capture folders outside the repository.
+    """
+
+    def __init__(self, directory: Path, identities: dict, meta: dict):
+        self.directory = directory
+        directory.mkdir(parents=True, exist_ok=True)
+        manifest_path = directory / CAPTURE_MANIFEST
+        manifest = {"written_utc": now(), "identities": identities, **meta}
+        if manifest_path.exists():
+            previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if previous.get("identities") != identities:
+                raise SystemExit("capture folder holds responses from other model identities")
+            manifest["resumed_from"] = previous.get("resumed_from", []) + [previous.get("written_utc")]
+        manifest_path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+        self.identities = identities
+        self.sink = open(directory / CAPTURE_FILE, "a", encoding="utf-8", newline="\n")
+
+    def write(self, case_id, model_role, prompt_sha, payload=None, error=None, timings=None) -> None:
+        record = {"case_id": case_id, "model": model_role, "model_identity": self.identities.get(model_role),
+                  "prompt_sha256": prompt_sha, "timings": dict(timings or {})}
+        if error is None:
+            record.update(outcome="ok", payload=payload)
+        else:
+            record.update(outcome="error", error_kind=_error_kind(error), error_type=type(error).__name__)
+        self.sink.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        self.sink.flush()
+
+    def close(self) -> None:
+        self.sink.close()
+
+
+class FinderReplay:
+    """Serves captured finder responses; refuses any call whose prompt hash or model identity differs."""
+
+    def __init__(self, directory: Path, identities: dict):
+        manifest_path = directory / CAPTURE_MANIFEST
+        if not manifest_path.exists():
+            raise SystemExit(f"no capture manifest in {directory}")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("identities") != identities:
+            raise ReplayRefused(
+                f"model identities differ from the capture: captured {manifest.get('identities')}, now {identities}")
+        self.manifest = manifest
+        self.identities = identities
+        self.records: dict[tuple[str, str], dict] = {}
+        for line in (directory / CAPTURE_FILE).read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                record = json.loads(line)
+                # A resumed capture may hold a chunk twice (the crashed attempt and the rerun): the last one counts.
+                self.records[(record["case_id"], record["model"])] = record
+        self.served = 0
+
+    def serve(self, case_id, model_role, prompt_sha):
+        record = self.records.get((case_id, model_role))
+        if record is None:
+            raise ReplayRefused(f"no captured {model_role} response for case {case_id}")
+        if record["model_identity"] != self.identities.get(model_role):
+            raise ReplayRefused(f"model identity differs for {model_role} on case {case_id}")
+        if record["prompt_sha256"] != prompt_sha:
+            raise ReplayRefused(f"prompt hash differs for {model_role} on case {case_id}")
+        self.served += 1
+        if record["outcome"] == "ok":
+            return json.loads(json.dumps(record["payload"]))  # a fresh copy each time
+        kind = record["error_kind"]
+        if kind == "timeout":
+            raise TimeoutError("replayed-timeout")
+        if kind == "malformed":
+            raise ValueError("replayed-malformed")
+        raise RuntimeError("replayed-failure")
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# Case files. --cases replaces the split's bundled file(s). The v0.1 test file was retired to development data in
+# v0.2 (it has been seen), so it may be scored as dev; any other case marked "test" needs the test split's guard.
+# --------------------------------------------------------------------------------------------------------------------
+RETIRED_TEST_SHA256 = {"f1fbcb4311eb7579c1f309c3b9595e55b7dc253d73d7c0592196e0be258db792"}
+
+
+def load_cases(split: str, files: list[str] | None) -> tuple[list[dict], dict[str, str]]:
+    paths = [Path(f) for f in files] if files else list(scorer.SPLIT_FILES[split])
+    cases, hashes = [], {}
+    for path in paths:
+        digest = sha256_file(path)
+        hashes[str(path)] = digest
+        rows = scorer.load_jsonl(path)
+        if split != "test" and digest not in RETIRED_TEST_SHA256 and any(r.get("split") == "test" for r in rows):
+            raise SystemExit(f"{path} holds held-out (test) cases; run it with --split test under the test guard")
+        cases.extend(rows)
+    ids = [c["id"] for c in cases]
+    if len(set(ids)) != len(ids):
+        raise SystemExit("duplicate case ids across the case files")
+    return cases, hashes
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -186,7 +352,23 @@ def configure_detection(args) -> dict:
     finder = llm_finder.configure_finder(
         context=args.finder_context, prompt_version=args.prompt, do_not_flag=source.get("finder_do_not_flag"),
     )
-    return {"rule_packs": list(packs), "institution": institution, "finder": finder}
+    versions = configure_gate_versions(args)
+    return {"rule_packs": list(packs), "institution": institution, "finder": finder, "versions": versions}
+
+
+def configure_gate_versions(args) -> dict:
+    """Detection and policy behaviour versions (v0.2 by default; v0.1 is the negative control)."""
+    from themis_shield.detectors.settings import configure_detection_version
+    from themis_shield.policy import configure_policy
+
+    gate = getattr(args, "gate_version", None)
+    detection = getattr(args, "detection_version", None) or gate
+    policy_version = getattr(args, "policy_version", None) or gate
+    quasi = getattr(args, "quasi_id_ask", None)
+    return {
+        "detection": configure_detection_version(detection),
+        "policy": configure_policy(policy_version, quasi_id_ask=None if quasi is None else quasi == "on"),
+    }
 
 
 def finding_label(item) -> str:
@@ -228,8 +410,9 @@ def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk
     from themis_shield.policy import decide
 
     total = len(todo) if total is None else total
-    with open(run_dir / "predictions.jsonl", "a", encoding="utf-8") as preds, \
-            open(run_dir / "decisions.jsonl", "a", encoding="utf-8") as decs:
+    with open(run_dir / "predictions.jsonl", "a", encoding="utf-8", newline="\n") as preds, \
+            open(run_dir / "decisions.jsonl", "a", encoding="utf-8", newline="\n") as decs, \
+            open(run_dir / "timings.jsonl", "a", encoding="utf-8", newline="\n") as times:
         for first in range(0, len(todo), chunk_size):
             chunk = todo[first:first + chunk_size]
             client.case_ids = [c["id"] for c in chunk]
@@ -266,15 +449,19 @@ def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk
                                 "persons": r.person_count, "values_not_found": r.values_not_found}
                         for stage, r in result.stage_status.items()
                     },
-                    "timings_ms": {str(k): round(v, 1) for k, v in result.timings_ms.items()},
+                }) + "\n")
+                # Timings live in their own file so that predictions and decisions are reproducible byte for byte.
+                times.write(json.dumps({
+                    "id": case["id"], "timings_ms": {str(k): round(v, 1) for k, v in result.timings_ms.items()},
                 }) + "\n")
             preds.flush()
             decs.flush()
+            times.flush()
             log(f"chunk {first // chunk_size + 1}: {len(chunk)} cases in {time.perf_counter() - t0:.0f} s "
                 f"({done_before + first + len(chunk)}/{total})")
 
 
-def run_detection(args, run_dir: Path, cases: list[dict], log) -> dict:
+def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict | None = None) -> dict:
     from themis_shield.config import DeploymentProfile, UseCasePolicy
     from themis_shield.detectors import DetectionTargets
     from themis_shield.runtime import RuntimeSettings, build_runtime
@@ -290,23 +477,22 @@ def run_detection(args, run_dir: Path, cases: list[dict], log) -> dict:
         settings = replace(settings, catalogue_file=Path(args.catalogue))
     catalogue = Catalogue.load(settings.catalogue_file)
     tracer_dir = Path(args.tracer_dir) if args.tracer_dir else settings.models_dir / "pii-tracer"
+    identities = finder_identities(catalogue)
 
     config = {
         "written_utc": now(), "args": vars(args), "git_head": git("rev-parse", "HEAD"),
         "git_describe": git("describe", "--tags", "--always", "--dirty"),
         "git_dirty_files": git("status", "--porcelain", "--untracked-files=no").splitlines(),
         "python": sys.version, "platform": platform.platform(),
-        "case_files_sha256": {p.name: sha256_file(p) for p in scorer.SPLIT_FILES[args.split]},
+        "case_files_sha256": case_hashes or {p.name: sha256_file(p) for p in scorer.SPLIT_FILES[args.split]},
         "rule_packs": configured["rule_packs"], "finder_context": args.finder_context,
         "prompt_version": args.prompt, "institution_profile": args.institution_profile,
+        "gate_versions": configured["versions"],
         "finder_settings": {k: (list(v) if isinstance(v, tuple) else v) for k, v in configured["finder"].items()},
         "runtime_settings": {name: str(getattr(settings, name)) for name in settings.__dataclass_fields__},
-        "finders": {
-            model_id: {"file": catalogue.get(model_id).file, "args": list(catalogue.get(model_id).args),
-                       "ctx": catalogue.get(model_id).ctx}
-            for model_id in FINDER_IDS
-        },
+        "finders": identities,
         "tracer_dir": str(tracer_dir), "llm_max_tokens": args.max_tokens,
+        "finder_mode": "replay" if args.replay_finders else ("live+capture" if args.capture_finders else "live"),
     }
     engine = Path(settings.engine_path)
     try:
@@ -327,24 +513,41 @@ def run_detection(args, run_dir: Path, cases: list[dict], log) -> dict:
     todo = [c for c in cases if c["id"] not in done]
     log(f"{len(cases)} cases, {len(done)} already done, {len(todo)} to run")
 
-    runtime = build_runtime(settings, catalogue)
-    # Windows releases GPU memory some seconds after a model server exits; the scheduler re-reads free memory for
-    # memory_settle_seconds (5 by default) before refusing a load. The harness allows longer so that a slow release
-    # is not scored as a detection failure.
-    runtime.memory_settle_seconds = args.memory_settle_seconds
+    replay = capture = runtime = None
+    if args.replay_finders:
+        replay = FinderReplay(Path(args.replay_finders), identities)
+        log(f"replaying finder responses from {args.replay_finders} ({len(replay.records)} captured calls)")
+    else:
+        if args.capture_finders:
+            capture = FinderCapture(Path(args.capture_finders), identities, {
+                "prompt_version": args.prompt, "finder_context": args.finder_context,
+                "institution_profile": args.institution_profile, "engine_version": config["engine_version"],
+                "case_files_sha256": config["case_files_sha256"], "git_head": config["git_head"],
+            })
+        runtime = build_runtime(settings, catalogue)
+        # Windows releases GPU memory some seconds after a model server exits; the scheduler re-reads free memory for
+        # memory_settle_seconds (5 by default) before refusing a load. The harness allows longer so that a slow
+        # release is not scored as a detection failure.
+        runtime.memory_settle_seconds = args.memory_settle_seconds
     began = time.perf_counter()
+    history = []
     try:
-        with open(run_dir / "llm_calls.jsonl", "a", encoding="utf-8") as sink:
-            client = RecordingClient(SequentialFinderClient(runtime), sink)
+        with open(run_dir / "llm_calls.jsonl", "a", encoding="utf-8", newline="\n") as sink:
+            inner = object() if replay is not None else SequentialFinderClient(runtime)
+            client = RecordingClient(inner, sink, capture=capture, replay=replay)
             targets = DetectionTargets(
                 llm_client=client, thorough=True, tracer_model_directory=str(tracer_dir),
                 llm_max_tokens=args.max_tokens,
             )
             process_cases(todo, profile, targets, client, use_case, run_dir, args.chunk, log, len(done), len(cases),
                           allow_stage_failures=args.allow_stage_failures)
-            history = runtime.status().get("timings", [])
+            if runtime is not None:
+                history = runtime.status().get("timings", [])
     finally:
-        runtime.close()
+        if runtime is not None:
+            runtime.close()
+        if capture is not None:
+            capture.close()
     leftover = llama_servers()
     for model_role, templates in client.templates.items():
         (run_dir / f"prompt-{model_role}.txt").write_text(
@@ -355,11 +558,13 @@ def run_detection(args, run_dir: Path, cases: list[dict], log) -> dict:
         "scheduler_history": history,
         "llama_server_left_running": leftover,
         "templates_per_model": {k: len(v) for k, v in client.templates.items()},
+        "replayed_calls": replay.served if replay is not None else None,
     }
 
 
 # --------------------------------------------------------------------------------------------------------------------
-def summarise(rep: dict, decisions: list[dict], calls: list[dict], cases: list[dict]) -> dict:
+def summarise(rep: dict, decisions: list[dict], calls: list[dict], cases: list[dict],
+              timings: list[dict] | None = None) -> dict:
     rows = rep["per_label"]
 
     def count(label, key):
@@ -397,7 +602,8 @@ def summarise(rep: dict, decisions: list[dict], calls: list[dict], cases: list[d
             "seconds_per_call_median": round(statistics.median([c["wall_ms"] for c in ok]) / 1000, 2) if ok else None,
             "seconds_per_call_mean": round(statistics.mean([c["wall_ms"] for c in ok]) / 1000, 2) if ok else None,
         }
-    per_doc = [sum(x["timings_ms"].values()) / 1000 for x in decisions]
+    # v0.1 runs kept timings inside decisions.jsonl; v0.2 runs keep them in timings.jsonl.
+    per_doc = [sum(x["timings_ms"].values()) / 1000 for x in (timings or decisions) if "timings_ms" in x]
     o = rep["overall"]
     g = rep["gate"]
     return {
@@ -447,7 +653,10 @@ def score_run(run_dir: Path, split: str, cases: list[dict], extra: dict | None =
     decisions = [json.loads(l) for l in (run_dir / "decisions.jsonl").read_text(encoding="utf-8").splitlines() if l]
     calls_path = run_dir / "llm_calls.jsonl"
     calls = [json.loads(l) for l in calls_path.read_text(encoding="utf-8").splitlines() if l] if calls_path.exists() else []
-    summary = summarise(rep, decisions, calls, cases)
+    timings_path = run_dir / "timings.jsonl"
+    timings = ([json.loads(l) for l in timings_path.read_text(encoding="utf-8").splitlines() if l]
+               if timings_path.exists() else None)
+    summary = summarise(rep, decisions, calls, cases, timings)
     if extra:
         summary["run"] = extra
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
@@ -481,14 +690,32 @@ def main(argv=None) -> int:
     ap.add_argument("--resume", action="store_true", help="continue a crashed run in the same folder")
     ap.add_argument("--frozen-tag", default=None, help="required for --split test: the tag on HEAD")
     ap.add_argument("--score-only", action="store_true", help="re-score an existing run folder")
+    ap.add_argument("--cases", nargs="+", default=None,
+                    help="case file(s) to run instead of the split's bundled file (e.g. a merged dev file)")
+    ap.add_argument("--capture-finders", default=None,
+                    help="write every finder response (with prompt hash and model identity) to this folder")
+    ap.add_argument("--replay-finders", default=None,
+                    help="serve finder responses from a capture folder instead of calling llama-server; refuses "
+                         "any call whose prompt hash or model identity differs")
+    ap.add_argument("--gate-version", choices=["v0.1", "v0.2"], default=None,
+                    help="detection and policy behaviour together (v0.1 = the negative control)")
+    ap.add_argument("--detection-version", choices=["v0.1", "v0.2"], default=None)
+    ap.add_argument("--policy-version", choices=["v0.1", "v0.2"], default=None)
+    ap.add_argument("--quasi-id-ask", choices=["on", "off"], default=None,
+                    help="v0.2 policy: whether a found QUASI_ID holds the document for ASK (default: the policy's)")
     args = ap.parse_args(argv)
     if not args.runs_dir:
         ap.error("--runs-dir (or THEMIS_EVAL_RUNS) is required")
     runs_dir = Path(args.runs_dir).resolve()
     if runs_dir.is_relative_to(ROOT.resolve()):
         ap.error("run outputs must live outside the repository")
+    if args.capture_finders and args.replay_finders:
+        ap.error("--capture-finders and --replay-finders are exclusive")
+    for folder in (args.capture_finders, args.replay_finders):
+        if folder and Path(folder).resolve().is_relative_to(ROOT.resolve()):
+            ap.error("finder captures must live outside the repository")
     run_dir = runs_dir / args.run_name
-    cases = scorer.load_gold(args.split)
+    cases, case_hashes = load_cases(args.split, args.cases)
     if args.ids:
         wanted = set(args.ids.split(","))
         cases = [c for c in cases if c["id"] in wanted]
@@ -511,7 +738,7 @@ def main(argv=None) -> int:
 
     log(f"run {args.run_name} split={args.split} prompt={args.prompt} head={git('rev-parse', '--short', 'HEAD')}")
     started = time.perf_counter()
-    extra = run_detection(args, run_dir, cases, log)
+    extra = run_detection(args, run_dir, cases, log, case_hashes)
     extra["wall_seconds_total_this_session"] = round(time.perf_counter() - started, 1)
     summary = score_run(run_dir, args.split, cases, extra)
     log(f"R_full {summary['R_full']:.3f}  R_any {summary['R_any']:.3f}  precision {summary['precision_any_label']:.3f}"

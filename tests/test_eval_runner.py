@@ -181,3 +181,91 @@ def test_recording_client_records_a_residency_failure():
             pass
     assert client.calls[0]["status"] == "residency_failed"
     assert "available RAM" in client.calls[0]["error"]
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# v0.2: finder capture and replay, case files
+# --------------------------------------------------------------------------------------------------------------------
+IDENTITIES = {"gemma4-e4b": {"file": "e4b.gguf", "args": ["-ngl", "99"], "ctx": 16384},
+              "gemma4-26b-a4b": {"file": "26b.gguf", "args": ["-ngl", "99", "-ncmoe", "18"], "ctx": 16384}}
+
+
+def _process(tmp_path, cases, client, name):
+    out = tmp_path / name
+    out.mkdir()
+    use_case = UseCasePolicy("evaluation", (), requires_in_region_inference=False)
+    profile = DeploymentProfile("evaluation", "1", (), (use_case,),
+                                institution=load_profile_json("institution", "harbourline-eval"))
+    targets = DetectionTargets(tracer=FakeTracer(), llm_client=client, thorough=True)
+    run_eval.process_cases(cases, profile, targets, client, use_case, out, 3, lambda m: None)
+    return out
+
+
+def test_capture_then_replay_is_byte_identical_and_needs_no_model(tmp_path):
+    cases = scorer.load_gold("dev")[:5]
+    capture = run_eval.FinderCapture(tmp_path / "cap", IDENTITIES, {"prompt_version": "v2"})
+    live = _process(tmp_path, cases, run_eval.RecordingClient(FakeFinder(), capture=capture), "live")
+    capture.close()
+    records = [json.loads(line) for line in (tmp_path / "cap" / "finders.jsonl").read_text().splitlines()]
+    assert len(records) == 2 * len(cases)
+    assert all(r["prompt_sha256"] and r["model_identity"] == IDENTITIES[r["model"]] for r in records)
+    replay = run_eval.FinderReplay(tmp_path / "cap", IDENTITIES)
+    replayed = _process(tmp_path, cases, run_eval.RecordingClient(object(), replay=replay), "replay")
+    for name in ("predictions.jsonl", "decisions.jsonl"):
+        assert (live / name).read_bytes() == (replayed / name).read_bytes()
+    assert replay.served == 2 * len(cases)
+    assert (replayed / "timings.jsonl").exists()
+
+
+def test_replay_refuses_other_prompts_models_and_missing_cases(tmp_path):
+    cases = scorer.load_gold("dev")[:2]
+    capture = run_eval.FinderCapture(tmp_path / "cap", IDENTITIES, {})
+    _process(tmp_path, cases, run_eval.RecordingClient(FakeFinder(), capture=capture), "live")
+    capture.close()
+    other = {**IDENTITIES, "gemma4-26b-a4b": {**IDENTITIES["gemma4-26b-a4b"], "file": "other.gguf"}}
+    with pytest.raises(run_eval.ReplayRefused):
+        run_eval.FinderReplay(tmp_path / "cap", other)
+    replay = run_eval.FinderReplay(tmp_path / "cap", IDENTITIES)
+    with pytest.raises(run_eval.ReplayRefused):
+        replay.serve(cases[0]["id"], "gemma4-e4b", "0" * 64)
+    with pytest.raises(run_eval.ReplayRefused):
+        replay.serve("no-such-case", "gemma4-e4b", "0" * 64)
+    # A changed prompt (here: another finder context) is refused inside a run, not scored as a stage failure.
+    from themis_shield.detectors import llm_finder
+    before = llm_finder.configure_finder(context="a hospital")
+    try:
+        with pytest.raises(run_eval.ReplayRefused):
+            _process(tmp_path, cases, run_eval.RecordingClient(object(), replay=replay), "changed")
+    finally:
+        llm_finder.configure_finder()
+    assert before["context"] == "a hospital"
+
+
+def test_replayed_errors_keep_their_stage_meaning(tmp_path):
+    capture = run_eval.FinderCapture(tmp_path / "cap", IDENTITIES, {})
+    capture.write("c1", "gemma4-e4b", "h1", error=TimeoutError())
+    capture.write("c2", "gemma4-e4b", "h2", error=ValueError())
+    capture.write("c3", "gemma4-e4b", "h3", error=RuntimeError())
+    capture.close()
+    replay = run_eval.FinderReplay(tmp_path / "cap", IDENTITIES)
+    for case_id, digest, error in (("c1", "h1", TimeoutError), ("c2", "h2", ValueError), ("c3", "h3", RuntimeError)):
+        with pytest.raises(error):
+            replay.serve(case_id, "gemma4-e4b", digest)
+
+
+def test_case_files_and_the_held_out_guard(tmp_path):
+    cases, hashes = run_eval.load_cases("dev", [str(EVAL / "cases" / "dev.jsonl"), str(EVAL / "cases" / "test.jsonl")])
+    assert len(cases) == 521 and len(hashes) == 2  # the v0.1 test file is retired to dev
+    held_out = tmp_path / "fresh.jsonl"
+    held_out.write_text(json.dumps({"id": "X-1", "split": "test", "text": "x", "spans": []}) + "\n")
+    with pytest.raises(SystemExit):
+        run_eval.load_cases("dev", [str(held_out)])
+    assert len(run_eval.load_cases("test", [str(held_out)])[0]) == 1
+    with pytest.raises(SystemExit):
+        run_eval.load_cases("dev", [str(EVAL / "cases" / "dev.jsonl")] * 2)
+
+
+def test_capture_and_replay_folders_must_be_outside_the_repository(tmp_path):
+    for flag in ("--capture-finders", "--replay-finders"):
+        with pytest.raises(SystemExit):
+            run_eval.main(["--split", "dev", "--run-name", "x", "--runs-dir", str(tmp_path), flag, str(EVAL / "cap")])
