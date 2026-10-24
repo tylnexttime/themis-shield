@@ -47,10 +47,11 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | `detectors/pii_tracer.py`, `labels.py` | real | PII-Tracer on CPU with exact offset mapping; label adapter. |
 | `detectors/llm_finder.py` | real | Local LLM finders, prompt v1 and v2, structured JSON output. |
 | `detectors/escalation.py` | real | Tier-selection rule with fixed reason codes. |
-| `detectors/union.py`, `propagate.py`, `allowlist.py`, `profile_adapter.py` | real | Evidence union, propagation across tables, names and initials, institutional allow-list from a profile. |
+| `detectors/union.py`, `propagate.py`, `allowlist.py`, `profile_adapter.py` | real | Evidence union, propagation across tables, names and initials, a column-aware quasi-identifier pass for identifier-bearing tables (v0.2), institutional allow-list from a profile. |
 | `detectors/markings.py`, `routing.py` | real | Security-marking gate and the marking-based route, applied before any PII decision. |
 | `detectors/contracts.py`, `types.py` | real | Value-free evidence types and the label set. |
-| `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. |
+| `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. |
+| `detectors/settings.py` | real | `[detection] version`: `v0.2` (default) turns on the tier-1 fixes and the column-aware table pass; `v0.1` restores the evaluated v0.1 detection. |
 | `normalise.py` | skeleton | Specification of input normalisation with mapping back to original characters. |
 
 ### Substitution, vault, restoration

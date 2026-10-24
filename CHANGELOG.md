@@ -2,6 +2,26 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## Unreleased (v0.2, in development; not yet tested on a held-out split)
+
+- Policy: when both LLM finders return nothing, only PII-Tracer findings that
+  survive the allow-list count as contrary evidence, by label; a date the
+  tracer flags that cannot be a date of birth no longer holds a document.
+  `[policy] quasi_id_ask` makes a found quasi-identifier hold the document
+  for ASK.
+- Detection: a column-aware pass marks rare categorical values (role, title,
+  team, site, attribute) as quasi-identifiers in tables with identifier-like
+  columns or an "anonymised" label; tracer dates with a time of day, bare
+  weekdays and the organisation's public dates become OTHER_DATE; trailing
+  punctuation no longer defeats the role-mailbox allow-list; a USI must
+  contain a digit; the organisation's own ABN is allow-listed even when
+  checksum-valid.
+- `[detection] version` and `[policy] version` (`v0.2` default; `v0.1`
+  restores the evaluated v0.1 behaviour as a negative control).
+- Evaluation runner: `--cases`, `--capture-finders` / `--replay-finders`
+  (refuses a changed prompt or model), `--gate-version`; timings moved to
+  `timings.jsonl`. Development log in `eval/V02-DEV-LOG.md`.
+
 ## 0.1.0 (24/10/2026)
 
 First public preview, for synthetic rehearsal only.

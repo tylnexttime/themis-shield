@@ -441,6 +441,9 @@ attachment live against Strata serving Qwen3.8-Flash-Next on the same laptop.
 Each item below is a known gap from our own runs, in the order we plan to work on them. A fix that changes detection
 or policy needs a **fresh test split**: v0.1's test split has been seen and can't be used to validate it.
 
+Items 1 to 3 are implemented for v0.2 and tuned on development data only (`eval/V02-DEV-LOG.md`); they are not
+claimed until they pass a fresh held-out split.
+
 1. **Friction.** Stop the empty-finder rule from holding clean documents: when both LLM finders return nothing,
    weigh what PII-Tracer flagged by label and allow-list, instead of asking every time.
 2. **Quasi-identifiers.** Let them count in the policy, and add a column-aware pass that treats rare values in
