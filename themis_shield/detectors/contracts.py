@@ -35,6 +35,9 @@ class FindingEvidence:
 @dataclass(frozen=True, slots=True)
 class DetectionFinding(Finding):
     evidence: tuple[FindingEvidence, ...] = ()
+    # v0.3: the whole value is an organisation's contact (role mailbox, inbound number) or company number. Still
+    # substituted; only the empty-finder disagreement rule reads it (such a finding is not contrary evidence).
+    organisation_value: bool = False
 
     @property
     def start(self) -> int:

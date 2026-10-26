@@ -14,7 +14,7 @@ import pytest
 
 from themis_shield.detectors.markings import load_marking_profile, set_marking_profile
 from themis_shield.detectors.rules import set_rule_packs
-from themis_shield.detectors.settings import configure_detection_version
+from themis_shield.detectors.settings import configure_detection_fixes, configure_detection_version
 from themis_shield.policy import configure_policy
 from themis_shield.timezone import set_business_timezone
 
@@ -39,9 +39,11 @@ def pytest_collection_modifyitems(config, items):
 def _default_gate_versions():
     """Every test starts and ends on the shipped detection and policy versions (v0.2)."""
     configure_detection_version(None)
+    configure_detection_fixes(None)
     configure_policy(None)
     yield
     configure_detection_version(None)
+    configure_detection_fixes(None)
     configure_policy(None)
 
 

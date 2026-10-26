@@ -6,7 +6,8 @@ Rule packs:
   secrets, private keys, secret assignments and "phone: NNNN NNNN" forms.
 - ``au``: Australian identifiers with checksums (TFN, Medicare, ABN, USI) and
   Australian phone number formats.
-- ``intl``: international E.164 phone numbers and IBANs (mod-97 checksum).
+- ``intl``: international E.164 phone numbers and IBANs (mod-97 checksum); with the v0.3
+  ``rule-completeness`` fix, payment cards (issuer prefix, length and Luhn).
 
 The default is ``core`` only; deployments opt in to regional packs with
 ``[detection] rule_packs`` (or the ``THEMIS_RULE_PACKS`` environment variable,
@@ -26,7 +27,7 @@ import unicodedata
 from ..normalise import detection_view, strip_default_ignorable
 from ..types import Label
 from .contracts import StageReport, StageResult, Status, finding
-from .settings import v02
+from .settings import fix_on, v02
 
 
 USI_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -170,6 +171,233 @@ SECRET_PROSE = re.compile(
 )
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# v0.3 fix "secret-placeholders": a secret assignment whose WHOLE value is a template placeholder or a reference to a
+# secret manager names where the secret lives; the secret itself is not in the text. Conservative by construction:
+# - the placeholder must be the entire value (quoted: everything inside the quotes; bare: up to whitespace, a comma,
+#   a semicolon or the end), so "${VAULT:x}s3cretValue" or "<set>abc123" is still a secret;
+# - only the assignment and "password is ..." heuristics consult it; the key, hex and base64 patterns still run over
+#   the whole text, so a high-entropy string written inside a placeholder is still caught by them.
+# ----------------------------------------------------------------------------------------------------------------------
+_REF_NAME = r"[A-Za-z0-9_.][A-Za-z0-9_.:/#@\-]{0,126}"
+PLACEHOLDER = re.compile(
+    r"""(?x)
+    \$\{\{\s*""" + _REF_NAME + r"""\s*\}\}                          # ${{ secrets.DB_PASSWORD }} (CI expressions)
+    | \$\{\s*""" + _REF_NAME + r"""(?::-?[A-Za-z0-9_.\-]{0,40})?\s*\}  # ${VAULT:db-password}, ${DB_PASSWORD}, ${X:-}
+    | \{\{-?\s*""" + _REF_NAME + r"""(?:\s*\|\s*[A-Za-z_]+)*\s*-?\}\}  # {{ secret }}, {{- .Values.db.password -}}
+    | \$\(\s*[A-Za-z_][A-Za-z0-9_.\-]{0,80}\s*\)                     # $(DB_PASSWORD), $(var.password)
+    | %\([A-Za-z_][A-Za-z0-9_]{0,80}\)[sdr]                            # %(db_password)s
+    | %[A-Za-z_][A-Za-z0-9_]{0,80}%                                   # %DB_PASSWORD%
+    | \$[A-Z][A-Z0-9]*_[A-Z0-9_]{1,60}                               # $DB_PASSWORD (upper case with an underscore)
+    | <\s*[A-Za-z][A-Za-z_\-]*(?:[ _\-][A-Za-z][A-Za-z_\-]*){0,10}\s*>  # <set in vault>, <your-api-key>, <REDACTED>
+    | \[\s*(?:REDACTED|REMOVED|HIDDEN|MASKED|SECRET|PASSWORD|TOKEN)\s*\]
+    | \((?:REDACTED|REMOVED|HIDDEN|MASKED)\)
+    | (?:REDACTED|MASKED)
+    | \*{3,}                                                          # ******** (masked)
+    | (?:vault|secret|secrets|ssm|kms|keyvault|op)://[A-Za-z0-9_./#:@\-]{1,200}   # secret-manager URIs
+    | arn:[a-z\-]{1,20}:(?:secretsmanager|ssm):[A-Za-z0-9_./:#\-]{1,200}           # cloud secret ARNs
+    | @[A-Za-z]{1,40}\.KeyVault\([^()\s]{1,200}\)                                  # key-vault app-setting references
+    | projects/[A-Za-z0-9_\-]{1,80}/secrets/[A-Za-z0-9_\-]{1,80}(?:/versions/[A-Za-z0-9_\-]{1,40})?
+    """
+)
+_VALUE_END = re.compile(r"\s|[,;]|$")
+
+
+def _upper_or_lower_words(value: str) -> bool:
+    """An angle placeholder must read as words: separated words, or one all-lower / all-upper word (no digits)."""
+    inner = value.strip("<> ")
+    return bool(re.search(r"[ _\-]", inner)) or inner.islower() or inner.isupper()
+
+
+def placeholder_value(view: str, start: int, end: int | None = None) -> bool:
+    """True when the value starting at ``start`` is wholly a placeholder or secret-manager reference.
+
+    With ``end`` (a quoted value), the placeholder must fill ``view[start:end]`` exactly; without it (a bare value),
+    the placeholder must run from ``start`` to whitespace, a comma, a semicolon or the end of the text.
+    """
+    match = PLACEHOLDER.match(view, start, len(view) if end is None else end)
+    if not match:
+        return False
+    if end is not None:
+        if match.end() != end:
+            return False
+    elif not _VALUE_END.match(view, match.end()):
+        return False
+    value = match.group()
+    return not value.startswith("<") or _upper_or_lower_words(value)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# v0.3 fix "checksum-context": about 1 in 11 random nine-digit numbers passes the TFN check (1 in 22 ten-digit numbers
+# the Medicare check, 1 in 89 eleven-digit numbers the ABN check), so an order or invoice number is often a "valid"
+# TFN. Words on the same line just before the number decide: positive context keeps the specific label; negative
+# context without positive context makes the rule's finding a generic identifier (INTERNAL_ID), still substituted.
+# Positive context is also read a few characters after the number ("123 456 782 (TFN)").
+# ----------------------------------------------------------------------------------------------------------------------
+CONTEXT_BEFORE_CHARS = 40
+CONTEXT_AFTER_CHARS = 16
+NEGATIVE_NUMBER_CONTEXT = re.compile(
+    r"(?i)\b(?:invoice|inv|order|ord|ref|reference|ticket|case|account\s*(?:no|number|num)|acct|acn|"
+    r"build|serial|s/n|receipt|tracking|transaction|txn|booking|quote|purchase\s+order)\b"
+    r"|\bPO\b|\bA\.C\.N\b"
+)
+POSITIVE_NUMBER_CONTEXT = {
+    Label.TFN: re.compile(r"(?i)\btfn\b|\btax\s*file\b"),
+    Label.MEDICARE: re.compile(r"(?i)\bmedicare\b"),
+    Label.ABN: re.compile(r"(?i)\babn\b|\bbusiness\s+number\b"),
+}
+ACN_CONTEXT = re.compile(r"(?i)\bacn\b|\bA\.C\.N\b|\bcompany\s+number\b")
+ACN_WEIGHTS = (8, 7, 6, 5, 4, 3, 2, 1)
+
+
+def _line_window(view: str, start: int, end: int) -> tuple[str, str]:
+    """The text on the same line just before and just after ``view[start:end]``."""
+    before = view[max(0, start - CONTEXT_BEFORE_CHARS):start]
+    before = before[before.rfind("\n") + 1:]
+    after = view[end:end + CONTEXT_AFTER_CHARS]
+    newline = after.find("\n")
+    return before, after if newline < 0 else after[:newline]
+
+
+def number_context(label: Label, view: str, start: int, end: int) -> str | None:
+    """``"positive"``, ``"negative"`` or ``None`` for a checksum-valid number.
+
+    Before the number, the closest context word on the line decides ("TFN: ... Order no. N" is an order number).
+    After it, only positive context counts, and only up to the next digit or sentence break ("N (TFN)").
+    """
+    before, after = _line_window(view, start, end)
+    after = re.split(r"[0-9.;!?]", after, maxsplit=1)[0]
+    positive = POSITIVE_NUMBER_CONTEXT.get(label)
+    last_positive = max((m.end() for m in positive.finditer(before)), default=-1) if positive else -1
+    last_negative = max((m.end() for m in NEGATIVE_NUMBER_CONTEXT.finditer(before)), default=-1)
+    if last_positive > last_negative or (positive is not None and positive.search(after)):
+        return "positive"
+    return "negative" if last_negative >= 0 else None
+
+
+def acn_valid(value: str) -> bool:
+    """Australian Company Number: eight-digit body, weights 8..1, check digit = (10 - sum mod 10) mod 10."""
+    compact = _compact(value)
+    if not re.fullmatch(r"[0-9]{9}", compact):
+        return False
+    total = sum(int(digit) * weight for digit, weight in zip(compact, ACN_WEIGHTS))
+    return (10 - total % 10) % 10 == int(compact[8])
+
+
+def company_number(view: str, start: int, end: int) -> bool:
+    """A nine-digit number introduced as an ACN on its line that passes the ACN check: company evidence."""
+    before, _ = _line_window(view, start, end)
+    return bool(ACN_CONTEXT.search(before)) and acn_valid(view[start:end])
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# v0.3 fix "rule-completeness" (intl pack): payment cards by issuer prefix, length and the Luhn check.
+# Prefixes and lengths follow the published issuer identification ranges of the major card schemes (ISO/IEC 7812).
+# ----------------------------------------------------------------------------------------------------------------------
+CARD = re.compile(r"(?<![\w.\-])[0-9](?:[ \-]?[0-9]){11,18}(?![\w\-]|\.[0-9])")
+_CARD_RANGES = (
+    # (low prefix, high prefix, lengths); prefixes compare as strings of equal length
+    ("4", "4", (13, 16, 19)),
+    ("51", "55", (16,)), ("2221", "2720", (16,)),
+    ("34", "34", (15,)), ("37", "37", (15,)),
+    ("6011", "6011", (16, 17, 18, 19)), ("644", "649", (16, 17, 18, 19)), ("65", "65", (16, 17, 18, 19)),
+    ("3528", "3589", (16, 17, 18, 19)),
+    ("300", "305", (14, 15, 16, 17, 18, 19)), ("36", "36", (14, 15, 16, 17, 18, 19)),
+    ("38", "39", (16, 17, 18, 19)),
+    ("62", "62", (16, 17, 18, 19)),
+)
+
+
+def luhn_valid(digits: str) -> bool:
+    if not digits.isdigit() or len(digits) < 2:
+        return False
+    total = 0
+    for index, character in enumerate(reversed(digits)):
+        value = int(character)
+        if index % 2:
+            value = value * 2 - 9 if value > 4 else value * 2
+        total += value
+    return total % 10 == 0
+
+
+def payment_card_valid(value: str) -> bool:
+    """Issuer prefix and length from the scheme table, the Luhn check, and not one repeated digit."""
+    digits = re.sub(r"[ \-]", "", value)
+    if not digits.isdigit() or len(set(digits)) == 1:
+        return False
+    for low, high, lengths in _CARD_RANGES:
+        prefix = digits[:len(low)]
+        if len(digits) in lengths and low <= prefix <= high:
+            return luhn_valid(digits)
+    return False
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# v0.3 fix "organisation-contacts": role mailboxes and Australian inbound numbers are an organisation's, not a
+# person's, in nearly every document. They are still substituted (a sole trader's info@ can be personal), but a
+# tracer finding on one is no longer evidence for the empty-finder hold. Generic function and department words only;
+# a mailbox whose local part has any other word in it (a name, a place) is not a role mailbox here.
+# ----------------------------------------------------------------------------------------------------------------------
+ROLE_LOCAL_WORDS = frozenset({
+    "info", "information", "enquiries", "enquiry", "inquiries", "inquiry", "support", "help", "helpdesk",
+    "servicedesk", "service", "services", "desk", "admin", "administration", "noreply", "donotreply", "no", "not",
+    "do", "reply", "contact", "contactus", "contacts", "us", "office", "frontdesk", "front", "reception",
+    "bookings", "booking", "reservations", "sales", "accounts", "accountspayable", "payable", "receivable",
+    "billing", "invoices", "finance", "payroll", "hr", "people", "careers", "jobs", "recruitment", "media", "press",
+    "news", "newsletter", "comms", "communications", "marketing", "privacy", "feedback", "complaints", "hello",
+    "team", "ops", "operations", "it", "ict", "security", "safety", "whs", "hse", "facilities", "maintenance",
+    "legal", "compliance", "procurement", "purchasing", "orders", "events", "admissions", "enrolments",
+    "enrollments", "records", "library", "webmaster", "postmaster", "hostmaster", "abuse", "noc", "mailer", "daemon",
+    "notifications", "alerts", "general", "governance", "quality", "grants", "membership", "volunteers",
+    "donations", "student", "students", "customer", "customers", "and", "the", "centre", "center",
+})
+# Words that belong in a role mailbox but are never one on their own ("us@", "no@", "the@").
+_ROLE_CONNECTORS = frozenset({"no", "not", "do", "us", "and", "the", "front", "desk"})
+INBOUND_NUMBER = re.compile(r"13[0-9]{4}|1[38]00[0-9]{6}")
+_CONTACT_EDGE = ".,;:!?)]}'\"([{<>"
+
+
+def role_mailbox(value: str) -> bool:
+    """The local part is made only of generic function or department words (``info``, ``no-reply``, ``hr.payroll``)."""
+    value = value.strip(_CONTACT_EDGE)
+    if value.count("@") != 1:
+        return False
+    local = value.split("@", 1)[0].split("+", 1)[0].casefold()
+    words = [word for word in re.split(r"[._\-]", local) if word]
+    return bool(words) and all(word in ROLE_LOCAL_WORDS for word in words) and not (
+        len(words) == 1 and words[0] in _ROLE_CONNECTORS
+    )
+
+
+def inbound_number(value: str) -> bool:
+    """An Australian inbound number: 13 xx xx, 1300 xxx xxx or 1800 xxx xxx."""
+    value = unicodedata.normalize("NFKC", strip_default_ignorable(value)).strip(_CONTACT_EDGE + " ")
+    if re.search(r"[^0-9\s.\-()]", value):
+        return False
+    return bool(INBOUND_NUMBER.fullmatch(re.sub(r"[^0-9]", "", value)))
+
+
+def organisation_value(text: str, start: int, end: int, labels, *, contacts: bool, companies: bool) -> bool:
+    """True when a finding's whole value is an organisation's contact or company number (value-based, no profile).
+
+    ``contacts``: a role mailbox (EMAIL) or an inbound number (PHONE). ``companies``: a nine-digit ACN-valid number
+    introduced as an ACN on its line, whatever label a detector gave it.
+    """
+    value = text[start:end]
+    if contacts:
+        if Label.EMAIL in labels and role_mailbox(unicodedata.normalize("NFKC", strip_default_ignorable(value))):
+            return True
+        if Label.PHONE in labels and inbound_number(value):
+            return True
+    if companies:
+        before = detection_view(text[max(0, start - CONTEXT_BEFORE_CHARS):start]).text
+        number = detection_view(value).text.strip(_CONTACT_EDGE + " ")
+        if re.fullmatch(r"[0-9](?:[\s.\-]*[0-9]){8}", number):
+            local = before + number
+            return company_number(local, len(before), len(local))
+    return False
+
+
 INTL_PHONE = re.compile(
     r"(?<![\w+])\+[1-9][0-9]{0,2}(?:[\s.-]?\(?[0-9]{1,5}\)?){2,6}(?!\w)"
 )
@@ -251,11 +479,20 @@ class RulesDetector:
                 checksum_valid=True if checked else None,
             ))
 
+        context, companies = fix_on("checksum-context"), fix_on("rule-completeness")
         if au:
             for match in NUMERIC.finditer(view):
                 for label in (Label.TFN, Label.MEDICARE, Label.ABN):
                     if validate_identifier(label, match.group()).checksum_valid:
-                        emit(match.start(), match.end(), label, True)
+                        a, b = match.span()
+                        if label == Label.TFN and companies and company_number(view, a, b):
+                            # v0.3: a number introduced as an ACN that passes the ACN check is a company number,
+                            # even when it also passes the TFN check (about 1 in 11 do). Still substituted.
+                            emit(a, b, Label.INTERNAL_ID)
+                        elif context and number_context(label, view, a, b) == "negative":
+                            emit(a, b, Label.INTERNAL_ID)
+                        else:
+                            emit(a, b, label, True)
             for match in USI_PATTERN.finditer(view):
                 # v0.2: the USI check character alone matches about one ordinary 10-letter word in 32
                 # ("Breakwater"), so a USI must also contain at least one digit.
@@ -277,6 +514,10 @@ class RulesDetector:
             for match in IBAN.finditer(view):
                 if iban_valid(match.group()):
                     emit(match.start(), match.end(), Label.BANK_ACCOUNT, True)
+            if companies:
+                for match in CARD.finditer(view):
+                    if payment_card_valid(match.group()):
+                        emit(match.start(), match.end(), Label.PAYMENT_CARD, True)
         for pattern, label in patterns:
             for match in pattern.finditer(view):
                 end = match.end()
@@ -285,15 +526,26 @@ class RulesDetector:
                 emit(match.start(), end, label)
         for match in LOCAL_PHONE.finditer(view):
             emit(*match.span("number"), Label.PHONE)
+        placeholders = fix_on("secret-placeholders")
         for match in SECRET_ASSIGNMENT.finditer(view):
             group = next(
                 name for name in ("double", "single", "bare")
                 if match.group(name) is not None
             )
-            emit(*match.span(group), Label.SECRET)
+            start, end = match.span(group)
+            if placeholders:
+                if placeholder_value(view, start, None if group == "bare" else end):
+                    continue
+                if group == "bare" and PLACEHOLDER.match(view, start):
+                    # Placeholder syntax with a value attached ("${VAULT:x}Zq8kLm2"): the bare pattern stops at the
+                    # closing brace, so take the whole token, up to whitespace, a comma or a semicolon.
+                    end = _VALUE_END.search(view, start).start()
+            emit(start, end, Label.SECRET)
         for match in SECRET_PROSE.finditer(view):
             # Avoid obvious generic prose; assignments and key patterns do not
             # use this heuristic. The LLM stages remain responsible for context.
+            if placeholders and placeholder_value(view, match.start("value")):
+                continue
             if match.group("value").casefold() not in {
                 "reset", "policy", "requirements", "protected", "required",
             }:
