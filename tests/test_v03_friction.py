@@ -349,8 +349,8 @@ def test_published_test_cards_are_valid(card):
 @pytest.mark.parametrize("value", [
     "4111 1111 1111 1112",       # Luhn fails
     "1111 1111 1111 1117",       # no issuer starts with 1
-    "4111 1111 1111 111",        # Visa is 13, 16 or 19 digits
-    "3782 822463 1000",          # Amex is 15 digits
+    "4111 1111 1111 111",        # prefix 4 issues 13, 16 or 19 digits
+    "3782 822463 1000",          # prefixes 34 and 37 issue 15 digits
     "0000 0000 0000 0000",       # one repeated digit
     "9999 9999 9999 9995",
 ])
