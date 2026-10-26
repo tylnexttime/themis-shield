@@ -3,4 +3,4 @@
 Imports do not load models, open stores, read credentials or start workers.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"

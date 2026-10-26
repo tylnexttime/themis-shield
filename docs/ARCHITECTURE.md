@@ -52,7 +52,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | `detectors/contracts.py`, `types.py` | real | Value-free evidence types and the label set. |
 | `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. |
 | `detectors/settings.py` | real | `[detection] version`: `v0.2` (default) turns on the tier-1 fixes and the column-aware table pass; `v0.1` restores the evaluated v0.1 detection. |
-| `normalise.py` | skeleton | Specification of input normalisation with mapping back to original characters. |
+| `normalise.py` | partial | Real: `detection_view`, the shared detection view (Unicode default-ignorable characters removed, NFKC per character, each view character mapped back to its source character) used by the rule packs, the marking gate and the injection signal. Skeleton: the document-level `normalise` and `OffsetMap` contract. |
 
 ### Substitution, vault, restoration
 

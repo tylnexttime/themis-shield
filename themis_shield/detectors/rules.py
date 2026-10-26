@@ -23,6 +23,7 @@ import re
 from threading import Lock
 import unicodedata
 
+from ..normalise import detection_view, strip_default_ignorable
 from ..types import Label
 from .contracts import StageReport, StageResult, Status, finding
 from .settings import v02
@@ -33,7 +34,6 @@ TFN_WEIGHTS = (1, 4, 3, 7, 5, 8, 6, 9, 10)
 MEDICARE_WEIGHTS = (1, 3, 7, 9, 1, 3, 7, 9)
 ABN_WEIGHTS = (10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19)
 CHECKSUM_LABELS = frozenset({Label.USI, Label.TFN, Label.MEDICARE, Label.ABN})
-IGNORABLE = "\u200b\u2060\ufeff"
 SEPARATORS = r"[\s.\-]*"
 RULE_PACKS = ("core", "au", "intl")
 DEFAULT_RULE_PACKS = ("core",)
@@ -48,8 +48,7 @@ class ChecksumResult:
 
 
 def _compact(value: str) -> str:
-    value = unicodedata.normalize("NFKC", value).upper()
-    value = value.translate(dict.fromkeys(map(ord, IGNORABLE)))
+    value = unicodedata.normalize("NFKC", strip_default_ignorable(value)).upper()
     return re.sub(r"[\s.\-]", "", value)
 
 
@@ -102,17 +101,13 @@ def validate_identifier(label: Label | str, value: str) -> ChecksumResult:
 def normalised_view(text: str) -> tuple[str, tuple[tuple[int, int], ...]]:
     """NFKC detection view with conservative original-character back-mapping.
 
-    Each expanded character points to its complete source character. Selected
-    zero-width separators are omitted only from the view, not from the source.
+    Each expanded character points to its complete source character. Every
+    Unicode default-ignorable code point (zero-width characters, soft hyphen,
+    bidi controls, variation selectors, tag characters) is omitted from the
+    view only, not from the source; see :func:`themis_shield.normalise.detection_view`.
     """
-    characters, offsets = [], []
-    for index, character in enumerate(text):
-        if character in IGNORABLE:
-            continue
-        for normal in unicodedata.normalize("NFKC", character):
-            characters.append(normal)
-            offsets.append((index, index + 1))
-    return "".join(characters), tuple(offsets)
+    view = detection_view(text)
+    return view.text, view.offsets
 
 
 NUMERIC = re.compile(

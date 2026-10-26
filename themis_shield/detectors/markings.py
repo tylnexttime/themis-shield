@@ -26,6 +26,9 @@ False-positive policy: err towards local.
   a non-space character; profile-listed short markers additionally need an
   ASCII capital letter or digit after them.
 - Rules flagged ``any_case_in_body`` count in any case, including the body.
+- Invisible characters and compatibility forms do not hide a marking: the
+  surface is also read through the shared detection view (default-ignorable
+  code points removed, NFKC), and the stricter of the two readings wins.
 
 Findings contain canonical values and half-open original Python-character
 offsets, never matched text or excerpts. HEADER_FOOTER denotes a mostly-marking
@@ -43,6 +46,8 @@ from enum import IntEnum, StrEnum
 import re
 from threading import Lock
 from typing import Any, Mapping
+
+from ..normalise import detection_view
 
 
 class MarkingClass(IntEnum):
@@ -413,11 +418,36 @@ def _sorted_values(findings, category) -> tuple[str, ...]:
 
 
 def detect_markings(text: str, profile: MarkingProfile | None = None) -> MarkingResult:
-    """Inspect one complete textual surface without normalising away offsets."""
+    """Inspect one complete textual surface; offsets always address ``text``.
+
+    The surface is scanned twice: as written, and as the shared detection view
+    (default-ignorable characters removed, NFKC per character; see
+    :func:`themis_shield.normalise.detection_view`), so that SECRET with a
+    zero-width joiner inside, or CONFIDENTIAL in full-width letters, still
+    counts. View findings are mapped back to source offsets and added to the
+    raw findings, so the result fails towards the stricter marking: the
+    classification is never lower than the raw text's, and a raw finding is
+    never dropped.
+    """
 
     if not isinstance(text, str):
         raise TypeError("marking input must be text")
     profile = profile or active_marking_profile()
+    findings = _scan(text, profile)
+    view = detection_view(text)
+    if view.changed:
+        seen = {(item.category, item.value, item.start, item.end) for item in findings}
+        for item in _scan(view.text, profile):
+            start, end = view.to_source(item.start, item.end)
+            key = (item.category, item.value, start, end)
+            if key not in seen:
+                seen.add(key)
+                findings.append(replace(item, start=start, end=end))
+    return _result(findings, profile)
+
+
+def _scan(text: str, profile: MarkingProfile) -> list[MarkingFinding]:
+    """One pass over one text; findings carry offsets into that text."""
     token_re = profile._token
     paragraph_re = profile._paragraph
     assert token_re is not None
@@ -501,6 +531,10 @@ def detect_markings(text: str, profile: MarkingProfile | None = None) -> Marking
                 MarkingFinding(rule.category, rule.value, position, start, end)
             )
 
+    return findings
+
+
+def _result(findings: list[MarkingFinding], profile: MarkingProfile) -> MarkingResult:
     findings.sort(key=lambda item: (item.start, item.end, item.category.value))
     classification = max(
         (

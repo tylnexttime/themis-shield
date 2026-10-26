@@ -18,6 +18,7 @@ from time import perf_counter
 from types import MappingProxyType
 from typing import Callable
 
+from ..normalise import detection_view
 from ..types import Label
 from .allowlist import AllowList, apply_allowlist, compile_profile
 from .contracts import (
@@ -137,7 +138,9 @@ def _tier1(document, profile, targets):
         projected.findings if projected.report.status == Status.OK
         else propagated.findings
     )
-    document.injection = bool(INJECTION.search(text))
+    # The signal fires on the text as written or on the shared detection view (invisible characters removed,
+    # NFKC), so a zero-width character inside "ignore all previous instructions" no longer hides it.
+    document.injection = bool(INJECTION.search(text) or INJECTION.search(detection_view(text).text))
     document.reasons = escalation_reasons(EscalationInput(
         len(text), bool(findings), tracer.report.doc_sensitivity,
         targets.has_attachment, document.injection, targets.thorough,
