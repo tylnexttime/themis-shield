@@ -9,8 +9,8 @@ Set at start-up from ``[detection] version`` (or the evaluation runner's ``--det
 
 v0.3 friction fixes (lane 1) are named switches on top of v0.2, each measured alone and together by replay on the
 development sets. ``[detection] fixes`` (a list of names, ``"all"`` or ``"none"``) or the runner's
-``--detection-fixes`` selects them; ``version = "v0.1"`` switches every one of them off as well. With no fix on,
-v0.2 behaviour is reproduced byte for byte.
+``--detection-fixes`` selects them; ``version = "v0.1"`` switches every one of them off as well. All are on by
+default; ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte.
 
 - ``secret-placeholders``: a secret assignment whose whole value is a template placeholder or a reference to a
   secret manager (``${VAULT:...}``, ``{{ secret }}``, ``<set in vault>``, ``%(name)s``, ``$(VAR)``, ``<REDACTED>``)
@@ -41,7 +41,11 @@ DETECTION_FIXES = (
     "secret-placeholders", "organisation-contacts", "checksum-context", "rule-completeness",
     "table-role-words", "title-tokens", "contact-brackets",
 )
-DEFAULT_DETECTION_FIXES: tuple[str, ...] = ()
+# Every fix held the ratchet (released leaks, R_any, sensitive R_any, QUASI_ID R_any) on both development sets
+# (the v0.1 set and split C, replayed from captured finder answers) and is on by default. Three of them
+# (organisation-contacts, checksum-context, and the ACN half of rule-completeness) changed no decision or metric
+# there: no development case exercises the situation they are for, so they are adopted on their unit tests.
+DEFAULT_DETECTION_FIXES: tuple[str, ...] = DETECTION_FIXES
 _lock = Lock()
 _version = DEFAULT_DETECTION_VERSION
 _fixes: frozenset[str] = frozenset(DEFAULT_DETECTION_FIXES)

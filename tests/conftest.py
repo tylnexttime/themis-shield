@@ -37,7 +37,7 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.fixture(autouse=True)
 def _default_gate_versions():
-    """Every test starts and ends on the shipped detection and policy versions (v0.2)."""
+    """Every test starts and ends on the shipped detection and policy versions (v0.2) and default v0.3 fixes."""
     configure_detection_version(None)
     configure_detection_fixes(None)
     configure_policy(None)

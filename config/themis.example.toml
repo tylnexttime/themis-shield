@@ -117,6 +117,11 @@ institution_profile = ""
 # Detection behaviour: "v0.2" (default) or "v0.1" (the evaluated v0.1
 # detection, kept as a negative control).
 version = "v0.2"
+# v0.3 friction fixes on top of v0.2: "all" (default), "none" (exact v0.2.1
+# behaviour) or a list of names: "secret-placeholders",
+# "organisation-contacts", "checksum-context", "rule-completeness",
+# "table-role-words", "title-tokens", "contact-brackets".
+# fixes = "all"
 
 [policy]
 # Policy behaviour: "v0.2" (default) or "v0.1" (negative control).

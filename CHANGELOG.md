@@ -2,6 +2,44 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## Unreleased (v0.3 development: deterministic friction fixes)
+
+Seven deterministic fixes for v0.2's known friction causes, each a named
+switch (`[detection] fixes`, default "all"; "none" restores 0.2.1 exactly;
+detection version "v0.1" turns them all off). Measured only by replaying the
+captured v0.2 finder answers over the development data (the v0.1 set and
+split C); no new held-out split has been run.
+
+- `secret-placeholders`: a secret assignment whose whole value is a template
+  placeholder or a secret-manager reference (`${VAULT:...}`, `<set in vault>`,
+  `{{ secret }}`, `${{ secrets.X }}`, `%(name)s`, `$(VAR)`, `<REDACTED>`) is
+  not a secret. A value glued to placeholder syntax is still caught, now as
+  the whole token. Split C: the four configuration files blocked as SECRET are
+  released.
+- `organisation-contacts`: role mailboxes (generic function or department
+  local parts) and Australian inbound numbers (13, 1300, 1800) are still
+  substituted but no longer count as evidence for the empty-finder hold.
+- `checksum-context`: a TFN-, Medicare- or ABN-valid number labelled by a
+  reference word directly before it ("Invoice", "Order no.", "Ticket #") is a
+  generic identifier in the rules (still substituted); "TFN" or "tax file" on
+  the line keeps the TFN.
+- `rule-completeness`: a payment-card rule (issuer prefix, length, Luhn) in
+  the `intl` pack; an ACN validator in the `au` pack: a number introduced as
+  an ACN that passes the ACN check is company evidence (generic identifier,
+  not a TFN, and not evidence for the empty-finder hold). Australian
+  validators are cross-tested against an independent implementation.
+- `table-role-words`: a table cell that is only a common occupation or role
+  word ("Teacher", "Registered nurse") is not a quasi-identifier candidate;
+  qualified or rare roles still are.
+- `title-tokens`: a leading title in a found name ("Captain", "Sister") is not
+  propagated through the document as a name token.
+- `contact-brackets`: a contact span that lost its opening bracket still
+  matches the whole public number.
+- Development replay, all fixes on: split C clean-case friction 0.200 ->
+  0.147 (19 -> 14 of 95), over-redaction 605 -> 600, any-label precision
+  0.761 -> 0.781; released leaks 0, R_any, sensitive and quasi-identifier
+  recall unchanged. The v0.1 set is unchanged on every metric.
+
 ## 0.2.1 (27/10/2026)
 
 Security hardening: invisible Unicode characters and compatibility forms no
