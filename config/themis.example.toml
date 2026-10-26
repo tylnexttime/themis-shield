@@ -151,8 +151,9 @@ insecure_test_only = false
 # redacted. Values are never stored. Manage it with `themis kmr`.
 enabled = false
 # path = "~/.local/share/themis-shield/known-miss.db"
-# A snapshot older than this sends cloud-bound work to ASK (`themis kmr refresh` attests it
-# is current). An unreadable register blocks.
+# A local register is always current. A snapshot IMPORTED from a central or shared register
+# (`themis kmr import`) whose source export is older than this sends cloud-bound work to ASK
+# until a current export is re-imported. An unreadable register blocks.
 max_snapshot_age_days = 7
 
 [false_positives]

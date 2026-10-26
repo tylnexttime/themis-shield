@@ -179,14 +179,26 @@ feed training and the regression set, never a held-out test split (docs/ROADMAP.
 ### Known-miss register and final sweep
 
 `catalogues/known_miss.py`, managed with `themis kmr` (`add`, `list`, `verify`, `reject`, `promote`,
-`export-regression-stub`, `refresh`, `rotate-key`). A local SQLite file (default `<app data>/known-miss.db`)
-whose entries and history refuse UPDATE and DELETE through triggers, like the job register.
+`export-regression-stub`, `rotate-key`, `export`, `import`, `imports`). A local SQLite file (default
+`<app data>/known-miss.db`) whose entries, history and imports refuse UPDATE and DELETE through triggers, like the
+job register.
 
 - **Entries.** `entry_kind` is `rule` (a pattern for a format), `context` (a phrase shape that carried a
   quasi-identifier) or `fingerprint`. Each has an entity type (a gate label), a source (`operator`,
   `cloud_tripwire`, `peer_check`, `evaluation`), a UTC creation time, the job id that showed the miss and a link
   to a synthetic regression case. Patterns must generalise (a character class, escape class or quantifier) and
   cannot match empty text, so an entry is a shape, not a stored value or quoted surrounding text.
+- **Patterns cannot hang the sweep.** Rule and context patterns (and the false-positive catalogue's context
+  patterns) are checked with the standard library's own regular-expression parser, at `add` or import and again
+  each time the register is loaded (an unsafe stored pattern blocks rather than hangs). Refused: backreferences
+  and conditionals, lookahead and lookbehind, a quantified group containing another quantifier (`(a+)+$`),
+  alternation inside a quantified group (`(a|aa)*b`), and a backtracking budget: the product over all
+  quantifiers of how many lengths each can take (an unbounded one counts as 1,024) may not exceed 4,096, which in
+  practice means at most one unbounded quantifier and the rest tightly bounded (`\w*\w*x` is refused,
+  `the only \w{1,30} on the \w{1,30} shift` is not). The text each entry scans is bounded too: windows of 1,024
+  characters overlapping by 256 (a match up to 256 characters is always seen whole), and at most 1 MiB per entry
+  per sweep, beyond which the sweep blocks instead of skipping text. On the largest request the worst allowed
+  pattern costs about two seconds, never a hang.
 - **Lifecycle.** `proposed` → `verified` (by a person other than the proposer) → `in_sweep` → `built_in` (needs
   the release tag and a linked regression case) or `rejected`. Only `in_sweep` entries are swept. Status is the
   latest event in the append-only history. `export-regression-stub` writes a value-free stub (entry id, kind,
@@ -212,14 +224,20 @@ whose entries and history refuse UPDATE and DELETE through triggers, like the jo
   exact-data-match tools in docs/ROADMAP.md section 3, without hashing every n-gram of arbitrary length). Hits
   are value-free: entry id, kind, entity type, JSON path and character offsets.
 - **Outcomes.** A hit adds `ASK:known-miss-hit`: the job is held with the findings listed and goes through the
-  normal ASK path (requester confirmation, Operator approval); nothing is silently redacted. A snapshot whose
-  latest event is older than `max_snapshot_age_days` (default 7) adds `ASK:known-miss-stale` for cloud-bound
-  work; `themis kmr refresh` attests the register is current. A missing, corrupt or unkeyable register raises
-  `BLOCK:known-miss-unreadable`. An entry that starts matching after a package was approved without a hold
-  refuses that package (`KNOWN_MISS_HIT`); the work is re-submitted as a new job. The decision record stores the
-  register version (latest event id) and age the sweep used.
-- **Scope.** The sweep runs inside `Router._protect`, so the hooks path gets it too, but only the web/API path
-  writes the decision record today.
+  normal ASK path (requester confirmation, Operator approval); nothing is silently redacted. A missing, corrupt
+  or unkeyable register raises `BLOCK:known-miss-unreadable`. An entry that starts matching after a package was
+  approved without a hold refuses that package (`KNOWN_MISS_HIT`, fail closed); the work is re-submitted as a new
+  job. The decision record stores the register version (latest event id) and the imports in force.
+- **Staleness applies to imported snapshots only.** A local register cannot be stale: there is nothing for it to
+  be behind. A register exported from a central or shared source (`themis kmr export`: in-sweep rule and context
+  entries only; fingerprints never leave the gate whose key made them) can be imported on another gate
+  (`themis kmr import`). The newest import per source is in force, an older export than the one in force is
+  refused, and its age is measured from the source's export time recorded at import. An import older than
+  `max_snapshot_age_days` (default 7) adds `ASK:known-miss-stale` for cloud-bound work until a current export is
+  re-imported.
+- **Known gap (v0.3): the hooks path has no decision record.** The sweep runs inside `Router._protect`, so the
+  Claude Code hooks path gets it (and the false-positive catalogue) too, but only the web/API path writes the
+  `gate_decisions` record with the register version used.
 
 ### Reviewed false-positive catalogue
 
@@ -256,14 +274,16 @@ whose entries and history refuse UPDATE and DELETE through triggers, like the jo
   task turn. Never for BLOCK or local-only work (they never reach the cloud). It runs once per approved package.
 - **What it sends.** The approved de-identified messages (and tools) as one JSON document in a user message,
   behind a fixed first system instruction (`tripwire-v1`): list residual personal information by character span or
-  placeholder, never guess who anyone is, reply with exactly `{"residual": [...], "stop": bool}`. The request is
+  placeholder, never guess who anyone is, reply with exactly `{"residual": [...], "stop": bool}`, bare or as the
+  only content of one fenced block (```` ```json ```` or ```` ``` ````) with nothing else around it. The request is
   checked for original values like any other and bound to the job's current approval (`TRIPWIRE_SENT` audit
   event). It sees what it was about to see anyway; **it detects, it does not prevent**.
 - **Outcomes.** A clear reply is recorded and changes nothing: silence is not evidence and never upgrades a
   decision. A flag stops the job (Held-Offline, audited), records only spans, placeholder ids and a fixed category,
   and points the Operator to `themis tripwire review JOB --confirm` (the job is refused and a known-miss proposal
   is offered) or `--reject` (the job returns to Approved for the same package and is not re-checked). A malformed
-  reply (prose, code fences, extra keys, inconsistent `stop`, spans outside the document, unknown placeholders),
+  reply (prose, text around a fence, two fences, extra keys, inconsistent `stop`, spans outside the document,
+  unknown placeholders),
   including one produced by an instruction injected into the document, refuses the job; a reply that contains an
   original value, or a transport failure, does too.
 - **Precision.** Each Operator verdict is stored; `themis tripwire stats` reports confirmed, rejected and pending
