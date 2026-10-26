@@ -86,6 +86,10 @@ class ReasonCode(StrEnum):
     QUASI_ID = "ASK:quasi-identifier"
     INJECTION_SIGNAL = "ASK:injection-signal"
     AMBIGUOUS_ENTITY = "ASK:ambiguous-entity"
+    # v0.3 known-miss register (only with [known_miss] enabled = true).
+    KNOWN_MISS_HIT = "ASK:known-miss-hit"
+    KNOWN_MISS_STALE = "ASK:known-miss-stale"
+    KNOWN_MISS_UNREADABLE = "BLOCK:known-miss-unreadable"
     UNKNOWN_TOKEN = "RESTORE:unknown-token"
     DROPPED_TOKEN = "RESTORE:dropped-token"
     INVENTED_TOKEN = "RESTORE:invented-token"
