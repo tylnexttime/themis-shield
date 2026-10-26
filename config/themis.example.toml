@@ -140,3 +140,35 @@ protector = "auto"
 passphrase_env = "THEMIS_VAULT_PASSPHRASE"
 insecure_test_only = false
 # path = "~/.local/share/themis-shield/vault.db"
+
+# --- v0.3 catalogues: every feature below is OFF by default -----------------------------------
+# With all three off the gate behaves exactly as v0.2.1. See docs/ARCHITECTURE.md.
+
+[known_miss]
+# Known-miss register and final sweep: confirmed misses (rules, context shapes and, for
+# high-entropy strings only, keyed fingerprints) checked on the outbound de-identified text
+# after substitution. A hit sends the job to ASK with the finding shown; it is never silently
+# redacted. Values are never stored. Manage it with `themis kmr`.
+enabled = false
+# path = "~/.local/share/themis-shield/known-miss.db"
+# A snapshot older than this sends cloud-bound work to ASK (`themis kmr refresh` attests it
+# is current). An unreadable register blocks.
+max_snapshot_age_days = 7
+
+[false_positives]
+# Reviewed false-positive catalogue: look-alikes accepted by a person, scoped, expiring.
+# "no_hold" entries stop a finding holding a document (still substituted); "allow" entries
+# are not substituted (refused for secrets, sensitive statements, dates of birth and
+# quasi-identifiers). Never an in-document marker. Manage it with `themis fpc`.
+enabled = false
+# path = "~/.local/share/themis-shield/false-positives.db"
+# Scope entries apply to. Empty = the [detection] institution_profile name, else "default".
+scope = ""
+
+[tripwire]
+# Optional cloud trip-wire: after Operator approval and before the task turn, the cloud model
+# is asked (fixed first instruction, strict JSON reply) to list residual personal information
+# by placeholder or span. A flag or a malformed reply stops the job. It detects; it does not
+# prevent. Review flags with `themis tripwire review`.
+enabled = false
+max_completion_tokens = 2048
