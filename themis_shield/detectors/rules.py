@@ -230,16 +230,18 @@ def placeholder_value(view: str, start: int, end: int | None = None) -> bool:
 # ----------------------------------------------------------------------------------------------------------------------
 # v0.3 fix "checksum-context": about 1 in 11 random nine-digit numbers passes the TFN check (1 in 22 ten-digit numbers
 # the Medicare check, 1 in 89 eleven-digit numbers the ABN check), so an order or invoice number is often a "valid"
-# TFN. Words on the same line just before the number decide: positive context keeps the specific label; negative
-# context without positive context makes the rule's finding a generic identifier (INTERNAL_ID), still substituted.
-# Positive context is also read a few characters after the number ("123 456 782 (TFN)").
+# TFN. A number whose label, directly before it, is a reference word ("Invoice 123...", "Order no. 123...",
+# "Ticket #123...") becomes a generic identifier (INTERNAL_ID) in the rules, still substituted, unless the label's
+# own positive context is anywhere on the line before it or right after it ("TFN", "tax file"), which keeps the
+# label. Tuning round 1 (development log): the reference word must label the number; "in case you need it: N" and
+# "the ABN for the invoice is N" are not case or invoice numbers.
 # ----------------------------------------------------------------------------------------------------------------------
 CONTEXT_BEFORE_CHARS = 40
 CONTEXT_AFTER_CHARS = 16
 NEGATIVE_NUMBER_CONTEXT = re.compile(
-    r"(?i)\b(?:invoice|inv|order|ord|ref|reference|ticket|case|account\s*(?:no|number|num)|acct|acn|"
-    r"build|serial|s/n|receipt|tracking|transaction|txn|booking|quote|purchase\s+order)\b"
-    r"|\bPO\b|\bA\.C\.N\b"
+    r"(?i)(?:\b(?:invoice|inv|order|ord|ref|reference|ticket|case|account|acct|acn|build|serial|s/n|receipt|"
+    r"tracking|transaction|txn|booking|quote|purchase\s+order|po)\b|\bA\.C\.N\b\.?)"
+    r"(?:\s*(?:no|num|number|id|ref)\b\.?)?\s*[:#=\-]*\s*$"
 )
 POSITIVE_NUMBER_CONTEXT = {
     Label.TFN: re.compile(r"(?i)\btfn\b|\btax\s*file\b"),
@@ -260,19 +262,17 @@ def _line_window(view: str, start: int, end: int) -> tuple[str, str]:
 
 
 def number_context(label: Label, view: str, start: int, end: int) -> str | None:
-    """``"positive"``, ``"negative"`` or ``None`` for a checksum-valid number.
+    """``"positive"``, ``"negative"`` or ``None`` for a checksum-valid number; positive wins.
 
-    Before the number, the closest context word on the line decides ("TFN: ... Order no. N" is an order number).
-    After it, only positive context counts, and only up to the next digit or sentence break ("N (TFN)").
+    Positive: the label's own context word anywhere on the line before the number, or after it up to the next digit
+    or sentence break ("N (TFN)"). Negative: a reference word that labels the number, directly before it.
     """
     before, after = _line_window(view, start, end)
     after = re.split(r"[0-9.;!?]", after, maxsplit=1)[0]
     positive = POSITIVE_NUMBER_CONTEXT.get(label)
-    last_positive = max((m.end() for m in positive.finditer(before)), default=-1) if positive else -1
-    last_negative = max((m.end() for m in NEGATIVE_NUMBER_CONTEXT.finditer(before)), default=-1)
-    if last_positive > last_negative or (positive is not None and positive.search(after)):
+    if positive is not None and (positive.search(before) or positive.search(after)):
         return "positive"
-    return "negative" if last_negative >= 0 else None
+    return "negative" if NEGATIVE_NUMBER_CONTEXT.search(before) else None
 
 
 def acn_valid(value: str) -> bool:
@@ -303,7 +303,7 @@ _CARD_RANGES = (
     ("6011", "6011", (16, 17, 18, 19)), ("644", "649", (16, 17, 18, 19)), ("65", "65", (16, 17, 18, 19)),
     ("3528", "3589", (16, 17, 18, 19)),
     ("300", "305", (14, 15, 16, 17, 18, 19)), ("36", "36", (14, 15, 16, 17, 18, 19)),
-    ("38", "39", (16, 17, 18, 19)),
+    ("38", "39", (14, 15, 16, 17, 18, 19)),
     ("62", "62", (16, 17, 18, 19)),
 )
 
