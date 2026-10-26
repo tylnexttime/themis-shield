@@ -83,8 +83,13 @@ def kmr_parser() -> argparse.ArgumentParser:
     stub.add_argument("entry_id")
     stub.add_argument("--out", type=Path, required=True, help="directory for the stub")
     stub.add_argument("--identity", default=None)
-    refresh = commands.add_parser("refresh", help="attest the register is current (resets its age)")
-    refresh.add_argument("--identity", default=None)
+    export = commands.add_parser("export", help="write this register's in-sweep rules for other gates")
+    export.add_argument("--source-id", required=True, help="a name for this register, e.g. central-register")
+    export.add_argument("--out", type=Path, required=True)
+    importing = commands.add_parser("import", help="import (or re-import) another register's export")
+    importing.add_argument("file", type=Path)
+    importing.add_argument("--identity", default=None)
+    commands.add_parser("imports", help="list the imports in force and their export times")
     rotate = commands.add_parser("rotate-key", help="replace the fingerprint key; invalidates fingerprints")
     rotate.add_argument("--confirm-invalidates", type=int, required=True)
     rotate.add_argument("--identity", default=None)
@@ -151,8 +156,22 @@ def kmr_main(argv=None, *, protector=None, prompt=getpass.getpass, read=input) -
                 json.dump(stub, stream, indent=2, sort_keys=True)
                 stream.write("\n")
             print(f"{args.entry_id}: regression stub {stub['case_id']} written; write the synthetic text yourself.")
-        elif args.command == "refresh":
-            print(f"Known-miss register refreshed; version {store.refresh(actor_identity=who)}.")
+        elif args.command == "export":
+            document = store.export_snapshot(source_id=args.source_id)
+            with args.out.open("x", encoding="utf-8") as stream:
+                json.dump(document, stream, indent=2, sort_keys=True)
+                stream.write("\n")
+            print(f"Exported {len(document['entries'])} rule and context entries (fingerprints never leave).")
+        elif args.command == "import":
+            with args.file.open("r", encoding="utf-8") as stream:
+                document = json.load(stream)
+            count = store.import_snapshot(document, actor_identity=who)
+            print(f"Imported {count} entries from {document['source_id']} (exported {document['exported_utc']}).")
+        elif args.command == "imports":
+            print("Source\tVersion\tExported (UTC)\tImported (UTC)\tEntries")
+            for row in store.imports():
+                print(f"{row['source_id']}\t{row['source_version']}\t{row['exported_utc']}\t"
+                      f"{row['imported_utc']}\t{row['entries']}")
         elif args.command == "rotate-key":
             count = store.rotate_key(actor_identity=who, confirm_invalidates=args.confirm_invalidates)
             print(f"Fingerprint key rotated; {count} fingerprint entries invalidated (add them again).")

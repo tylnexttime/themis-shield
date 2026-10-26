@@ -236,15 +236,69 @@ def test_final_sweep_only_moves_release_to_ask(tmp_path):
     )
 
 
-def test_stale_snapshot_asks_and_refresh_clears_it(tmp_path):
-    register = known_miss(tmp_path, clock=lambda: NOW - timedelta(days=8))
+def central_export(tmp_path, days_old, *, name="central"):
+    """A register elsewhere (the source), exported ``days_old`` days ago with one in-sweep rule."""
+    source = KnownMissRegister(
+        tmp_path / f"{name}-{days_old}.db", protector=protector(),
+        clock=lambda: NOW - timedelta(days=days_old), create=True,
+    )
+    in_sweep(source, source.add_pattern(
+        "rule", r"\bQX[0-9A-Z]{2}-[0-9A-Z]{4}\b", entity_type="INTERNAL_ID", source="evaluation",
+        proposed_by="synthetic-operator-a",
+    ))
+    add_missed(source)  # a fingerprint: never exported
+    return source.export_snapshot(source_id="central-register")
+
+
+def test_a_local_register_is_never_stale(tmp_path):
+    register = known_miss(tmp_path, clock=lambda: NOW - timedelta(days=400))
+    add_missed(register)
     raw = canonical({"messages": [{"role": "user", "content": "Nothing to see."}]})
     sweeper = KnownMissSweep(register, timedelta(days=7))
+    result = final_sweep(_Router(sweeper), raw, DecisionResult(Decision.RELEASE, ()))
+    assert result.decision == Decision.RELEASE and not result.sweep.stale
+    assert not hasattr(register, "refresh")
+
+
+def test_export_carries_rules_only_and_imports_are_swept(tmp_path):
+    document = central_export(tmp_path, 1)
+    assert [item["entry_kind"] for item in document["entries"]] == ["rule"]
+    assert "fingerprint" not in json.dumps(document)
+    local = known_miss(tmp_path)
+    assert local.import_snapshot(document, actor_identity="synthetic-operator-b") == 1
+    raw = canonical({"messages": [{"role": "user", "content": "Reference QX7Z-K9PW."}]})
+    result = final_sweep(_Router(KnownMissSweep(local, timedelta(days=7))), raw, DecisionResult(Decision.RELEASE, ()))
+    assert [hit.entry_id for hit in result.sweep.hits] == ["central-register:KMR-0001"]
+    assert result.reasons == (ReasonCode.KNOWN_MISS_HIT,)
+    assert result.sweep.as_record()["imports"][0]["source_id"] == "central-register"
+
+
+def test_stale_import_asks_until_a_current_export_is_imported(tmp_path):
+    local = known_miss(tmp_path)
+    local.import_snapshot(central_export(tmp_path, 8), actor_identity="synthetic-operator-b")
+    raw = canonical({"messages": [{"role": "user", "content": "Nothing to see."}]})
+    sweeper = KnownMissSweep(local, timedelta(days=7))
     stale = final_sweep(_Router(sweeper), raw, DecisionResult(Decision.RELEASE, ()))
     assert stale.decision == Decision.ASK and stale.reasons == (ReasonCode.KNOWN_MISS_STALE,)
-    KnownMissRegister(tmp_path / "known-miss.db", clock=lambda: NOW).refresh(actor_identity="synthetic-operator-b")
+    assert stale.sweep.stale_sources == ("central-register",)
+    local.import_snapshot(central_export(tmp_path, 1), actor_identity="synthetic-operator-b")
     fresh = final_sweep(_Router(sweeper), raw, DecisionResult(Decision.RELEASE, ()))
-    assert fresh.decision == Decision.RELEASE
+    assert fresh.decision == Decision.RELEASE and fresh.sweep.status == "clear"
+    with pytest.raises(CatalogueError, match="older"):
+        local.import_snapshot(central_export(tmp_path, 3), actor_identity="synthetic-operator-b")
+
+
+@pytest.mark.parametrize("change", [
+    {"schema": "something-else"}, {"source_id": "bad id!"}, {"exported_utc": "2099-01-01T00:00:00Z"},
+    {"entries": [{"source_entry_id": "KMR-0001", "entry_kind": "rule", "entity_type": "PERSON",
+                  "source": "operator", "pattern": "(a+)+$", "regression_case_id": None}]},
+    {"entries": [{"source_entry_id": "KMR-0001", "entry_kind": "fingerprint", "entity_type": "PERSON",
+                  "source": "operator", "pattern": None, "regression_case_id": None}]},
+])
+def test_imports_are_validated(tmp_path, change):
+    document = dict(central_export(tmp_path, 1), **change)
+    with pytest.raises(CatalogueError):
+        known_miss(tmp_path).import_snapshot(document, actor_identity="synthetic-operator-b")
 
 
 @pytest.mark.parametrize("damage", ["missing", "corrupt", "no-key"])
@@ -324,13 +378,15 @@ def test_router_unreadable_register_blocks_and_never_calls_the_cloud(tmp_path):
         h.cloud.close()
 
 
-def test_router_stale_register_asks(tmp_path):
-    register = known_miss(tmp_path, clock=lambda: NOW - timedelta(days=30))
+def test_router_stale_import_asks(tmp_path):
+    register = known_miss(tmp_path)
+    register.import_snapshot(central_export(tmp_path, 30), actor_identity="synthetic-operator-b")
     h = sweeping_harness(tmp_path, register)
     try:
         response = h.router.handle(request())
         assert response.reason == "REQUESTER_CONFIRM_REQUIRED"
-        assert "older than the configured limit" in response.body["choices"][0]["message"]["content"]
+        text = response.body["choices"][0]["message"]["content"]
+        assert "older than the configured limit" in text and "themis kmr import" in text
     finally:
         h.cloud.close()
 
@@ -391,3 +447,86 @@ def test_cli_rule_pattern_comes_from_a_prompt(tmp_path, capsys):
     argv = ["--db", str(tmp_path / "cli.db"), "add", "--kind", "rule", "--entity-type", "INTERNAL_ID"]
     assert kmr_main(argv, read=lambda _: r"\bQX[0-9A-Z]{2}-[0-9A-Z]{4}\b") == 0
     assert "KMR-0001" in capsys.readouterr().out
+
+
+# -- pattern safety ----------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("pattern", [
+    r"(a+)+$", r"(a|aa)*b", r"(\d+-)+x", r"(?:ab|cd){2,}", r"(\w)\1", r"(?P<x>a)(?P=x)", r"(a)?(?(1)b|c)",
+    r"(?=QX)\w+", r"(?<!x)\d+", r"(?!a)\w+", r"\w*\w*x", r"\w+\d+x", r"[a-z]+[a-z]{1,16}x",
+])
+def test_catastrophic_patterns_are_refused(pattern):
+    with pytest.raises(CatalogueError):
+        check_pattern(pattern)
+
+
+@pytest.mark.parametrize("pattern", [
+    r"\bQX[0-9A-Z]{2}-[0-9A-Z]{4}\b", r"the only \w+ on the night shift",
+    r"the only \w{1,30} on the \w{1,30} shift", r"(?:ref|case)[ :][0-9]{4,8}", r"[A-Z]{2}[0-9]{6}",
+    r"\d{3}-\d{3}-\d{4}", r"(?i)\bward [0-9]{1,2}[a-d]\b",
+])
+def test_ordinary_patterns_pass(pattern):
+    check_pattern(pattern)
+
+
+def test_unsafe_stored_pattern_blocks_at_load(tmp_path):
+    register = known_miss(tmp_path)
+    entry = in_sweep(register, register.add_pattern(
+        "rule", r"[0-9]{4}", entity_type="INTERNAL_ID", source="operator", proposed_by="synthetic-operator-a",
+    ))
+    with sqlite3.connect(tmp_path / "known-miss.db") as db:  # an entry written around the validator
+        db.execute(
+            "INSERT INTO kmr_entries (entry_id,entry_kind,entity_type,source,created_utc,pattern,proposed_by) "
+            "VALUES ('KMR-0002','rule','PERSON','operator','2026-10-22T00:00:00Z','(a+)+$','x')"
+        )
+        for status in ("proposed", "verified", "in_sweep"):
+            db.execute(
+                "INSERT INTO kmr_events (entry_id,event,to_status,actor,occurred_utc) "
+                "VALUES ('KMR-0002',?,?,'x','2026-10-22T00:00:00Z')", (status.upper(), status),
+            )
+    assert entry == "KMR-0001"
+    with pytest.raises(CatalogueUnavailable):
+        register.snapshot()
+
+
+def test_scanned_text_is_bounded_per_entry_and_windows_overlap(tmp_path):
+    from themis_shield.catalogues.known_miss import MAX_SCAN_PER_ENTRY, SCAN_WINDOW
+    register = known_miss(tmp_path)
+    in_sweep(register, register.add_pattern(
+        "rule", r"\bQX[0-9A-Z]{2}-[0-9A-Z]{4}\b", entity_type="INTERNAL_ID", source="operator",
+        proposed_by="synthetic-operator-a",
+    ))
+    snapshot = register.snapshot()
+    for position in range(SCAN_WINDOW - 20, SCAN_WINDOW + 5):  # every placement across a window boundary
+        text = "x " * (position // 2) + ("" if position % 2 == 0 else "y") + " QX7Z-K9PW " + "z " * 900
+        hits = snapshot.sweep([(("stop",), text)])
+        assert [text[hit.start:hit.end] for hit in hits] == ["QX7Z-K9PW"]
+    with pytest.raises(CatalogueUnavailable):
+        snapshot.sweep([(("stop",), "a " * (MAX_SCAN_PER_ENTRY // 2 + 1))])
+
+
+def test_worst_allowed_pattern_finishes_on_the_largest_request(tmp_path):
+    import time
+    register = known_miss(tmp_path)
+    in_sweep(register, register.add_pattern(
+        "rule", r"\w+[a-z]{1,4}x", entity_type="INTERNAL_ID", source="operator",
+        proposed_by="synthetic-operator-a",
+    ))
+    started = time.perf_counter()
+    assert register.snapshot().sweep([(("stop",), "a" * 200000)]) == ()
+    assert time.perf_counter() - started < 30
+
+
+def test_cli_export_and_import(tmp_path, capsys):
+    source, local = str(tmp_path / "central.db"), str(tmp_path / "local.db")
+    assert kmr_main(["--db", source, "add", "--kind", "rule", "--entity-type", "INTERNAL_ID",
+                     "--identity", "synthetic-operator-a"], read=lambda _: r"[A-Z]{2}[0-9]{6}") == 0
+    for command in (["verify", "KMR-0001"], ["promote", "KMR-0001", "--to", "in_sweep"]):
+        assert kmr_main(["--db", source, *command, "--identity", "synthetic-operator-b"]) == 0
+    out = tmp_path / "export.json"
+    assert kmr_main(["--db", source, "export", "--source-id", "central-register", "--out", str(out)]) == 0
+    assert kmr_main(["--db", local, "import", str(out), "--identity", "synthetic-operator-b"]) == 0
+    capsys.readouterr()
+    assert kmr_main(["--db", local, "imports"]) == 0
+    assert "central-register" in capsys.readouterr().out

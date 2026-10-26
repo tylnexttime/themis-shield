@@ -3,7 +3,8 @@
 - :func:`decide_with_catalogue` replaces the router's single ``decide`` call: without a false-positive catalogue it
   returns exactly ``decide(evidence)``; with one, the model's decision and the catalogue's override are kept apart.
 - :func:`final_sweep` runs the known-miss register over the outbound de-identified JSON, after substitution. A hit
-  or a stale snapshot can only move RELEASE to ASK; an unreadable register blocks.
+  or a stale imported snapshot can only move RELEASE to ASK; an unreadable register blocks. A purely local register
+  is never stale.
 - :func:`configure` reads ``[known_miss]``, ``[false_positives]`` and ``[tripwire]`` (all ``enabled = false`` by
   default) and attaches the enabled parts to the router.
 """
@@ -31,12 +32,16 @@ DEFAULT_TRIPWIRE_TOKENS = 2048
 
 @dataclass(frozen=True, slots=True)
 class SweepOutcome:
-    """Value-free: register version and age used, and where each hit is in the outbound text."""
+    """Value-free: register version and imports used, stale imported sources, and where each hit is."""
 
     version: int
-    as_of_utc: datetime
-    stale: bool
     hits: tuple[SweepHit, ...] = ()
+    imports: tuple[tuple[str, datetime], ...] = ()
+    stale_sources: tuple[str, ...] = ()
+
+    @property
+    def stale(self) -> bool:
+        return bool(self.stale_sources)
 
     @property
     def status(self) -> str:
@@ -45,7 +50,11 @@ class SweepOutcome:
     def as_record(self) -> dict:
         return {
             "status": self.status, "version": self.version,
-            "as_of_utc": self.as_of_utc.isoformat(timespec="seconds"),
+            "imports": [
+                {"source_id": source, "exported_utc": exported.isoformat(timespec="seconds")}
+                for source, exported in self.imports
+            ],
+            "stale_sources": list(self.stale_sources),
             "hits": [hit.as_record() for hit in self.hits],
         }
 
@@ -167,8 +176,8 @@ def outbound_leaves(body) -> Iterator[tuple[tuple, str]]:
 def final_sweep(router, raw: bytes, result: DecisionResult) -> DecisionResult:
     """Sweep the exact outbound JSON. Without a register: ``result`` unchanged.
 
-    A hit or a stale snapshot adds ASK reasons (RELEASE becomes ASK); nothing is redacted. An unreadable register
-    raises ``GateFailure(BLOCK:known-miss-unreadable)``.
+    A hit or a stale imported snapshot adds ASK reasons (RELEASE becomes ASK); nothing is redacted. An unreadable
+    register raises ``GateFailure(BLOCK:known-miss-unreadable)``.
     """
     sweeper = getattr(router, "known_miss", None)
     if sweeper is None:
@@ -180,8 +189,9 @@ def final_sweep(router, raw: bytes, result: DecisionResult) -> DecisionResult:
         hits = snapshot.sweep(outbound_leaves(strict_json(raw)))
     except Exception:
         raise GateFailure(ReasonCode.KNOWN_MISS_UNREADABLE.value, 200) from None
-    stale = snapshot.is_stale(router.clock(), sweeper.max_age)
-    outcome = SweepOutcome(snapshot.version, snapshot.as_of_utc, stale, hits)
+    stale_sources = snapshot.stale_sources(router.clock(), sweeper.max_age)
+    stale = bool(stale_sources)
+    outcome = SweepOutcome(snapshot.version, hits, snapshot.imports, stale_sources)
     reasons = list(result.reasons)
     if hits:
         reasons.append(ReasonCode.KNOWN_MISS_HIT)
@@ -204,8 +214,9 @@ def sweep_findings_text(result) -> str:
         lines.extend("- " + hit.describe() for hit in sweep.hits)
     if sweep.stale:
         lines.append(
-            f"The known-miss register snapshot (version {sweep.version}) is older than the configured limit; "
-            "an Operator refreshes it with `themis kmr refresh`."
+            "An imported known-miss snapshot is older than the configured limit (source "
+            + ", ".join(sweep.stale_sources)
+            + "); an Operator re-imports a current export with `themis kmr import`."
         )
     return "\n" + "\n".join(lines)
 

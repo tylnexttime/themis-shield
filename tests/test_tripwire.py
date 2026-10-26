@@ -38,10 +38,14 @@ def flag_reply(body):
 
 
 TEXT = '{"messages":[{"content":"Hello ⟦P:3fa9c1⟧ from the night desk","role":"user"}]}'
+CLEAR_TEXT = '{"residual": [], "stop": false}'
 
 
 @pytest.mark.parametrize("reply", [
-    "Nothing found.", "```json\n{\"residual\": [], \"stop\": false}\n```", "{}", '{"residual": []}',
+    "Nothing found.", "{}", '{"residual": []}',
+    "Here you go:\n```json\n" + CLEAR_TEXT + "\n```", "```json\n" + CLEAR_TEXT + "\n```\nDone.",
+    "```json\n" + CLEAR_TEXT + "\n```\n```json\n" + CLEAR_TEXT + "\n```", "```python\n" + CLEAR_TEXT + "\n```",
+    "```json " + CLEAR_TEXT + "```", "```json\nNote: " + CLEAR_TEXT + "\n```", "```\n" + CLEAR_TEXT,
     '{"residual": [], "stop": false, "note": "ok"}', '{"residual": [], "stop": true}',
     '{"residual": [{"start": 1, "end": 2}], "stop": false}',
     '{"residual": [{"start": 5, "end": 500}], "stop": true}',
@@ -247,3 +251,21 @@ def test_never_on_local_only_or_blocked_work(tmp_path):
 def test_document_is_the_approved_messages_as_json():
     raw = canonical({"model": "m", "messages": [{"role": "user", "content": "⟦P:3fa9c1⟧ hi"}], "stream": True})
     assert json.loads(document(raw)) == {"messages": [{"role": "user", "content": "⟦P:3fa9c1⟧ hi"}]}
+
+
+@pytest.mark.parametrize("reply", [
+    "```json\n" + CLEAR_TEXT + "\n```", "```\n" + CLEAR_TEXT + "\n```", "\n  ```json\n  " + CLEAR_TEXT + "  \n```\n",
+])
+def test_one_fenced_block_with_only_the_object_is_accepted(reply):
+    assert parse_reply(reply, TEXT) == ()
+    flagged = reply.replace(CLEAR_TEXT, '{"residual": [{"placeholder": "⟦P:3fa9c1⟧"}], "stop": true}')
+    assert [flag.placeholder for flag in parse_reply(flagged, TEXT)] == ["⟦P:3fa9c1⟧"]
+
+
+def test_fenced_clear_reply_goes_through_the_router(tmp_path):
+    h = tripwire_harness(tmp_path, "```json\n" + CLEAR + "\n```")
+    try:
+        _, sent = approve_and_send(h, request())
+        assert sent.route == "cloud-tokenised"
+    finally:
+        h.cloud.close()

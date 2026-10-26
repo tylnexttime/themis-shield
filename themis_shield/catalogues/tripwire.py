@@ -9,8 +9,9 @@ been read by the cloud model once.
 - A flag stops the job (Held-Offline, audited). Only spans and placeholder ids are recorded, never text. An
   Operator confirms or rejects each flag (``themis tripwire review``), which tracks flag precision; a confirmed
   flag is offered as a known-miss proposal.
-- The reply must be strict JSON in a fixed shape. Anything else, including a reply that obeys an instruction
-  injected into the document, stops the job (fail closed).
+- The reply must be strict JSON in a fixed shape, bare or as the only content of one fenced block (```json or
+  ```). Anything else, including a reply that obeys an instruction injected into the document, stops the job
+  (fail closed).
 - Silence never upgrades a decision: a clear reply changes nothing the gate decided. The trip-wire is itself an
   LLM reading untrusted text, so an injection can suppress its flags; that only weakens an extra layer.
 - It never runs for BLOCK or local-only work (those never reach the cloud at all).
@@ -46,6 +47,7 @@ MAX_FLAGS = 64
 MAX_REPLY_CHARACTERS = 65536
 _TOKEN = re.compile(STRICT_TOKEN_PATTERN)
 _LABELS = {item.value for item in Label}
+_FENCE = re.compile(r"```(?:json)?[ \t]*\r?\n(.*)\r?\n[ \t]*```", re.S)
 
 
 class TripwireMalformed(ValueError):
@@ -111,11 +113,21 @@ def _category(value) -> str:
 
 
 def parse_reply(content: str, text: str) -> tuple[Flag, ...]:
-    """Strict: exactly ``{"residual": [...], "stop": bool}``, consistent, with spans inside ``text``."""
+    """Strict: exactly ``{"residual": [...], "stop": bool}``, consistent, with spans inside ``text``.
+
+    The object may be bare, or the only content of exactly one fenced block (```json or ```) with nothing but
+    whitespace around it. Anything else is malformed.
+    """
     if not isinstance(content, str) or len(content) > MAX_REPLY_CHARACTERS:
         raise TripwireMalformed("reply")
+    body = content.strip()
+    if body.startswith("`"):
+        fenced = _FENCE.fullmatch(body)
+        if fenced is None or "`" in fenced.group(1):
+            raise TripwireMalformed("fence")
+        body = fenced.group(1).strip()
     try:
-        value = strict_json(content.strip())
+        value = strict_json(body)
     except ValueError:
         raise TripwireMalformed("json") from None
     if type(value) is not dict or set(value) != {"residual", "stop"}:

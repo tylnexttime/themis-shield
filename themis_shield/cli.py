@@ -5,7 +5,7 @@
     themis register   job register operator CLI
     themis runtime    local model runtime control
     themis profiles   list deployment profiles (shipped and external)
-    themis kmr        known-miss register (v0.3): add, list, verify, reject, promote, export-regression-stub
+    themis kmr        known-miss register (v0.3): add, list, verify, reject, promote, export, import
     themis fpc        reviewed false-positive catalogue (v0.3): propose, accept, list, expire
     themis tripwire   cloud trip-wire results (v0.3): review, list, stats
     themis --version  print the version

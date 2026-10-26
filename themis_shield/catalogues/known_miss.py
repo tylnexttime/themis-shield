@@ -21,6 +21,15 @@ invalidates, and those entries must be added again.
 Entry lifecycle: ``proposed`` -> ``verified`` (by a person other than the proposer) -> ``in_sweep`` -> ``built_in``
 (the fix shipped in a release, with its synthetic regression case) or ``rejected``. Only ``in_sweep`` entries are
 swept. Entries and their history are append-only.
+
+Operator-written patterns are checked so they cannot hang the sweep (no backreferences, lookarounds, nested
+quantifiers or alternation inside a quantified group; a bounded backtracking budget), at ``add`` and again at load,
+and the text each entry scans is bounded.
+
+A local register is always current: there is nothing for it to be behind. A register can also import a snapshot
+exported by a central or shared register (rules and context shapes only, never fingerprints); such an import is
+*stale* when the source's export time is older than the configured limit, and stale imports send cloud-bound work
+to ASK until re-imported.
 """
 
 from __future__ import annotations
@@ -29,11 +38,18 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import hashlib
 import hmac
+import json
 import math
 from pathlib import Path
 import re
 import secrets
 from typing import Callable, Iterable, Mapping
+
+try:  # the stdlib's own regular-expression parser (Python 3.11+ keeps it under re)
+    from re import _constants as _C, _parser as _sre_parse
+except ImportError:  # pragma: no cover
+    import sre_constants as _C
+    import sre_parse as _sre_parse
 
 from ..normalise import detection_view
 from ..placeholders import STRICT_TOKEN_PATTERN
@@ -60,6 +76,14 @@ MAX_WINDOW_RUNS = 8
 MAX_PATTERN_CHARS = 512
 MAX_HITS_PER_ENTRY = 20
 DEFAULT_MAX_SNAPSHOT_AGE_DAYS = 7
+# Pattern safety (see check_pattern_safety) and the text bound per entry.
+SCAN_WINDOW = 1024
+MAX_BACKTRACK = SCAN_WINDOW * 4
+MAX_MATCH_CHARS = 256
+MAX_SCAN_PER_ENTRY = 1 << 20
+_REPEATS = (_C.MAX_REPEAT, _C.MIN_REPEAT, getattr(_C, "POSSESSIVE_REPEAT", _C.MAX_REPEAT))
+_SOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+EXPORT_SCHEMA = "themis-shield/known-miss-export/v1"
 _FINGERPRINT_CONTEXT = b"themis-shield/known-miss/v1\0"
 
 _JOB_ID = re.compile(r"JOB-[0-9]{4}-[0-9]{4}")
@@ -155,8 +179,58 @@ def fingerprint(key: bytes, normalised: str) -> str:
     return hmac.new(key, _FINGERPRINT_CONTEXT + normalised.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def check_pattern_safety(pattern: str) -> None:
+    r"""Refuse the regular-expression features that make backtracking blow up, using the stdlib parser.
+
+    Refused: backreferences and conditionals, lookarounds, a quantified group that contains another quantifier
+    (``(a+)+``), alternation inside a quantified group (``(a|aa)*``), and a pattern whose quantifiers together
+    could backtrack too far. That last check multiplies, over every quantifier, how many lengths it can take
+    (``hi - lo + 1``; an unbounded one counts as a whole ``SCAN_WINDOW``) and refuses a product above
+    ``MAX_BACKTRACK``: in practice at most one unbounded quantifier (``*``, ``+``, ``{n,}``) with the rest tightly
+    bounded, so ``\w*\w*x`` is refused and ``\w{1,30} on the \w{1,30} shift`` is not. With the scanned text
+    bounded per entry (``SCAN_WINDOW`` windows, ``MAX_SCAN_PER_ENTRY`` in all), an operator-written pattern costs
+    at most seconds on the largest request, never a hang.
+    """
+    try:
+        tree = _sre_parse.parse(pattern)
+    except Exception:
+        raise CatalogueError("the pattern does not compile") from None
+    product = 1
+
+    def walk(items, quantified: bool) -> None:
+        nonlocal product
+        for op, value in items:
+            if op in (_C.GROUPREF, _C.GROUPREF_EXISTS):
+                raise CatalogueError("backreferences and conditionals are not allowed in a pattern")
+            if op in (_C.ASSERT, _C.ASSERT_NOT):
+                raise CatalogueError("lookahead and lookbehind are not allowed in a pattern")
+            if op is _C.SUBPATTERN:
+                walk(value[3], quantified)
+            elif op is _C.ATOMIC_GROUP:
+                walk(value, quantified)
+            elif op is _C.BRANCH:
+                if quantified:
+                    raise CatalogueError("alternation inside a quantified group is not allowed in a pattern")
+                for branch in value[1]:
+                    walk(branch, quantified)
+            elif op in _REPEATS:
+                if quantified:
+                    raise CatalogueError("a quantified group may not contain another quantifier")
+                low, high, body = value
+                span = SCAN_WINDOW if high is _C.MAXREPEAT or high > SCAN_WINDOW else high - low + 1
+                product = min(product * max(span, 1), MAX_BACKTRACK * SCAN_WINDOW)
+                walk(body, True)
+
+    walk(tree, False)
+    if product > MAX_BACKTRACK:
+        raise CatalogueError(
+            "the pattern could backtrack too far: use at most one unbounded quantifier and bound the others "
+            "tightly, e.g. {1,20}"
+        )
+
+
 def check_pattern(pattern: str) -> re.Pattern:
-    """A rule or context pattern: bounded, compiles, generalises, and cannot match empty text."""
+    """A rule or context pattern: bounded, compiles, safe to backtrack, generalises, cannot match empty text."""
     if not isinstance(pattern, str) or not pattern.strip() or len(pattern) > MAX_PATTERN_CHARS:
         raise CatalogueError(f"a pattern of 1 to {MAX_PATTERN_CHARS} characters is required")
     if any(ord(character) < 32 and character not in "\t" for character in pattern):
@@ -165,6 +239,7 @@ def check_pattern(pattern: str) -> re.Pattern:
         compiled = re.compile(pattern)
     except re.error:
         raise CatalogueError("the pattern does not compile") from None
+    check_pattern_safety(pattern)
     if compiled.fullmatch("") is not None or compiled.search("") is not None:
         raise CatalogueError("the pattern matches empty text, so it would match everywhere")
     if not _GENERALISES.search(pattern):
@@ -207,6 +282,17 @@ class SweepHit:
         )
 
 
+def _windows(text: str):
+    if len(text) <= SCAN_WINDOW:
+        yield 0, text
+        return
+    step = SCAN_WINDOW - MAX_MATCH_CHARS
+    for offset in range(0, len(text), step):
+        yield offset, text[offset:offset + SCAN_WINDOW]
+        if offset + SCAN_WINDOW >= len(text):
+            return
+
+
 @dataclass(frozen=True, slots=True)
 class SweepRule:
     entry_id: str
@@ -217,16 +303,27 @@ class SweepRule:
 
 @dataclass(frozen=True, slots=True)
 class SweepSnapshot:
-    """The in-sweep entries at one register version, with the unwrapped key held only for the sweep."""
+    """The in-sweep entries at one register version, with the unwrapped key held only for the sweep.
+
+    ``imports`` lists each imported source and the export time its latest snapshot carried. Only imported
+    snapshots can be stale (behind their source); local entries are always current.
+    """
 
     version: int
-    as_of_utc: datetime
     rules: tuple[SweepRule, ...]
     fingerprints: Mapping[str, tuple[str, str]] = field(repr=False)
     key: bytes | None = field(default=None, repr=False)
+    imports: tuple[tuple[str, datetime], ...] = ()
+
+    def stale_sources(self, now: datetime, max_age: timedelta) -> tuple[str, ...]:
+        return tuple(source for source, exported in self.imports if utc(now) - exported > max_age)
 
     def is_stale(self, now: datetime, max_age: timedelta) -> bool:
-        return utc(now) - self.as_of_utc > max_age
+        return bool(self.stale_sources(now, max_age))
+
+    @property
+    def oldest_export_utc(self) -> datetime | None:
+        return min((exported for _, exported in self.imports), default=None)
 
     def sweep(self, leaves: Iterable[tuple[tuple, str]]) -> tuple[SweepHit, ...]:
         hits: dict[tuple, SweepHit] = {}
@@ -239,15 +336,23 @@ class SweepSnapshot:
             per_entry[entry_id] = per_entry.get(entry_id, 0) + 1
             hits[key] = SweepHit(entry_id, kind, entity_type, path, span[0], span[1])
 
+        scanned: dict[str, int] = {}
         for path, text in leaves:
             # The gate's own placeholders are masked (same length), so no entry can match a token's letters.
             masked = _TOKEN.sub(lambda match: " " * len(match.group()), text)
             view = detection_view(masked)
             for rule in self.rules:
-                for match in rule.regex.finditer(view.text):
-                    if match.end() > match.start():
-                        add(rule.entry_id, rule.kind, rule.entity_type, path,
-                            view.to_source(match.start(), match.end()))
+                # Bounded work per entry: windows of SCAN_WINDOW characters overlapping by MAX_MATCH_CHARS (a
+                # match up to that long is always seen whole), and at most MAX_SCAN_PER_ENTRY characters in all;
+                # beyond that the sweep refuses (fail closed) rather than skip text.
+                for offset, window in _windows(view.text):
+                    scanned[rule.entry_id] = scanned.get(rule.entry_id, 0) + len(window)
+                    if scanned[rule.entry_id] > MAX_SCAN_PER_ENTRY:
+                        raise CatalogueUnavailable("outbound text exceeds the sweep bound")
+                    for match in rule.regex.finditer(window):
+                        if match.end() > match.start():
+                            add(rule.entry_id, rule.kind, rule.entity_type, path,
+                                view.to_source(offset + match.start(), offset + match.end()))
             if not self.fingerprints or self.key is None:
                 continue
             runs = list(_RUN.finditer(view.text))
@@ -322,7 +427,17 @@ class KnownMissRegister:
                 release_tag TEXT,
                 note TEXT
             )""")
-            for table in ("kmr_meta", "kmr_entries", "kmr_events"):
+            # Imported snapshots from a central or shared register: the latest import per source is in force.
+            db.execute("""CREATE TABLE IF NOT EXISTS kmr_imports (
+                import_id INTEGER PRIMARY KEY,
+                source_id TEXT NOT NULL,
+                source_version INTEGER NOT NULL,
+                exported_utc TEXT NOT NULL,
+                imported_utc TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                entries_json TEXT NOT NULL
+            )""")
+            for table in ("kmr_meta", "kmr_entries", "kmr_events", "kmr_imports"):
                 deny_changes(db, table)
             # The key table is key custody, not history: rotation deletes the old wrapped key.
             db.execute(
@@ -493,11 +608,94 @@ class KnownMissRegister:
             self._entry(db, entry_id)
             self._event(db, entry_id, "LINKED", None, None, actor_identity, self._now(), case=case_id)
 
-    def refresh(self, *, actor_identity: str) -> int:
-        """Attest that the register is current (resets the snapshot age). Returns the new version."""
+    # -- sharing: export from a central or shared register, import here ------------------------------------------
+
+    def export_snapshot(self, *, source_id: str) -> dict:
+        """The local in-sweep ``rule`` and ``context`` entries, for another gate to import.
+
+        Fingerprints are never exported: they are only usable with this gate's key, and shipping the key would
+        make every copy a value oracle. A central register shares rules (or, later, an OPRF-style service).
+        """
+        if not isinstance(source_id, str) or not _SOURCE_ID.fullmatch(source_id):
+            raise CatalogueError("invalid source id")
+        now = self._now()
         with self._open() as db:
-            self._event(db, None, "REFRESHED", None, None, actor_identity, self._now())
-            return db.execute("SELECT MAX(event_id) FROM kmr_events").fetchone()[0]
+            version = db.execute("SELECT MAX(event_id) FROM kmr_events").fetchone()[0]
+            entries = [
+                {
+                    "source_entry_id": row["entry_id"], "entry_kind": row["entry_kind"],
+                    "entity_type": row["entity_type"], "source": row["source"], "pattern": row["pattern"],
+                    "regression_case_id": self._case(db, row),
+                }
+                for row in db.execute(
+                    "SELECT * FROM kmr_entries WHERE entry_kind<>'fingerprint' ORDER BY entry_id"
+                ).fetchall()
+                if self._status(db, row["entry_id"]) == "in_sweep"
+            ]
+        return {
+            "schema": EXPORT_SCHEMA, "source_id": source_id, "source_version": version,
+            "exported_utc": stamp(now), "entries": entries,
+        }
+
+    def import_snapshot(self, document: dict, *, actor_identity: str) -> int:
+        """Import (or re-import) a snapshot exported by a source register. Returns the number of entries.
+
+        The newest import per source is in force, and its age is measured from the source's export time: an
+        import older than the configured limit makes cloud-bound work ASK until it is re-imported. A snapshot older
+        than the one already imported from the same source is refused (no silent rollback).
+        """
+        if type(document) is not dict or document.get("schema") != EXPORT_SCHEMA:
+            raise CatalogueError("not a known-miss register export")
+        source = document.get("source_id")
+        version = document.get("source_version")
+        entries = document.get("entries")
+        if not isinstance(source, str) or not _SOURCE_ID.fullmatch(source):
+            raise CatalogueError("invalid source id")
+        if type(version) is not int or version < 0 or type(entries) is not list or len(entries) > 10000:
+            raise CatalogueError("invalid export")
+        try:
+            exported = parse_stamp(str(document.get("exported_utc")))
+        except ValueError:
+            raise CatalogueError("invalid export time") from None
+        now = self._now()
+        if exported > now + timedelta(minutes=5):
+            raise CatalogueError("the export time is in the future")
+        clean = []
+        for item in entries:
+            if type(item) is not dict or set(item) != {
+                "source_entry_id", "entry_kind", "entity_type", "source", "pattern", "regression_case_id",
+            }:
+                raise CatalogueError("invalid export entry")
+            if item["entry_kind"] not in {"rule", "context"} or item["source"] not in SOURCES:
+                raise CatalogueError("an export carries rule and context entries only")
+            if not isinstance(item["source_entry_id"], str) or not _CASE_ID.fullmatch(item["source_entry_id"]):
+                raise CatalogueError("invalid export entry id")
+            check_pattern(item["pattern"])
+            clean.append(dict(item, entity_type=_entity_type(item["entity_type"])))
+        with self._open() as db:
+            previous = db.execute(
+                "SELECT exported_utc, source_version FROM kmr_imports WHERE source_id=? "
+                "ORDER BY import_id DESC LIMIT 1", (source,),
+            ).fetchone()
+            if previous is not None and (
+                parse_stamp(previous[0]) > exported or previous[1] > version
+            ):
+                raise CatalogueError("this export is older than the one already imported from that source")
+            db.execute(
+                "INSERT INTO kmr_imports (source_id,source_version,exported_utc,imported_utc,actor,entries_json) "
+                "VALUES (?,?,?,?,?,?)",
+                (source, version, stamp(exported), stamp(now), actor(actor_identity),
+                 json.dumps(clean, sort_keys=True, separators=(",", ":"))),
+            )
+            self._event(db, None, "IMPORTED", None, None, actor_identity, now, note=source)
+        return len(clean)
+
+    @staticmethod
+    def _imports(db) -> list:
+        return db.execute(
+            "SELECT i.* FROM kmr_imports i JOIN (SELECT source_id, MAX(import_id) AS latest FROM kmr_imports "
+            "GROUP BY source_id) l ON i.import_id = l.latest ORDER BY i.source_id"
+        ).fetchall()
 
     def fingerprints_invalidated_by_rotation(self) -> int:
         with self._open() as db:
@@ -561,12 +759,21 @@ class KnownMissRegister:
                 return row
         raise KeyError("entry not found")
 
-    def version(self) -> tuple[int, datetime]:
+    def version(self) -> int:
         with self._open() as db:
-            row = db.execute("SELECT MAX(event_id), MAX(occurred_utc) FROM kmr_events").fetchone()
+            row = db.execute("SELECT MAX(event_id) FROM kmr_events").fetchone()
             if row is None or row[0] is None:
                 raise CatalogueUnavailable("register has no history")
-            return row[0], parse_stamp(row[1])
+            return row[0]
+
+    def imports(self) -> tuple[dict, ...]:
+        """The import in force for each source (source, versions, export and import times, entry count)."""
+        with self._open() as db:
+            return tuple({
+                "source_id": row["source_id"], "source_version": row["source_version"],
+                "exported_utc": row["exported_utc"], "imported_utc": row["imported_utc"],
+                "entries": len(json.loads(row["entries_json"])),
+            } for row in self._imports(db))
 
     def snapshot(self) -> SweepSnapshot:
         """Load everything ``in_sweep``. Any problem raises :class:`CatalogueUnavailable` (the gate BLOCKs)."""
@@ -577,9 +784,7 @@ class KnownMissRegister:
                 meta = db.execute("SELECT schema_version FROM kmr_meta").fetchone()
                 if meta is None or meta[0] != SCHEMA_VERSION:
                     raise CatalogueUnavailable("unsupported known-miss register schema")
-                version, latest = db.execute(
-                    "SELECT MAX(event_id), MAX(occurred_utc) FROM kmr_events"
-                ).fetchone()
+                version = db.execute("SELECT MAX(event_id) FROM kmr_events").fetchone()[0]
                 if version is None:
                     raise CatalogueUnavailable("register has no history")
                 rules, prints = [], {}
@@ -592,11 +797,20 @@ class KnownMissRegister:
                             raise CatalogueUnavailable("an in-sweep fingerprint has no key")
                         prints[row["fingerprint"]] = (row["entry_id"], row["entity_type"])
                     else:
+                        # Patterns are re-checked at load: an unsafe stored pattern blocks rather than hangs.
                         rules.append(SweepRule(
-                            row["entry_id"], row["entry_kind"], row["entity_type"], re.compile(row["pattern"]),
+                            row["entry_id"], row["entry_kind"], row["entity_type"], check_pattern(row["pattern"]),
+                        ))
+                imported = []
+                for row in self._imports(db):
+                    imported.append((row["source_id"], parse_stamp(row["exported_utc"])))
+                    for item in json.loads(row["entries_json"]):
+                        rules.append(SweepRule(
+                            f"{row['source_id']}:{item['source_entry_id']}", item["entry_kind"],
+                            _entity_type(item["entity_type"]), check_pattern(item["pattern"]),
                         ))
                 key = self._key(db)[1] if prints else None
-                return SweepSnapshot(version, parse_stamp(latest), tuple(rules), dict(prints), key)
+                return SweepSnapshot(version, tuple(rules), dict(prints), key, tuple(imported))
         except CatalogueUnavailable:
             raise
         except Exception:

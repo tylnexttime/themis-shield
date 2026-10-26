@@ -252,3 +252,10 @@ def test_cli_propose_accept_list_expire(tmp_path, capsys):
     assert fpc_main(["--db", db, "expire", "FPC-0001", "--identity", "synthetic-operator-b"]) == 0
     assert fpc_main(["--db", db, "propose", "--label", "HEALTH", "--strength", "allow"],
                     read=lambda _: "Wellbeing Week") == 2
+
+
+@pytest.mark.parametrize("context", [r"(a+)+$", r"(a|aa)*b", r"(?<=x)switchboard"])
+def test_context_patterns_cannot_backtrack_catastrophically(tmp_path, context):
+    store = FalsePositiveCatalogue(tmp_path / "f.db", clock=lambda: NOW, create=True)
+    with pytest.raises(CatalogueError):
+        store.propose(profile="default", label="PHONE", context=context, proposed_by="synthetic-operator-a")

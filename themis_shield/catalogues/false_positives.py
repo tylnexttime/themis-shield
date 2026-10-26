@@ -28,6 +28,7 @@ from typing import Callable
 
 from ..detectors.allowlist import NEVER_TRIM
 from ..normalise import detection_view
+from .known_miss import check_pattern_safety
 from ..types import Label
 from .store import (
     CatalogueError, CatalogueUnavailable, actor, deny_changes, parse_stamp, stamp, transaction, utc,
@@ -78,6 +79,8 @@ def _context(pattern: str | None) -> re.Pattern | None:
         raise CatalogueError("the context pattern does not compile") from None
     if compiled.search("") is not None:
         raise CatalogueError("the context pattern matches empty text, so it would match everywhere")
+    # The same backtracking limits as known-miss patterns (it runs on untrusted text around each finding).
+    check_pattern_safety(pattern)
     return compiled
 
 
