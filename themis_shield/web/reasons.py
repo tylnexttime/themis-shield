@@ -8,6 +8,7 @@ from themis_shield.detectors.escalation import (
 )
 from themis_shield.register.models import REASONS, MARKING_REASONS
 from themis_shield.register.two_stage import STAGE_REASONS
+from themis_shield.register.gate_records import GATE_RECORD_REASONS
 from themis_shield.routing import RouteReasonCode
 from themis_shield.types import ReasonCode
 
@@ -94,6 +95,9 @@ FIXED = {
     "STOPPED": "Processing was stopped.",
     "CHECKED": "The clean package was peer-checked.",
     "REVIEW_REQUIRED": "Further peer review is required.",
+    "KNOWN_MISS_HIT": "The de-identified text matches the known-miss register; check the listed findings, then confirm.",
+    "TRIPWIRE_FLAGGED": "The cloud trip-wire flagged possible residual personal information; the job stopped for an Operator.",
+    "TRIPWIRE_REVIEW_REQUIRED": "An Operator must review the trip-wire flag before this job can continue.",
 }
 POLICY = {
     "STAGE_FAILED": "A required detection stage failed.",
@@ -108,11 +112,14 @@ POLICY = {
     "DISAGREEMENT_FEW_PERSONS": "The finders found substantially fewer people than the tracer.",
     "QUASI_ID": "A detail that can single someone out without naming them (a quasi-identifier) requires confirmation and review.",
     "INJECTION_SIGNAL": "Possible instruction injection requires confirmation and review.",
+    "KNOWN_MISS_HIT": "The de-identified text matches an entry in the known-miss register; check the finding before confirming.",
+    "KNOWN_MISS_STALE": "The known-miss register snapshot is older than the configured limit; the job needs a human check.",
+    "KNOWN_MISS_UNREADABLE": "The known-miss register could not be read; release is blocked.",
 }
 
 
 def catalogue():
-    result = {**FIXED, **REASONS, **STAGE_REASONS}
+    result = {**FIXED, **REASONS, **STAGE_REASONS, **GATE_RECORD_REASONS}
     result.update({
         PII_FOUND: "Tier-1 personal findings require both finder tiers.",
         DOCUMENT_SENSITIVE: "The document sensitivity score requires both finder tiers.",

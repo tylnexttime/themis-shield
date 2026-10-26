@@ -9,6 +9,8 @@ import hashlib
 from threading import Lock
 from .timezone import business_timezone
 
+from .catalogues import tripwire
+from .catalogues.gate import GateDecision, sweep_findings_text
 from .chat_boundary import ChatBoundary
 from .cloud.openai_compat import CloudFailure, Outbound, canonical, strict_json, verify_json
 from .detectors.markings import MarkingClass, detect_markings, marking_policy, summarise_markings
@@ -195,6 +197,9 @@ def handle(router, request, headers=None, *, source_document_count=1):
             )
         if job.status in {S.REFUSED, S.WITHDRAWN, S.EXPIRED}:
             return router._response(job, "blocked", "APPROVAL_NOT_ACTIVE", "This job is closed.")
+        stopped = tripwire.pending_response(router, job)
+        if stopped is not None:
+            return stopped
         if local:
             if not router.local_authorised:
                 return router._response(
@@ -270,14 +275,24 @@ def handle(router, request, headers=None, *, source_document_count=1):
             with router._state_lock:
                 router._payloads[job.job_id] = raw
         job = refresh(router, job.job_id)
+        if isinstance(policy, GateDecision):
+            # v0.3 decision record: model output and catalogue override kept apart, with the register version.
+            router._register_call(
+                "record_gate_decision", job.job_id, digest, policy.record(), now=router.clock(),
+            )
         row = router._register_call("get_details", job.job_id)
+        sweep = getattr(policy, "sweep", None)
+        if sweep is not None and (sweep.hits or sweep.stale) and not row["confirmation_required"]:
+            # The bound package was assessed without this finding; it cannot be released as it stands.
+            raise GateFailure("KNOWN_MISS_HIT", 200)
         confirmed = cloud_confirm if routing.local_alternative_offered else headers.get("x-themis-confirm") == job.job_id
         if policy.decision == Decision.ASK:
             confirmed = confirmed and headers.get("x-themis-confirm") == job.job_id
         if row["confirmation_required"] and not confirmed:
+            shown = sweep_findings_text(policy)
             return router._response(
-                job, "held", "REQUESTER_CONFIRM_REQUIRED",
-                f"Held for confirmation of the clean package {job.job_id}.", timings=timings,
+                job, "held", "KNOWN_MISS_HIT" if sweep is not None and sweep.hits else "REQUESTER_CONFIRM_REQUIRED",
+                f"Held for confirmation of the clean package {job.job_id}.{shown}", timings=timings,
             )
         if row["confirmation_required"] and router._register_call("get_approval", job.job_id) is None:
             router._register_call(
@@ -291,6 +306,10 @@ def handle(router, request, headers=None, *, source_document_count=1):
         if router._register_call("get_approval", job.job_id) is None:
             return held(router, job, "OPERATOR_APPROVAL_REQUIRED", timings)
         verify_json(raw, originals)
+        if getattr(router, "tripwire", None) is not None:
+            stopped = tripwire.run(router, job, raw, digest, originals, state.marking_class, timings)
+            if stopped is not None:
+                return stopped
         outbound = Outbound(job.job_id, state.marking_class, raw, digest, True, originals)
         with router.register.release_guard(job.job_id, digest, now=router.clock()):
             stream = router.cloud.open(outbound)

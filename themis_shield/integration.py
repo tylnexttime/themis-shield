@@ -344,6 +344,9 @@ def build_router(config_path):
             and settings.engine_path.is_file()
             and (settings.models_dir / entry.file).is_file()
         )
+        # v0.3 catalogues ([known_miss], [false_positives], [tripwire]): all off unless enabled.
+        from .catalogues.gate import configure as configure_catalogues
+        configure_catalogues(router, config, protector_factory=lambda: build_protector(vault_config))
         return router
     except BaseException:
         if cloud is not None:

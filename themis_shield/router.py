@@ -13,6 +13,7 @@ import re
 from threading import Lock, RLock
 from typing import Callable, Iterator
 
+from .catalogues.gate import decide_with_catalogue, final_sweep
 from .chat_boundary import ChatBoundary, assign
 from .cloud.openai_compat import (
     CloudFailure, CloudClient, canonical, strict_json, verify_json,
@@ -299,8 +300,10 @@ class Router:
         for surface in boundary.surfaces:
             starts.append(position)
             position += len(surface.text) + 2
-        evidence = self._scan("\n\n".join(surface.text for surface in boundary.surfaces))
-        result = decide(evidence, self.use_case)
+        scanned = "\n\n".join(surface.text for surface in boundary.surfaces)
+        evidence = self._scan(scanned)
+        # v0.3: exactly decide(evidence) unless the reviewed false-positive catalogue is enabled.
+        result, evidence = decide_with_catalogue(self, scanned, evidence)
         timings = dict(evidence.timings_ms)
         if result.decision == Decision.BLOCK:
             raise GateFailure(result.reasons[0].value if result.reasons else "POLICY_BLOCK", 200)
@@ -347,6 +350,8 @@ class Router:
         raw = canonical(boundary.final_body(self.cloud.settings.max_tokens, self.cloud.settings.model))
         originals = tuple(mapping.values())
         verify_json(raw, originals)
+        # v0.3: the known-miss final sweep on the exact outbound JSON (a no-op unless enabled).
+        result = final_sweep(self, raw, result)
         return raw, scoped, sent, originals, result, timings, dict(counts)
 
     def handle(self, request, headers=None, *, source_document_count=1):

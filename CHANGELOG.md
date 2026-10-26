@@ -2,6 +2,13 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## Unreleased (v0.3)
+
+- Safety fix, restore: the placeholder allocator never issues an identifier one hex digit, or one adjacent swap,
+  away from one already issued in the conversation, so a cloud answer that damages a single character of a
+  placeholder restores that placeholder's value or nothing, never another person's. Before, such near-neighbours
+  could coexist: by our estimate about a 2.7% chance in a conversation with 100 placeholders.
+
 ## 0.2.1 (27/10/2026)
 
 Security hardening: invisible Unicode characters and compatibility forms no

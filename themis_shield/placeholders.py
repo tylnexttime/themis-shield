@@ -133,6 +133,26 @@ class EntityMap:
         return len(set(self.entity_by_token.values()))
 
 
+def confusable(first: str, second: str) -> bool:
+    """True when two identifiers are equal, differ in one hex digit, or differ by one adjacent swap.
+
+    The allocator never issues an identifier confusable with one already issued in the conversation (whatever
+    its class letter), so a cloud answer that damages one character of a placeholder either restores exactly
+    that placeholder or matches nothing: it can never resolve to another person's value. Restoration itself is
+    exact (no fuzzy matching), and an unmatched placeholder is left visible.
+    """
+    if len(first) != len(second):
+        return False
+    differences = [index for index, (a, b) in enumerate(zip(first, second)) if a != b]
+    if len(differences) <= 1:
+        return True
+    return (
+        len(differences) == 2 and differences[1] == differences[0] + 1
+        and first[differences[0]] == second[differences[1]]
+        and first[differences[1]] == second[differences[0]]
+    )
+
+
 class MappingVault(Protocol):
     allocation_lock: RLock
 
@@ -266,7 +286,7 @@ class TokenAllocator:
                 identifier = self._id_factory()
                 if not isinstance(identifier, str) or not _HEX.fullmatch(identifier):
                     raise AllocationError("invalid identifier generator output")
-                if identifier not in identifiers:
+                if not any(confusable(identifier, other) for other in identifiers):
                     token = PlaceholderToken(category, identifier).render()
                     self.vault.put(self.conversation_id, token, value)
                     self._values[token] = value
