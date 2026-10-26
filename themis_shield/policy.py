@@ -70,10 +70,16 @@ DISAGREEMENT_TRACER_MIN_SCORE = 0.9
 
 
 def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
-    """Labels PII-Tracer attached to findings that are still present after the final allow-list (value-free)."""
+    """Labels PII-Tracer attached to findings that are still present after the final allow-list (value-free).
+
+    v0.3 (detection fix ``organisation-contacts`` / ``rule-completeness``): a finding whose whole value is an
+    organisation's role mailbox, inbound number or company number is still substituted but is not contrary evidence.
+    The flag is only ever set by detection; it cannot cancel a finding and is never read when a finder found anything.
+    """
     return frozenset(
         item.label
         for found in evidence.findings
+        if not found.organisation_value
         for item in found.evidence
         if item.stage == "pii-tracer" and item.label not in DISAGREEMENT_IGNORED_TRACER_LABELS
         and (item.score is None or item.score >= DISAGREEMENT_TRACER_MIN_SCORE)

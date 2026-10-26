@@ -5,6 +5,7 @@ Every invisible character in this file is written as an escape, never literally.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 
 import pytest
@@ -255,7 +256,9 @@ def test_span_covering_an_invisible_character_is_substituted_whole(invisible):
     allocator = TokenAllocator("synthetic")
     result = substitute(text, found, allocator)
     assert ch not in result.tokenised_text
-    assert "jane" not in result.tokenised_text and "678" not in result.tokenised_text
+    # Check outside the placeholders: their random hex can contain "678" by chance (about 2% of runs).
+    outside = re.sub("⟦[^⟧]*⟧", "", result.tokenised_text)
+    assert "jane" not in outside and "678" not in outside
     assert verify_no_originals(result.tokenised_text, allocator.mapping().values())
     assert sorted(allocator.mapping().values()) == sorted(
         [f"jane{ch}.doe@example.com", f"0412 3{ch}45 678"])

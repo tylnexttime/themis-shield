@@ -31,8 +31,8 @@ from .llm_finder import FinderModel, LLMFinder
 from .pii_tracer import PIITracerDetector, PIITracerSpec
 from .profile_adapter import adapt
 from .propagate import propagate
-from .rules import RulesDetector
-from .settings import v02
+from .rules import RulesDetector, organisation_value
+from .settings import fix_on, v02
 from .union import union_findings
 
 
@@ -197,6 +197,16 @@ def _finder_tier(documents, targets, tier, model):
             document.timings.setdefault(tier, elapsed if index == 0 else 0.0)
 
 
+def mark_organisation_values(text, findings, *, contacts, companies):
+    """v0.3: flag findings whose whole value is an organisation's contact or company number (still substituted)."""
+    return tuple(
+        replace(item, organisation_value=True)
+        if organisation_value(text, item.start, item.end, item.labels, contacts=contacts, companies=companies)
+        else item
+        for item in findings
+    )
+
+
 def _finish(document):
     text = document.text
     began = perf_counter()
@@ -229,6 +239,9 @@ def _finish(document):
         final.findings if final.report.status == Status.OK
         else union_findings(merged.findings, propagated.findings)
     )
+    contacts, companies = fix_on("organisation-contacts"), fix_on("rule-completeness")
+    if contacts or companies:
+        findings = mark_organisation_values(text, findings, contacts=contacts, companies=companies)
     document.timings[tier] += (perf_counter() - began) * 1000
     if any(not isfinite(value) or value < 0 for value in document.timings.values()):
         raise RuntimeError("invalid-timing")

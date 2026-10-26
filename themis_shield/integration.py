@@ -141,11 +141,11 @@ def configure_finder_prompt(config: Mapping[str, Any], institution: Mapping | No
 
 
 def configure_versions(config: Mapping[str, Any]) -> dict:
-    """Apply ``[detection] version`` and ``[policy] version`` / ``quasi_id_ask`` (defaults: v0.2).
+    """Apply ``[detection] version`` / ``fixes`` and ``[policy] version`` / ``quasi_id_ask`` (defaults: v0.2).
 
     ``version = "v0.1"`` in both tables restores the evaluated v0.1 behaviour (kept as a negative control).
     """
-    from .detectors.settings import configure_detection_version
+    from .detectors.settings import configure_detection_fixes, configure_detection_version
     from .policy import configure_policy
 
     detection = config.get("detection") or {}
@@ -154,6 +154,7 @@ def configure_versions(config: Mapping[str, Any]) -> dict:
         raise ValueError("unknown [policy] settings")
     return {
         "detection": configure_detection_version(detection.get("version") or None),
+        "detection_fixes": configure_detection_fixes(detection.get("fixes")),
         "policy": configure_policy(policy.get("version") or None, quasi_id_ask=policy.get("quasi_id_ask")),
     }
 

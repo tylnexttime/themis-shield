@@ -13,7 +13,7 @@ from .labels import is_bare_time_or_weekday
 from .profile_adapter import adapt
 from .propagate import TABLE_QUASI_STAGE
 from .rules import CHECKSUM_LABELS, PHONE, canonical_phone, validate_identifier
-from .settings import v02
+from .settings import fix_on, v02
 from .union import union_findings
 
 
@@ -145,6 +145,11 @@ def trim(
                 start += 1
             starts.add(start)
             ends.add(end)
+        if fix_on("contact-brackets"):
+            # v0.3: a detector span that lost the value's opening bracket ("07) 5550 0145") is still the whole
+            # value; the interval may start one bracket earlier. Leading brackets only, never a longer prefix.
+            starts.update(a for a, _, kind in intervals if kind != "date" and a < span.start
+                          and text[a:span.start] and all(ch in _LEADING for ch in text[a:span.start]))
         eligible = any(
             a in starts and b in ends and kind != "date"
             for a, b, kind in intervals

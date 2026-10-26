@@ -16,7 +16,7 @@ from themis_shield.detectors.contracts import StageReport, StageResult, Status, 
 from themis_shield.detectors.labels import is_bare_time_or_weekday, normalise_tracer_dates
 from themis_shield.detectors.propagate import TABLE_QUASI_STAGE, propagate, table_quasi_spans
 from themis_shield.detectors.rules import USI_ALPHABET, RulesDetector, usi_check_char, validate_identifier
-from themis_shield.detectors.settings import configure_detection_version, detection_version
+from themis_shield.detectors.settings import DEFAULT_DETECTION_FIXES, configure_detection_version, detection_version
 from themis_shield.detectors.union import union_findings
 from themis_shield.integration import configure_versions
 from themis_shield.policy import configure_policy, decide, policy_settings
@@ -70,9 +70,10 @@ def test_defaults_are_v02_and_v01_is_reachable():
 
 def test_versions_come_from_the_toml_tables():
     active = configure_versions({"detection": {"version": "v0.1"}, "policy": {"version": "v0.1"}})
-    assert active == {"detection": "v0.1", "policy": {"version": "v0.1", "quasi_id_ask": False}}
+    fixes = DEFAULT_DETECTION_FIXES
+    assert active == {"detection": "v0.1", "detection_fixes": fixes, "policy": {"version": "v0.1", "quasi_id_ask": False}}
     active = configure_versions({"policy": {"quasi_id_ask": True}})
-    assert active == {"detection": "v0.2", "policy": {"version": "v0.2", "quasi_id_ask": True}}
+    assert active == {"detection": "v0.2", "detection_fixes": fixes, "policy": {"version": "v0.2", "quasi_id_ask": True}}
     with pytest.raises(ValueError):
         configure_versions({"policy": {"verison": "v0.1"}})
 

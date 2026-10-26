@@ -358,15 +358,17 @@ def configure_detection(args) -> dict:
 
 def configure_gate_versions(args) -> dict:
     """Detection and policy behaviour versions (v0.2 by default; v0.1 is the negative control)."""
-    from themis_shield.detectors.settings import configure_detection_version
+    from themis_shield.detectors.settings import configure_detection_fixes, configure_detection_version
     from themis_shield.policy import configure_policy
 
     gate = getattr(args, "gate_version", None)
     detection = getattr(args, "detection_version", None) or gate
     policy_version = getattr(args, "policy_version", None) or gate
     quasi = getattr(args, "quasi_id_ask", None)
+    fixes = getattr(args, "detection_fixes", None)
     return {
         "detection": configure_detection_version(detection),
+        "detection_fixes": list(configure_detection_fixes(fixes)),
         "policy": configure_policy(policy_version, quasi_id_ask=None if quasi is None else quasi == "on"),
     }
 
@@ -701,6 +703,8 @@ def main(argv=None) -> int:
                     help="detection and policy behaviour together (v0.1 = the negative control)")
     ap.add_argument("--detection-version", choices=["v0.1", "v0.2"], default=None)
     ap.add_argument("--policy-version", choices=["v0.1", "v0.2"], default=None)
+    ap.add_argument("--detection-fixes", default=None,
+                    help="v0.3 friction fixes: comma-separated names, 'all' or 'none' (default: the shipped default)")
     ap.add_argument("--quasi-id-ask", choices=["on", "off"], default=None,
                     help="v0.2 policy: whether a found QUASI_ID holds the document for ASK (default: the policy's)")
     args = ap.parse_args(argv)

@@ -10,7 +10,7 @@ import re
 
 from ..types import Label, Span
 from .contracts import DetectionFinding, FindingEvidence, finding
-from .settings import v02
+from .settings import fix_on, v02
 from .union import union_findings
 
 
@@ -132,6 +132,29 @@ def table_spans(
     return tuple(out)
 
 
+# v0.3 fix "title-tokens": titles, honorifics and ranks in front of a name. A found name such as "Captain Jane Roe"
+# keeps its whole span, but the leading title is never propagated through the document as a name token: the title is
+# beside the name, not part of it. Only a capitalised title before at least one other name token, with no comma after
+# it, is skipped ("Bishop, Jane" keeps "Bishop": surname-first lists put the surname there).
+TITLE_WORDS = frozenset({
+    "captain", "capt", "doctor", "professor", "sister", "brother", "father", "mother", "reverend", "rev", "pastor",
+    "elder", "deacon", "bishop", "rabbi", "imam", "saint", "sergeant", "sgt", "constable", "inspector", "detective",
+    "officer", "lieutenant", "lt", "major", "colonel", "col", "general", "admiral", "commander", "corporal",
+    "private", "judge", "justice", "magistrate", "councillor", "cr", "senator", "minister", "mayor", "president",
+    "director", "manager", "coordinator", "head", "lead", "chief", "chair", "chairperson", "nurse", "coach",
+    "uncle", "aunt", "aunty", "auntie", "sir", "dame", "lady", "lord", "madam", "madame", "mister", "master",
+    "fr", "sr", "br", "dean", "principal", "matron", "chef", "governor", "premier", "sheriff", "agent",
+})
+
+
+def _leading_title(name: str, parts: list[str]) -> str | None:
+    """The first name part when it is a capitalised title followed by another part and no comma."""
+    if len(parts) < 2 or parts[0].casefold() not in TITLE_WORDS or not parts[0][:1].isupper():
+        return None
+    after = name[name.find(parts[0]) + len(parts[0]):]
+    return None if after.lstrip().startswith(",") else parts[0]
+
+
 def extra_spans(
     text: str,
     spans: tuple[DetectionFinding, ...],
@@ -144,6 +167,10 @@ def extra_spans(
             continue
         name = text[parent.start:parent.end]
         parts = [part for part in WORD.findall(name) if part.casefold() not in STOP]
+        if fix_on("title-tokens"):
+            title = _leading_title(name, parts)
+            if title is not None:
+                parts = parts[1:]
         tokens = {part for part in parts if len(part) >= 2}
         capitals = [part for part in parts if part[:1].isupper()]
         initials = set()
@@ -213,6 +240,41 @@ def _header_name(raw: str) -> str:
     return re.sub(r"[\s_\-]+", " ", raw).strip()
 
 
+# v0.3 fix "table-role-words": a cell that is only a common occupation or role title is never a quasi-identifier
+# candidate. A common job title next to a substituted date of birth and postcode adds little: its holders are
+# everywhere. What singles a person out is a rare or qualified role ("Only overseas-trained surgeon", "Night
+# pharmacist (only one)", "Branch manager"), and those stay candidates: the match is on the whole cell, so any
+# qualifier (rank, place, shift, "only", "sole", a count) keeps the cell in the pass. The list is a fixed vocabulary
+# of common occupations and generic role words, in singular and plural forms; it is not learned from any data.
+COMMON_ROLES = frozenset(" ".join(value.split()) for value in """
+accountant|accounts clerk|accounts officer|accounts payable officer|administration officer|administrative officer|
+administration assistant|administrative assistant|admin officer|admin assistant|administrator|analyst|
+apprentice|assistant|bar attendant|barista|bookkeeper|bricklayer|builder|bus driver|business analyst|butcher|
+call centre operator|carer|aged care worker|disability support worker|support worker|care worker|carpenter|
+cashier|checkout operator|chef|child care worker|childcare educator|educator|cleaner|clerk|general clerk|
+office clerk|data entry operator|receptionist|consultant|contractor|cook|kitchen hand|kitchenhand|
+customer service officer|customer service representative|customer service assistant|delivery driver|developer|
+software developer|software engineer|programmer|web developer|doctor|general practitioner|driver|truck driver|
+electrician|employee|engineer|civil engineer|mechanical engineer|electrical engineer|farmhand|farm hand|
+farm worker|gardener|groundskeeper|hairdresser|handyperson|labourer|general labourer|construction worker|lawyer|
+solicitor|librarian|mechanic|motor mechanic|diesel mechanic|nurse|registered nurse|enrolled nurse|
+nursing assistant|office manager|operator|machine operator|forklift driver|forklift operator|painter|
+paramedic|personal assistant|pharmacist|pharmacy assistant|physiotherapist|plumber|police officer|
+project officer|project manager|project coordinator|retail assistant|sales assistant|sales associate|
+sales representative|salesperson|secretary|security guard|security officer|staff|staff member|storeperson|
+storeman|student|supervisor|team member|team leader|teacher|primary teacher|secondary teacher|teacher aide|
+teachers aide|teacher's aide|technician|it technician|lab technician|laboratory technician|tradesperson|trainee|
+tutor|volunteer|waiter|waitress|waitstaff|warehouse assistant|warehouse worker|warehouse operator|welder|worker|
+officer|manager|coordinator|trainer|lecturer|casual|full-time|part-time|permanent|temporary|
+""".replace("\n", "").split("|") if value.strip())
+
+
+def common_role(value: str) -> bool:
+    """The whole cell is a common occupation or role word (case, spacing and a plural "s" ignored)."""
+    key = " ".join(value.split()).casefold()
+    return key in COMMON_ROLES or (key.endswith("s") and key[:-1] in COMMON_ROLES)
+
+
 def table_quasi_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
     lines = text.splitlines(keepends=True)
     offsets, position = [], 0
@@ -258,6 +320,7 @@ def table_quasi_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
             rows.append((row_index, row, row_cells))
             row_index += 1
         context = "".join(lines[max(0, index - QUASI_CONTEXT_LINES):index + 1])
+        role_words = fix_on("table-role-words")
         if rows and (identifier or ANONYMISED.search(context)):
             for column in sorted(category):
                 values = []
@@ -268,6 +331,7 @@ def table_quasi_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
                         not value.strip() or len(value) > QUASI_MAX_VALUE_CHARS
                         or _NOT_CATEGORICAL.fullmatch(value)
                         or not any(ch.isalpha() for ch in value)
+                        or (role_words and common_role(value))
                     ):
                         continue
                     values.append((offsets[line_no] + a, offsets[line_no] + b,
