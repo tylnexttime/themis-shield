@@ -33,6 +33,8 @@ from .profile_adapter import adapt
 from .propagate import propagate
 from .rules import RulesDetector, organisation_value
 from .settings import fix_on, v02
+from .typed import typed_settings
+from .typed_tier import run_typed_tier
 from .union import union_findings
 
 
@@ -297,7 +299,11 @@ def detect_batch(texts, profile, targets=None, *, thorough):
         _tier1(document, profile, targets)
     _finder_tier(documents, targets, 2, FinderModel.E4B)
     _finder_tier(documents, targets, 3, FinderModel.GEMMA_26B_A4B)
-    return [_finish(document) for document in documents]
+    results = [_finish(document) for document in documents]
+    # v0.3 typed-decision tier (T1.5): off unless [typed] enabled; never for trusted local-only previews.
+    if typed_settings().enabled and not targets.local_only:
+        results = run_typed_tier(texts, results, targets.typed)
+    return results
 
 
 def detect(text, profile, targets=None):

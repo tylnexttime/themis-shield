@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from math import isfinite
 from types import MappingProxyType
-from typing import Mapping, Protocol
+from typing import Any, Mapping, Protocol
 
 from ..paths import default_tracer_dir
 from ..types import Decision, DecisionResult, Finding, Label, Span
@@ -138,6 +138,9 @@ class DetectionTargets:
     tracer_artefact_manifest_id: str = ""
     llm_max_tokens: int = 8192
     local_only: bool = False
+    # v0.3 typed-decision tier (T1.5): where its back end comes from (``detectors.typed.TypedRuntime``). Used only
+    # when ``[typed] enabled``; None with the tier enabled fails that stage closed.
+    typed: Any = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +160,9 @@ class DetectionResult:
     )
     injection_signal: bool = False
     policy_result: DecisionResult | None = None
+    # v0.3 typed-decision tier: the questions asked and the model's answers (``detectors.typed.TypedEvidence``), or
+    # None when the tier did not run. The policy reads it; it never changes a finding by itself.
+    typed: Any = None
 
     @property
     def decision(self) -> Decision | None:

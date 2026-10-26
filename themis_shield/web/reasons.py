@@ -115,6 +115,7 @@ POLICY = {
     "KNOWN_MISS_HIT": "The de-identified text matches an entry in the known-miss register; check the finding before confirming.",
     "KNOWN_MISS_STALE": "The known-miss register snapshot is older than the configured limit; the job needs a human check.",
     "KNOWN_MISS_UNREADABLE": "The known-miss register could not be read; release is blocked.",
+    "TYPED_INDIRECT": "A sentence no detector flagged may reveal a sensitive fact about a person; check it before confirming.",
 }
 
 

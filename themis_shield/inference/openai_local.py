@@ -27,6 +27,9 @@ TIMING_KEYS = {
 }
 
 
+# llama-server's native endpoints the typed-decision tier may call (never a proxy, never a file or admin endpoint).
+NATIVE_PATHS = frozenset({"/apply-template", "/tokenize", "/completion", "/v1/systemone"})
+
 _NO_TLS: ssl.SSLContext | None = None
 _NO_TLS_LOCK = threading.Lock()
 
@@ -117,7 +120,7 @@ class OpenAILocalTarget:
         )
 
     def _exchange(
-        self, method: str, path: str, body: dict[str, Any] | None = None,
+        self, method: str, path: str, body: dict[str, Any] | None = None, *, root: str | None = None,
     ) -> Any:
         import json
 
@@ -144,7 +147,7 @@ class OpenAILocalTarget:
                 verify=_no_tls_context(),
             ) as client:
                 with client.stream(
-                    method, self.base_url + path, content=raw, headers=headers,
+                    method, (self.base_url if root is None else root) + path, content=raw, headers=headers,
                 ) as response:
                     if response.status_code != 200:
                         raise RuntimeFailure("local inference HTTP failure")
@@ -156,6 +159,15 @@ class OpenAILocalTarget:
         except (httpx.HTTPError, OSError):
             raise RuntimeFailure("local inference transport failed") from None
         return strict_loads(bytes(data))
+
+    def native_json(self, path: str, body: dict[str, Any]) -> Any:
+        """POST to one of llama-server's native endpoints (typed-decision tier only): template rendering,
+        tokenisation, a one-token completion with top log-probabilities, or a decision model. Fixed allow-list; the
+        same loopback, size and no-proxy bounds as chat; bodies and replies are never logged."""
+        if path not in NATIVE_PATHS or not isinstance(body, dict):
+            raise ValueError("unsupported native local endpoint")
+        root = self.base_url[:-3] if self.base_url.endswith("/v1") else self.base_url
+        return self._exchange("POST", path, body, root=root)
 
     @property
     def completion_path(self) -> str:

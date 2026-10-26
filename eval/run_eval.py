@@ -28,6 +28,12 @@ kind), with the case id, the model, the prompt hash and the model identity (weig
 --replay-finders DIR serves those responses instead of starting llama-server and refuses any call whose prompt hash
 or model identity differs from the capture. Rules, PII-Tracer, union, propagation, allow-list and policy still run.
 
+Typed-decision tier (v0.3, T1.5): --typed on runs it (off by default) with --typed-families and --typed-settings
+(a JSON file of temperatures, margin, label-mass floor, mixed_families, indirect_substitute). --capture-typed DIR
+writes every typed call (prompt key, model identity, top log-probabilities); --replay-typed DIR serves them and
+refuses a call that was not captured or another model identity (see typed_capture.py). --typed-ask-all asks every
+question any setting could need (for a capture that later tuning can replay); it changes no decision.
+
 Gate versions: --gate-version v0.1 restores the evaluated v0.1 detection and policy (the negative control);
 --detection-version, --policy-version and --quasi-id-ask set them one at a time. The default is v0.2.
 
@@ -58,6 +64,7 @@ for entry in (str(ROOT), str(HERE)):
         sys.path.insert(0, entry)
 
 import label_map  # noqa: E402
+from themis_shield.runtime.modes import SequentialFinderClient  # noqa: E402
 import score as scorer  # noqa: E402
 
 SENSITIVE_GOLD = ["HEALTH", "DISABILITY", "ETHNICITY", "SEXUALITY", "RELIGION", "CRIMINAL", "FAMILY_VIOLENCE", "UNION"]
@@ -353,7 +360,28 @@ def configure_detection(args) -> dict:
         context=args.finder_context, prompt_version=args.prompt, do_not_flag=source.get("finder_do_not_flag"),
     )
     versions = configure_gate_versions(args)
-    return {"rule_packs": list(packs), "institution": institution, "finder": finder, "versions": versions}
+    typed = configure_typed_args(args)
+    return {"rule_packs": list(packs), "institution": institution, "finder": finder, "versions": versions,
+            "typed": typed}
+
+
+def configure_typed_args(args) -> dict:
+    """The typed-decision tier's process-wide settings from --typed, --typed-families, --typed-settings."""
+    from themis_shield.detectors.typed import configure_typed, settings_record
+
+    values = {}
+    if getattr(args, "typed_settings", None):
+        values = json.loads(Path(args.typed_settings).read_text(encoding="utf-8"))
+        if not isinstance(values, dict) or set(values) - {
+            "temperatures", "margin", "min_label_mass", "mixed_families", "indirect_substitute", "max_state_chars",
+            "families",
+        }:
+            raise SystemExit("invalid --typed-settings file")
+    if getattr(args, "typed_families", None):
+        values["families"] = args.typed_families
+    configured = configure_typed(enabled=getattr(args, "typed", "off") == "on",
+                                 ask_all=bool(getattr(args, "typed_ask_all", False)), **values)
+    return settings_record(configured)
 
 
 def configure_gate_versions(args) -> dict:
@@ -406,7 +434,8 @@ def llama_servers() -> list[int]:
 
 
 def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk_size: int, log,
-                  done_before: int = 0, total: int | None = None, allow_stage_failures: bool = False) -> None:
+                  done_before: int = 0, total: int | None = None, allow_stage_failures: bool = False,
+                  typed_on: bool = False) -> None:
     """detect_batch per chunk, the real policy per case; append predictions and decisions after every chunk."""
     from themis_shield.detectors import detect_batch
     from themis_shield.policy import decide
@@ -440,7 +469,7 @@ def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk
                                "stages": list(f.provenance)} for f in result.findings],
                     "decision": decision.decision.value,
                 }, ensure_ascii=False) + "\n")
-                decs.write(json.dumps({
+                row = {
                     "id": case["id"], "decision": decision.decision.value,
                     "reasons": [r.value for r in decision.reasons],
                     "tiers_run": list(result.tiers_run), "escalation_reasons": list(result.escalation_reasons),
@@ -451,11 +480,23 @@ def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk
                                 "persons": r.person_count, "values_not_found": r.values_not_found}
                         for stage, r in result.stage_status.items()
                     },
-                }) + "\n")
-                # Timings live in their own file so that predictions and decisions are reproducible byte for byte.
-                times.write(json.dumps({
+                }
+                timing = {
                     "id": case["id"], "timings_ms": {str(k): round(v, 1) for k, v in result.timings_ms.items()},
-                }) + "\n")
+                }
+                if typed_on:
+                    # The model's answers and the policy's use of them, kept apart (keys only with the tier on, so
+                    # a run with it off reproduces earlier runs byte for byte).
+                    typed = result.typed
+                    row["typed"] = {
+                        "answers": typed.records() if typed is not None else [],
+                        "calls": typed.calls if typed is not None else 0,
+                        "policy": list(decision.typed),
+                    }
+                    timing["typed_ms"] = round(typed.wall_ms, 1) if typed is not None else 0.0
+                decs.write(json.dumps(row) + "\n")
+                # Timings live in their own file so that predictions and decisions are reproducible byte for byte.
+                times.write(json.dumps(timing) + "\n")
             preds.flush()
             decs.flush()
             times.flush()
@@ -463,13 +504,34 @@ def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk
                 f"({done_before + first + len(chunk)}/{total})")
 
 
+def build_typed_runtime(args, catalogue, config, configured, runtime, client, sink, log):
+    """The typed tier's back end: replayed from a capture, or live through the gate's runtime (captured or logged)."""
+    from themis_shield.detectors.typed import LlamaServerTypedRuntime, typed_settings
+    import typed_capture
+
+    identity = typed_capture.typed_identity(catalogue, typed_settings().model_role)
+    config["typed_identity"] = identity
+
+    def case_ids():  # the current chunk's case ids, by document position
+        return client.case_ids
+
+    if args.replay_typed:
+        typed_runtime = typed_capture.ReplayTypedRuntime(Path(args.replay_typed), identity, case_ids, sink,
+                                                         ReplayRefused)
+        log(f"replaying typed calls from {args.replay_typed} ({len(typed_runtime.records)} captured)")
+        return typed_runtime
+    live = LlamaServerTypedRuntime(SequentialFinderClient(runtime))
+    meta = {"engine_version": config["engine_version"], "git_head": config["git_head"],
+            "case_files_sha256": config["case_files_sha256"], "typed_settings": configured["typed"]}
+    directory = Path(args.capture_typed) if args.capture_typed else None
+    return typed_capture.CapturingTypedRuntime(live, directory, identity, meta, case_ids, sink)
+
+
 def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict | None = None) -> dict:
     from themis_shield.config import DeploymentProfile, UseCasePolicy
     from themis_shield.detectors import DetectionTargets
     from themis_shield.runtime import RuntimeSettings, build_runtime
     from themis_shield.runtime.catalogue import Catalogue
-    from themis_shield.runtime.modes import SequentialFinderClient
-
     configured = configure_detection(args)
     use_case = UseCasePolicy("evaluation", (), requires_in_region_inference=False)
     profile = DeploymentProfile("evaluation", "1", (), (use_case,), institution=configured["institution"])
@@ -495,6 +557,9 @@ def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict
         "finders": identities,
         "tracer_dir": str(tracer_dir), "llm_max_tokens": args.max_tokens,
         "finder_mode": "replay" if args.replay_finders else ("live+capture" if args.capture_finders else "live"),
+        "typed": configured["typed"],
+        "typed_mode": (None if not configured["typed"]["enabled"] else "replay" if args.replay_typed
+                       else ("live+capture" if args.capture_typed else "live")),
     }
     engine = Path(settings.engine_path)
     try:
@@ -515,7 +580,8 @@ def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict
     todo = [c for c in cases if c["id"] not in done]
     log(f"{len(cases)} cases, {len(done)} already done, {len(todo)} to run")
 
-    replay = capture = runtime = None
+    replay = capture = runtime = typed_runtime = None
+    typed_on = configured["typed"]["enabled"]
     if args.replay_finders:
         replay = FinderReplay(Path(args.replay_finders), identities)
         log(f"replaying finder responses from {args.replay_finders} ({len(replay.records)} captured calls)")
@@ -531,18 +597,27 @@ def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict
         # memory_settle_seconds (5 by default) before refusing a load. The harness allows longer so that a slow
         # release is not scored as a detection failure.
         runtime.memory_settle_seconds = args.memory_settle_seconds
+    if typed_on and not args.replay_typed and runtime is None:
+        # Finders replayed, typed calls live: the gate's own runtime starts llama-server for the typed model only.
+        runtime = build_runtime(settings, catalogue)
+        runtime.memory_settle_seconds = args.memory_settle_seconds
     began = time.perf_counter()
     history = []
+    typed_sink = open(run_dir / "typed_calls.jsonl", "a", encoding="utf-8", newline="\n") if typed_on else None
     try:
         with open(run_dir / "llm_calls.jsonl", "a", encoding="utf-8", newline="\n") as sink:
             inner = object() if replay is not None else SequentialFinderClient(runtime)
             client = RecordingClient(inner, sink, capture=capture, replay=replay)
+            if typed_on:
+                typed_runtime = build_typed_runtime(args, catalogue, config, configured, runtime, client, typed_sink,
+                                                    log)
+                config_path.write_text(json.dumps(config, indent=1), encoding="utf-8")
             targets = DetectionTargets(
                 llm_client=client, thorough=True, tracer_model_directory=str(tracer_dir),
-                llm_max_tokens=args.max_tokens,
+                llm_max_tokens=args.max_tokens, typed=typed_runtime,
             )
             process_cases(todo, profile, targets, client, use_case, run_dir, args.chunk, log, len(done), len(cases),
-                          allow_stage_failures=args.allow_stage_failures)
+                          allow_stage_failures=args.allow_stage_failures, typed_on=typed_on)
             if runtime is not None:
                 history = runtime.status().get("timings", [])
     finally:
@@ -550,6 +625,10 @@ def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict
             runtime.close()
         if capture is not None:
             capture.close()
+        if typed_runtime is not None and hasattr(typed_runtime, "close"):
+            typed_runtime.close()
+        if typed_sink is not None:
+            typed_sink.close()
     leftover = llama_servers()
     for model_role, templates in client.templates.items():
         (run_dir / f"prompt-{model_role}.txt").write_text(
@@ -561,6 +640,7 @@ def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict
         "llama_server_left_running": leftover,
         "templates_per_model": {k: len(v) for k, v in client.templates.items()},
         "replayed_calls": replay.served if replay is not None else None,
+        "typed_replayed_calls": getattr(typed_runtime, "served", None) if args.replay_typed else None,
     }
 
 
@@ -705,6 +785,16 @@ def main(argv=None) -> int:
     ap.add_argument("--policy-version", choices=["v0.1", "v0.2"], default=None)
     ap.add_argument("--detection-fixes", default=None,
                     help="v0.3 friction fixes: comma-separated names, 'all' or 'none' (default: the shipped default)")
+    ap.add_argument("--typed", choices=["on", "off"], default="off",
+                    help="v0.3 typed-decision tier (T1.5); off by default")
+    ap.add_argument("--typed-families", default=None, help="comma-separated Q-S,Q-M,Q-N,Q-P,Q-I, 'all' or 'none'")
+    ap.add_argument("--typed-settings", default=None,
+                    help="JSON: temperatures, margin, min_label_mass, mixed_families, indirect_substitute")
+    ap.add_argument("--typed-ask-all", action="store_true",
+                    help="ask every typed question any setting could need (capture for tuning); no decision changes")
+    ap.add_argument("--capture-typed", default=None, help="write every typed call to this folder")
+    ap.add_argument("--replay-typed", default=None,
+                    help="serve typed calls from a capture folder; refuses uncaptured calls or another identity")
     ap.add_argument("--quasi-id-ask", choices=["on", "off"], default=None,
                     help="v0.2 policy: whether a found QUASI_ID holds the document for ASK (default: the policy's)")
     args = ap.parse_args(argv)
@@ -715,7 +805,11 @@ def main(argv=None) -> int:
         ap.error("run outputs must live outside the repository")
     if args.capture_finders and args.replay_finders:
         ap.error("--capture-finders and --replay-finders are exclusive")
-    for folder in (args.capture_finders, args.replay_finders):
+    if args.capture_typed and args.replay_typed:
+        ap.error("--capture-typed and --replay-typed are exclusive")
+    if (args.capture_typed or args.replay_typed or args.typed_ask_all) and args.typed != "on":
+        ap.error("typed capture, replay and ask-all need --typed on")
+    for folder in (args.capture_finders, args.replay_finders, args.capture_typed, args.replay_typed):
         if folder and Path(folder).resolve().is_relative_to(ROOT.resolve()):
             ap.error("finder captures must live outside the repository")
     run_dir = runs_dir / args.run_name

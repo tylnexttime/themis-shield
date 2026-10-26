@@ -86,6 +86,9 @@ class ReasonCode(StrEnum):
     QUASI_ID = "ASK:quasi-identifier"
     INJECTION_SIGNAL = "ASK:injection-signal"
     AMBIGUOUS_ENTITY = "ASK:ambiguous-entity"
+    # v0.3 typed-decision tier (only with [typed] enabled = true): a sentence no detector touched reveals a special
+    # category about a real person (Q-I). Adds a hold; the tier never removes one it did not lift by rule.
+    TYPED_INDIRECT = "ASK:typed-indirect"
     # v0.3 known-miss register (only with [known_miss] enabled = true).
     KNOWN_MISS_HIT = "ASK:known-miss-hit"
     KNOWN_MISS_STALE = "ASK:known-miss-stale"
@@ -215,6 +218,9 @@ class LedgerEntry:
 class DecisionResult:
     decision: Decision
     reasons: tuple[ReasonCode, ...]
+    # v0.3 typed-decision tier: what the policy did with the model's answers ("lifted:<reason>:<family>",
+    # "added:<reason>:Q-I", "kept:<reason>:<why>"), kept apart from the reasons. Empty when the tier is off.
+    typed: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

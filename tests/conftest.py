@@ -48,6 +48,16 @@ def _default_gate_versions():
 
 
 @pytest.fixture(autouse=True)
+def _typed_tier_off():
+    """Every test starts and ends with the v0.3 typed-decision tier at its shipped default (off)."""
+    from themis_shield.detectors.typed import configure_typed
+
+    configure_typed()
+    yield
+    configure_typed()
+
+
+@pytest.fixture(autouse=True)
 def _business_timezone():
     set_business_timezone("Europe/Lisbon")
     yield

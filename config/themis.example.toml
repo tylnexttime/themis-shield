@@ -178,3 +178,18 @@ scope = ""
 # prevent. Review flags with `themis tripwire review`.
 enabled = false
 max_completion_tokens = 2048
+
+[typed]
+# v0.3 typed-decision tier (T1.5): the resident local model answers short multiple-choice questions about what
+# the cheaper tiers found (one forward pass, two option orders; an unsure answer changes nothing). OFF by default.
+# Q-S may lift a hold that only a fiction / example / policy sentence caused; Q-M, Q-N and Q-P may lift an
+# empty-finder hold that only organisation contacts, durations or other dates, or public figures caused; Q-I may
+# only ADD a hold for a sentence no detector touched. Never a marking, secret, injection or failed-stage hold.
+enabled = false
+# families = ["Q-S", "Q-M", "Q-N", "Q-P", "Q-I"]
+# margin = 0.2            # unsure when the top two options are closer than this
+# min_label_mass = 0.9    # unsure when the option letters carry less probability (never below 0.9)
+# mixed_families = false  # true lets several families together lift one hold
+# indirect_substitute = true  # a Q-I sentence is substituted as well as held
+# [typed.temperatures]
+# Q-S = 1.0

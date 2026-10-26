@@ -172,9 +172,9 @@ class StrataTarget(OpenAILocalTarget):
         else:
             self._headers = {}
 
-    def _exchange(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
+    def _exchange(self, method: str, path: str, body: dict[str, Any] | None = None, *, root: str | None = None) -> Any:
         self._refresh_auth()
-        return super()._exchange(method, path, body)
+        return super()._exchange(method, path, body, root=root)
 
     def _probe_get(self, path: str) -> Any:
         saved = self.timeout_seconds

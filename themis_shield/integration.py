@@ -33,6 +33,7 @@ from .runtime import RuntimeSettings, build_runtime
 from .runtime.calibration import CalibrationStore
 from .runtime.catalogue import Catalogue
 from .runtime.modes import SequentialFinderClient
+from .detectors.typed import LlamaServerTypedRuntime
 from .runtime.resources import read_identity
 from .timezone import set_business_timezone
 from .vault import Vault
@@ -159,6 +160,27 @@ def configure_versions(config: Mapping[str, Any]) -> dict:
     }
 
 
+TYPED_KEYS = {
+    "enabled", "families", "temperatures", "margin", "min_label_mass", "mixed_families", "indirect_substitute",
+    "max_state_chars", "model_role",
+}
+
+
+def configure_typed_tier(config: Mapping[str, Any]):
+    """Apply ``[typed]``: the v0.3 typed-decision tier (T1.5). Off by default; ``enabled = false`` is exactly v0.3
+    without the tier. ``ask_all`` is an evaluation-capture setting and cannot be set here."""
+    from .detectors.typed import configure_typed
+
+    table = dict(config.get("typed") or {})
+    if set(table) - TYPED_KEYS:
+        raise ValueError("unknown [typed] settings")
+    if "temperatures" in table and not isinstance(table["temperatures"], Mapping):
+        raise ValueError("invalid [typed] temperatures")
+    if "temperatures" in table:
+        table["temperatures"] = dict(table["temperatures"])
+    return configure_typed(**table)
+
+
 HOOKS_KEYS = {
     "cloud_authorised", "roots", "allowed_tools", "drafts_dir",
     "destination_id", "model", "deployment_type",
@@ -269,6 +291,7 @@ def build_router(config_path):
     institution = institution_profile(config)
     configure_finder_prompt(config, institution)
     configure_versions(config)
+    typed = configure_typed_tier(config)
     hooks = hooks_policy(config)
     reference = register_config.get("factory", DEFAULT_REGISTER_FACTORY)
     path = register_config.get("path") or None
@@ -316,6 +339,7 @@ def build_router(config_path):
             use_case=policy,
             targets=DetectionTargets(
                 llm_client=SequentialFinderClient(runtime), thorough=True,
+                typed=(LlamaServerTypedRuntime(SequentialFinderClient(runtime)) if typed.enabled else None),
                 tracer_model_directory=str(Path(
                     detection.get("tracer_model_directory")
                     or settings.models_dir / "pii-tracer"
