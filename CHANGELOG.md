@@ -2,6 +2,39 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## 0.2.1 (27/10/2026)
+
+Security hardening: invisible Unicode characters and compatibility forms no
+longer hide a security marking, the injection signal or a rule-pack value.
+
+- Markings: a zero-width character, soft hyphen or similar inside a marking
+  (SECRET with a zero-width joiner, CONFIDENTIAL with a zero-width space or a
+  soft hyphen), or a marking in full-width letters, was not detected, so a
+  local-only document could be released. The marking gate now also reads each
+  surface through a shared detection view (every Unicode
+  Default_Ignorable_Code_Point removed, NFKC per character) and keeps the
+  stricter result: the classification never drops below the raw text's, and
+  findings still carry offsets into the original text. Lines holding only
+  invisible characters no longer push a banner out of the first three lines.
+- Injection signal: fires on the raw text or the detection view, so one
+  invisible character inside "ignore all previous instructions" no longer
+  hides it.
+- Rule packs: the view ignores every default-ignorable code point, not only
+  U+200B, U+2060 and U+FEFF, so a ZWNJ, ZWJ, soft hyphen, variation selector
+  or tag character inside a phone number or email address no longer hides it
+  in whole or in part. Spans cover the whole original value, invisible
+  characters included, so substitution removes them too.
+- `normalise.detection_view` is the one shared helper; `rules.normalised_view`
+  uses it.
+- Replay of the captured v0.2 finder answers through this code reproduces the
+  v0.2 final runs byte for byte on dev+test (521 cases) and split C (371
+  cases): no prediction or decision changed, so every published number stands.
+  The published cases contain no invisible character the v0.2 code mishandled,
+  so the replay shows no regression; the new tests show the fix.
+- Residual: the LLM finders and PII-Tracer still read the raw text (their
+  prompts are hashed for capture and replay). Look-alike letters from other
+  scripts that NFKC does not fold are not covered.
+
 ## 0.2.0 (25/10/2026)
 
 - Tested once on a fresh held-out split written by an independent author (another Claude model): 0 released
