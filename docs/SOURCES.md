@@ -107,6 +107,35 @@ Checked on 24/10/2026 against the live web (and, for library and code facts, aga
 | [Turnstone](https://github.com/turnstonelabs/turnstone) | turnstonelabs (NOTICE: Copyright 2025-2026 Patrick Buckley) | Apache-2.0 from v1.6.0; Business Source License 1.1 for v1.5.x and earlier | Reviewed as a source of reusable modules; nothing is copied. | Described as self-hosted, local-first orchestration for tool-using AI agents; has a NOTICE file; 1.6k stars. | VERIFIED | The licence changed at v1.6.0. Never adapt code from a pre-1.6.0 revision. |
 | [Marian](https://github.com/tylnexttime/marian) | tylnexttime | Apache-2.0 | Optional back end: measure, plan and launch tool for local LLMs on llama.cpp; themis-shield uses its planner from saved profiles. | Sibling project of themis-shield (same authors). | VERIFIED | Licence and API read from the project's own repository on 24/10/2026. |
 
+## Roadmap research (27/10/2026)
+
+Sources behind [ROADMAP.md](ROADMAP.md), read on 27/10/2026 during the v0.3 research. Facts are as stated by each
+publisher (self-reported where marked); nothing here is a dependency yet, and no code or weights are vendored.
+
+| Source | Licence | Considered for | Fact we rely on | Status |
+|---|---|---|---|---|
+| [llama.cpp PR #29818](https://github.com/ggml-org/llama.cpp/pull/29818) (`/v1/systemone`) | MIT | Runtime for small decision models (typed-decision tier) | Adds a typed-decision endpoint to llama-server; a model that is not a decision model gets 501. | VERIFIED (endpoint present in our b11760 build; Gemma 4 gets 501, checked locally) |
+| [Laya](https://huggingface.co/convaiinnovations/laya) ([code](https://github.com/NandhaKishorM/laya), [GGUF](https://huggingface.co/ggml-org/Laya-GGUF)) | Apache-2.0 | Fine-tuned encoder candidate for the typed-decision tier | ModernBERT-large decision model, about 421M parameters; 0.362 zero-shot and 0.766 fine-tuned on its publisher's own benchmark (self-reported); documented fine-tuning CLI. | VERIFIED (claims self-reported) |
+| [laya.cpp](https://github.com/lkarlslund/laya.cpp) | MIT | Alternative runtime | Windows x64 CUDA/Vulkan releases; we prefer llama-server, which the gate already supervises. | VERIFIED |
+| [Kev-4B](https://huggingface.co/jaredpalmer/kev-4b) ([GGUF](https://huggingface.co/ggml-org/Kev-4B-GGUF)) | Apache-2.0 | Exploratory zero-shot decision model | Prefill-only causal decision model on a 4B base; about 3 GB at Q4. | VERIFIED |
+| [jev-pii-checker](https://github.com/coo-quack/jev-pii-checker) | MIT | Pipeline shape (candidate, then judge); out-of-distribution smoke cases | Cheap extractors propose candidates; a decision model answers typed questions about each; names use two decomposed questions with separate thresholds; model level and policy reasons recorded separately. Its eval fixtures are small and mostly Japanese. | VERIFIED |
+| [Presidio](https://github.com/data-privacy-stack/presidio) | MIT | Cross-test of Australian checksums; context-aware scoring; decision explanations | AU TFN, Medicare and ABN checksums agree with ours (ours are stricter on the Medicare issue number); context enhancers only raise scores. | VERIFIED |
+| [LLM Guard](https://github.com/protectai/llm-guard) | MIT (archived 09/07/2026) | Round-trip prior art (decided against) | Anonymize/Deanonymize with an in-memory vault and fuzzy restore. | VERIFIED |
+| [uktrade/pii-secret-check-hooks](https://github.com/uktrade/pii-secret-check-hooks) | MIT (archived) | False-positive catalogue design | Per-line ignore marker, an exclude list grown from runs, hashes of scanned files. | VERIFIED |
+| [detect-secrets](https://github.com/Yelp/detect-secrets), [gitleaks](https://github.com/gitleaks/gitleaks) | Apache-2.0, MIT | False-positive catalogue design | Audited baselines and ignore fingerprints for accepted findings. | VERIFIED |
+| [Microsoft Purview Exact Data Match](https://learn.microsoft.com/en-us/purview/sit-learn-about-exact-data-match-based-sits) | Documentation | Known-miss register prior art | Known values are hashed with a salt before upload and looked up only for candidates a pattern surfaced. | VERIFIED |
+| [Hagen et al., "All the Numbers are US" (NDSS 2021; IACR ePrint 2020/1119)](https://eprint.iacr.org/2020/1119) | Paper | Why low-entropy values are rules, not fingerprints | Hashed phone numbers were reversed at scale by enumeration. | VERIFIED |
+| [GLiNER](https://github.com/urchade/GLiNER), [gliner_multi_pii-v1](https://huggingface.co/urchade/gliner_multi_pii-v1), [nvidia/gliner-PII](https://huggingface.co/nvidia/gliner-PII) | Apache-2.0 (code, multi_pii-v1); original GLiNER weights CC BY-NC; NVIDIA Open Model License | Tier-1 bake-off (later) | Zero-shot span finders with labels given as text. | VERIFIED |
+| [DataFog](https://github.com/DataFog/datafog-python) | MIT | Tier-1 and hooks prior art (later) | Local regex, spaCy and GLiNER engines; a Claude Code hook. | VERIFIED |
+| [ARX](https://github.com/arx-deidentifier/arx) | Apache-2.0 | Calibrating the table quasi-identifier rule (later) | k-anonymity and re-identification risk models over whole tables. | VERIFIED |
+| [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) | MPL-2.0 | File inputs (later), as an external tool | Adds a text layer to scanned PDFs; runs on Windows. | VERIFIED |
+| [LLMAIx](https://github.com/KatherLab/LLMAIx) | AGPL-3.0 | Related work (cited only; no code) | Local-LLM de-identification of clinical documents with llama.cpp. | VERIFIED |
+| [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) | MIT | Out-of-family, human-annotated test slice | 1,268 court judgments annotated for direct and quasi-identifiers and confidential attributes. | VERIFIED |
+| [Gretel PII masking EN v1](https://huggingface.co/datasets/gretelai/gretel-pii-masking-en-v1) | Apache-2.0 | Training data for the typed-decision tier | Synthetic PII documents generated with a Mistral model. | VERIFIED |
+| [Nemotron-PII](https://huggingface.co/datasets/nvidia/Nemotron-PII) | CC-BY-4.0 | Training data | Large synthetic PII set with 55+ entity types. | PARTIAL (generator family not stated) |
+| [awesome-pii-tools](https://github.com/henrikaronsson/awesome-pii-tools) | CC0-1.0 | Watch list | 52 links; one commit (`9cb0602`, 19/07/2026). | VERIFIED |
+| [OpenRouter zero data retention](https://openrouter.ai/docs) | Documentation | Running split D's external authors | ZDR can be enforced per request; we enforce it on every call and log the provider. | VERIFIED |
+
 ## Licence obligations
 
 themis-shield is Apache-2.0. We do **not** redistribute model weights, llama.cpp binaries or any third-party Python wheels; users download them from the sources above. What each licence asks of us for the way we use it:

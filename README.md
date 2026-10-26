@@ -18,7 +18,9 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.2.0, preview.**
+**Status: v0.2.1, preview.** 0.2.1 is a security hardening release: invisible Unicode characters can no longer hide
+a security marking, the injection signal or a rule-pack value ([changelog](CHANGELOG.md)). What comes next, and how it
+will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
 - **Evaluation:** detection and policy are tested on held-out synthetic splits, under a pass rule written before
   each test. On a fresh split from an independent author, v0.2 released **0 leaks in 3,686 gold spans** and caught
   97.6% of quasi-identifiers (v0.1: 73.8%). It still **failed its own friction rule**: 19 of 95 clean documents were
@@ -506,30 +508,30 @@ attachment live against Strata serving Qwen3.8-Flash-Next on the same laptop.
 
 ## Next
 
-Each item is a known gap from our own runs, roughly in order. A change to detection or policy needs a test split
-nobody has seen: both published splits have now been opened.
+The full plan, with the reasoning, the prior art we looked at and how each part will be tested, is in
+[docs/ROADMAP.md](docs/ROADMAP.md). In short, each item a known gap from our own runs:
 
-1. **Friction, round three:**
-   - tell fiction, news and policy text apart from statements about real people before the sensitive rule fires;
-   - exempt vault and template placeholders (`${VAULT:…}`, `<set …>`) from the secret rule;
-   - handle mailboxes and switchboard numbers of organisations no profile describes, public figures in news, and
-     durations ("24 hours") read as dates of birth.
-2. **Table-pass precision:** stop flagging common job titles as quasi-identifiers.
-3. **Prove the empty-finder rule:** designed cases where both finders miss real personal data, to show the narrowed
-   rule still catches them.
-4. **Indirect statements.** On split C, union membership, criminal history and ethnicity written indirectly are the
-   most-missed spans; all were in held documents, so none was released. A sentence-level sensitive-statement
-   classifier, fine-tuned on synthetic data, would sit alongside the span finders.
-5. **A test author from another model family.** All three generators so far come from one; the next test split
-   should not.
-6. **A fast path:** tier 1 alone for short, low-sensitivity text, evaluated before it is offered.
-7. **A real-data evaluation protocol:** how to sample, label and score your own documents with the frozen-kit
-   discipline, before unlocking `synthetic_only`.
-8. **Platform and reach:** Linux and macOS runs, file inputs (PDF, Word), a native Anthropic Messages leg, a central
-   register service.
+1. **Friction, round three** (v0.3): deterministic fixes for the causes we can name (vault and template placeholders
+   read as secrets, role mailboxes and switchboards of unprofiled organisations, checksum-valid order numbers read as
+   TFNs, common job titles in tables), and a **typed-decision tier**: a small model answers short multiple-choice
+   questions about what the cheap detectors found (a real person or fiction? a person's own mailbox or an
+   organisation's? a date of birth or a duration?) in a single forward pass. It may lift a hold only when it is the
+   hold's sole cause, and never a marking or injection hold.
+2. **A gate that learns from its misses** (v0.3): a **known-miss register** checked as a final sweep before a document
+   is called clean (rules, context shapes and keyed fingerprints, never the values themselves), a reviewed
+   **false-positive catalogue**, and an optional **cloud trip-wire** that asks the cloud model to flag residual
+   identifiers before the real task. Misses become training and regression cases, never test cases.
+3. **A test author from another model family** (v0.3): split D is being written blind by two authors, half by a Qwen
+   model and half by a Claude model, re-labelled by a DeepSeek model, and sealed by hash before any v0.3 code meets
+   it. The halves are reported separately.
+4. **Indirect statements:** union membership, criminal history and ethnicity written indirectly are still the
+   most-missed spans on split C (all in held documents). The typed tier's last question family targets them.
+5. **Prove the empty-finder rule** on designed double misses.
+6. **A fast path**, a **real-data evaluation protocol** before `synthetic_only` can be unlocked, file inputs (PDF,
+   Word), Linux and macOS runs, a native Anthropic Messages leg and a central register service.
 
 Done in v0.2: a narrower empty-finder rule, a column-aware quasi-identifier pass, and fixes for the four tier-1
-false positives found in v0.1 (see [CHANGELOG.md](CHANGELOG.md)).
+false positives found in v0.1. Done in v0.2.1: Unicode hardening (see [CHANGELOG.md](CHANGELOG.md)).
 
 Contributions, critiques and independent evaluations are welcome. To report a bypass or a leak privately, see
 [SECURITY.md](SECURITY.md).
