@@ -86,6 +86,15 @@ text again. Idea from Chris, and from TypeSafe's Jev interface and its open alte
   model), and a small fine-tuned encoder such as [Laya](https://huggingface.co/convaiinnovations/laya) (Apache-2.0,
   421M), served by llama.cpp's decision endpoint. Laya is near chance without fine-tuning (0.362), so it is trained on
   a new training generator of ours, never on any test split.
+- **First fine-tune (27/10/2026, development only, not part of v0.3):** trained on 35,851 synthetic examples, it
+  answered 92.3% of questions correctly on sentence templates it had never seen (the untuned model: 34.6%, at chance
+  on the sensitive-statement family), and it converts to GGUF and serves through llama-server's decision endpoint
+  unchanged. But it is **confidently wrong**: its 33 mistakes out of 428 came with a median confidence of 1.000, and
+  its temperature could not be fitted because the calibration data shared templates with training. So the encoder
+  waits for v0.4, with calibration on whole templates held out from both training and scoring, early stopping before
+  the training loss reaches zero, and a fresh test split. And no version of the typed tier trusts a confidence score
+  on its own: the structural rules above (sole-cause lifts only, two option orders, never a marking or injection
+  hold) are what keep it safe.
 - The model's answer and the policy's decision are recorded separately, with the reason. Every disagreement is a free
   label for the catalogues below.
 
