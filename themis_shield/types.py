@@ -90,6 +90,7 @@ class ReasonCode(StrEnum):
     KNOWN_MISS_HIT = "ASK:known-miss-hit"
     KNOWN_MISS_STALE = "ASK:known-miss-stale"
     KNOWN_MISS_UNREADABLE = "BLOCK:known-miss-unreadable"
+    KNOWN_MISS_DEADLINE = "ASK:known-miss-deadline"
     UNKNOWN_TOKEN = "RESTORE:unknown-token"
     DROPPED_TOKEN = "RESTORE:dropped-token"
     INVENTED_TOKEN = "RESTORE:invented-token"

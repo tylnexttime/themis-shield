@@ -211,7 +211,7 @@ def run(router, job, raw: bytes, digest: str, originals, marking, timings):
                 f"Stopped: the cloud trip-wire flagged {job.job_id}; an Operator review is pending.",
                 timings=timings,
             )
-        raise GateFailure("TRIPWIRE_MALFORMED", 200)
+        raise GateFailure("TRIPWIRE_UNAVAILABLE" if state["outcome"] == "failed" else "TRIPWIRE_MALFORMED", 200)
     text = document(raw)
     settings = router.cloud.settings
     payload = canonical(request_body(settings.model, text, min(config.max_completion_tokens, settings.max_tokens)))
@@ -233,7 +233,7 @@ def run(router, job, raw: bytes, digest: str, originals, marking, timings):
             "record_tripwire", job.job_id, digest, "failed", (),
             instruction_version=config.instruction_version, now=router.clock(),
         )
-        raise
+        raise GateFailure("TRIPWIRE_UNAVAILABLE", 503) from None
     finally:
         if stream is not None:
             stream.close()

@@ -23,8 +23,8 @@ Entry lifecycle: ``proposed`` -> ``verified`` (by a person other than the propos
 swept. Entries and their history are append-only.
 
 Operator-written patterns are checked so they cannot hang the sweep (no backreferences, lookarounds, nested
-quantifiers or alternation inside a quantified group; a bounded backtracking budget), at ``add`` and again at load,
-and the text each entry scans is bounded.
+quantifiers, alternation inside a quantified group or unbounded quantifiers; a small backtracking budget), at
+``add``, at import and again at load; the text each entry scans is bounded and the whole sweep has a deadline.
 
 A local register is always current: there is nothing for it to be behind. A register can also import a snapshot
 exported by a central or shared register (rules and context shapes only, never fingerprints); such an import is
@@ -43,6 +43,7 @@ import math
 from pathlib import Path
 import re
 import secrets
+import time
 from typing import Callable, Iterable, Mapping
 
 try:  # the stdlib's own regular-expression parser (Python 3.11+ keeps it under re)
@@ -78,8 +79,13 @@ MAX_HITS_PER_ENTRY = 20
 DEFAULT_MAX_SNAPSHOT_AGE_DAYS = 7
 # Pattern safety (see check_pattern_safety) and the text bound per entry.
 SCAN_WINDOW = 1024
-MAX_BACKTRACK = SCAN_WINDOW * 4
 MAX_MATCH_CHARS = 256
+# Backtracking budget: the product over quantifiers of (hi - lo + 2) for a variable-length quantifier (1 for a
+# fixed count). 64 keeps the worst accepted pattern (measured: \w{0,6}\w{0,6}x) at about 0.4 s per entry at the
+# per-entry scan bound on the reference laptop; tests/test_known_miss.py checks it against the bound.
+MAX_BACKTRACK = 64
+MAX_QUANTIFIER = 64
+DEFAULT_SWEEP_DEADLINE_SECONDS = 5.0
 MAX_SCAN_PER_ENTRY = 1 << 20
 _REPEATS = (_C.MAX_REPEAT, _C.MIN_REPEAT, getattr(_C, "POSSESSIVE_REPEAT", _C.MAX_REPEAT))
 _SOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
@@ -100,6 +106,10 @@ _DATE = re.compile(
     r"|(?i:\b[0-9]{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec))"
 )
 _PHONE_SHAPE = re.compile(r"\+?[0-9 ().\-]{6,24}")
+
+
+class SweepDeadline(CatalogueError):
+    """The sweep did not finish within its deadline. Not a failure to read: the job goes to ASK, never RELEASE."""
 
 
 class LowEntropyValue(CatalogueError):
@@ -180,16 +190,16 @@ def fingerprint(key: bytes, normalised: str) -> str:
 
 
 def check_pattern_safety(pattern: str) -> None:
-    r"""Refuse the regular-expression features that make backtracking blow up, using the stdlib parser.
+    r"""Refuse the regular-expression features that make backtracking costly, using the stdlib parser.
 
     Refused: backreferences and conditionals, lookarounds, a quantified group that contains another quantifier
-    (``(a+)+``), alternation inside a quantified group (``(a|aa)*``), and a pattern whose quantifiers together
-    could backtrack too far. That last check multiplies, over every quantifier, how many lengths it can take
-    (``hi - lo + 1``; an unbounded one counts as a whole ``SCAN_WINDOW``) and refuses a product above
-    ``MAX_BACKTRACK``: in practice at most one unbounded quantifier (``*``, ``+``, ``{n,}``) with the rest tightly
-    bounded, so ``\w*\w*x`` is refused and ``\w{1,30} on the \w{1,30} shift`` is not. With the scanned text
-    bounded per entry (``SCAN_WINDOW`` windows, ``MAX_SCAN_PER_ENTRY`` in all), an operator-written pattern costs
-    at most seconds on the largest request, never a hang.
+    (``(a+)+``), alternation inside a quantified group (``(a|aa)*``), unbounded quantifiers (``*``, ``+``,
+    ``{n,}``) and quantifiers above ``{0,64}``, and a backtracking budget: the product over every
+    variable-length quantifier of ``hi - lo + 2`` (a fixed count such as ``{4}`` counts 1) may not exceed
+    ``MAX_BACKTRACK`` (64). So ``\d{1,20}`` and ``\w{0,6}\w{0,6}x`` pass, ``\d+`` and ``\w{1,30}\w{1,30}`` do
+    not. With the scanned text bounded per entry (``SCAN_WINDOW`` windows, ``MAX_SCAN_PER_ENTRY`` in all) the
+    worst accepted pattern costs well under a second per entry on the largest request, and the sweep as a whole
+    has a deadline (the job then goes to ASK).
     """
     try:
         tree = _sre_parse.parse(pattern)
@@ -217,15 +227,18 @@ def check_pattern_safety(pattern: str) -> None:
                 if quantified:
                     raise CatalogueError("a quantified group may not contain another quantifier")
                 low, high, body = value
-                span = SCAN_WINDOW if high is _C.MAXREPEAT or high > SCAN_WINDOW else high - low + 1
-                product = min(product * max(span, 1), MAX_BACKTRACK * SCAN_WINDOW)
+                if high is _C.MAXREPEAT or high > MAX_QUANTIFIER:
+                    raise CatalogueError(
+                        f"bound every quantifier, at most {{0,{MAX_QUANTIFIER}}}: write \\d{{1,20}}, not \\d+"
+                    )
+                if high > low:
+                    product = min(product * (high - low + 2), MAX_BACKTRACK + 1)
                 walk(body, True)
 
     walk(tree, False)
     if product > MAX_BACKTRACK:
         raise CatalogueError(
-            "the pattern could backtrack too far: use at most one unbounded quantifier and bound the others "
-            "tightly, e.g. {1,20}"
+            "the pattern could backtrack too far: use fewer variable-length quantifiers, or tighter ones"
         )
 
 
@@ -325,8 +338,14 @@ class SweepSnapshot:
     def oldest_export_utc(self) -> datetime | None:
         return min((exported for _, exported in self.imports), default=None)
 
-    def sweep(self, leaves: Iterable[tuple[tuple, str]]) -> tuple[SweepHit, ...]:
+    def sweep(self, leaves: Iterable[tuple[tuple, str]], *, deadline: float | None = None) -> tuple[SweepHit, ...]:
+        """Value-free hits. ``deadline`` is a ``time.monotonic()`` instant; past it :class:`SweepDeadline` is raised
+        (checked between windows, each of which is cheap), and the caller treats the job as ASK."""
         hits: dict[tuple, SweepHit] = {}
+
+        def check_deadline():
+            if deadline is not None and time.monotonic() > deadline:
+                raise SweepDeadline("the known-miss sweep ran out of time")
         per_entry: dict[str, int] = {}
 
         def add(entry_id, kind, entity_type, path, span):
@@ -346,6 +365,7 @@ class SweepSnapshot:
                 # match up to that long is always seen whole), and at most MAX_SCAN_PER_ENTRY characters in all;
                 # beyond that the sweep refuses (fail closed) rather than skip text.
                 for offset, window in _windows(view.text):
+                    check_deadline()
                     scanned[rule.entry_id] = scanned.get(rule.entry_id, 0) + len(window)
                     if scanned[rule.entry_id] > MAX_SCAN_PER_ENTRY:
                         raise CatalogueUnavailable("outbound text exceeds the sweep bound")
@@ -357,6 +377,8 @@ class SweepSnapshot:
                 continue
             runs = list(_RUN.finditer(view.text))
             for first in range(len(runs)):
+                if first % 256 == 0:
+                    check_deadline()
                 folded = ""
                 for last in range(first, min(first + MAX_WINDOW_RUNS, len(runs))):
                     folded += _fold(runs[last].group())

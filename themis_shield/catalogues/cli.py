@@ -31,6 +31,19 @@ def _config(path: str | None) -> dict:
 def _common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config", default=None, help="gate configuration (default: THEMIS_CONFIG)")
     parser.add_argument("--db", type=Path, default=None, help="catalogue file (default: from the configuration)")
+    parser.add_argument(
+        "--create", action="store_true",
+        help="start a new, empty catalogue file if none exists (otherwise a missing file is an error)",
+    )
+
+
+def _existing(path: Path, create: bool) -> Path:
+    # A mistyped --db must never silently start an empty register the gate does not read.
+    if not create and not Path(path).is_file():
+        raise CatalogueError(
+            "no catalogue file at the configured path; check --db or --config, or pass --create to start one"
+        )
+    return Path(path)
 
 
 def _identity(args) -> str:
@@ -99,11 +112,15 @@ def kmr_parser() -> argparse.ArgumentParser:
 def _kmr_store(args, protector):
     from .gate import settings
     config = _config(args.config)
-    path = args.db or settings(config)["known_miss"]["path"]
+    path = _existing(args.db or settings(config)["known_miss"]["path"], args.create)
+    vault = config.get("vault") or {}
     if protector is None and (args.command in {"add", "rotate-key"}):
         from ..protectors import build_protector
-        protector = build_protector(config.get("vault") or {})
-    return KnownMissRegister(path, protector=protector, create=True)
+        protector = build_protector(vault)
+    return KnownMissRegister(
+        path, protector=protector, create=True,
+        insecure_test_only=vault.get("insecure_test_only") is True,
+    )
 
 
 def kmr_main(argv=None, *, protector=None, prompt=getpass.getpass, read=input) -> int:
@@ -213,7 +230,7 @@ def fpc_main(argv=None, *, read=input) -> int:
         from .gate import settings
         config = _config(args.config)
         values = settings(config)["false_positives"]
-        store = FalsePositiveCatalogue(args.db or values["path"], create=True)
+        store = FalsePositiveCatalogue(_existing(args.db or values["path"], args.create), create=True)
         who = _identity(args)
         if args.command == "propose":
             phrase = None if args.no_phrase else read("Phrase (exactly as it appears; not personal data): ")

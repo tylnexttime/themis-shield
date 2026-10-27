@@ -87,6 +87,8 @@ class Session:
     draft_number: int = 0
     local_only: bool = False
     stopped: bool = False
+    # v0.3: the known-miss sweep outcome of the latest _protect (None when the register is off).
+    last_sweep: object = field(default=None, repr=False)
 
 
 class ObjectBoundary:
@@ -185,11 +187,15 @@ class HookService:
         tokens = set(state.issued)
         timings = {}
         decision = Decision.RELEASE
+        state.last_sweep = None
         for _ in range(3):
             boundary = ObjectBoundary(current)
             raw, mapping, sent, originals, result, measured, summary = (
                 self.router._protect(boundary, self.key(identifier), set())
             )
+            sweep = getattr(result, "sweep", None)
+            if sweep is not None and (state.last_sweep is None or not state.last_sweep.needs_ask):
+                state.last_sweep = sweep  # keep the first pass that asked
             decision = (
                 Decision.ASK
                 if decision == Decision.ASK or result.decision == Decision.ASK
@@ -349,6 +355,22 @@ class HookService:
             )
             if job.status in {S.REFUSED, S.WITHDRAWN, S.EXPIRED, S.COMPLETED}:
                 return prompt_block("This Claude job is closed; start a new session.")
+            sweep = state.last_sweep
+            if sweep is not None and sweep.needs_ask:
+                # Same rule as the web path: every release is swept, re-submissions included. A package assessed
+                # before the sweep asked needs a person if not yet approved, and is refused if it was.
+                row = self.router._register_call("get_details", job.job_id)
+                if not row["confirmation_required"]:
+                    if job.status in {S.LOGGED, S.AWAITING_OPERATOR, S.ESCALATED_REVIEW}:
+                        self.router._register_call(
+                            "require_confirmation", job.job_id, digest, now=self.router.clock(),
+                        )
+                    else:
+                        self.router._register_call("gate_refuse", job.job_id, now=self.router.clock())
+                        return prompt_block(
+                            sweep.reason + ": this approved prompt now needs a person to check it against the "
+                            "known-miss register, so job " + job.job_id + " is refused. Re-submit it as new work."
+                        )
             self.router._register_call(
                 "finalize_stages", job.job_id, now=self.router.clock(),
             )
@@ -533,6 +555,12 @@ class HookService:
                     )
                     return {"decision": "block", "reason": LOCAL_MESSAGE}
             clean, _, _, _ = self._protect(identifier, state, value)
+            if state.last_sweep is not None and state.last_sweep.hits:
+                # Tool output has no per-call human check: a known miss in it stops the job.
+                self.router._register_call(
+                    "gate_refuse", state.active_job, now=self.router.clock(),
+                )
+                return {"decision": "block", "reason": "KNOWN_MISS_HIT: tool output matches the known-miss register."}
             tool_output(tool, clean)
             verify_json(
                 canonical(clean),

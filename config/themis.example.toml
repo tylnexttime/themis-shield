@@ -160,6 +160,8 @@ enabled = false
 # (`themis kmr import`) whose source export is older than this sends cloud-bound work to ASK
 # until a current export is re-imported. An unreadable register blocks.
 max_snapshot_age_days = 7
+# The whole sweep's time limit; past it the job goes to ASK (never RELEASE).
+sweep_deadline_seconds = 5
 
 [false_positives]
 # Reviewed false-positive catalogue: look-alikes accepted by a person, scoped, expiring.
