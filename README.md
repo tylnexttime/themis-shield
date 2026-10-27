@@ -18,13 +18,14 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.2.1, preview.** 0.2.1 is a security hardening release: invisible Unicode characters can no longer hide
-a security marking, the injection signal or a rule-pack value ([changelog](CHANGELOG.md)). What comes next, and how it
-will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
-- **Evaluation:** detection and policy are tested on held-out synthetic splits, under a pass rule written before
-  each test. On a fresh split from an independent author, v0.2 released **0 leaks in 3,686 gold spans** and caught
-  97.6% of quasi-identifiers (v0.1: 73.8%). It still **failed its own friction rule**: 19 of 95 clean documents were
-  held for a human (0.200 against 0.15), down from 34 under v0.1's policy. See [Evaluation](#evaluation).
+**Status: v0.3.0, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
+- **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
+  is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
+  families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
+  driver licence numbers in table columns), and caught only **74% of sensitive statements** written indirectly by
+  new authors. Its own changes did what they were for: friction on clean documents fell from 0.320 to 0.248 with no
+  safety measure worse. v0.2 had released 0 leaks on its fresh split and failed on friction. See
+  [Evaluation](#evaluation).
 - **The round trip** (de-identify, send, restore) is covered by automated tests against a stand-in cloud endpoint.
 - **Not cleared for real personal data.** By design, themis-shield refuses to start unless it is configured for
   synthetic data.
@@ -166,16 +167,16 @@ Read this section before you rely on anything above.
   document for a human (`[policy] quasi_id_ask = true` changes that). v0.2's table pass finds rare values in
   "anonymised" tables (97.6% recall on our fresh split), but it also flags common job titles, so tables get
   over-redacted.
-- **Still too much friction.** On our fresh test split, 19 of 95 documents with no personal data were held, which
-  fails our own pass rule. The causes:
-  - the 26B finder reads fiction, a holiday notice or a policy FAQ as sensitive statements;
-  - the secret rule blocks vault placeholders such as `${VAULT:…}` in clean configuration files;
-  - PII-Tracer flags mailboxes of organisations no profile describes, public figures in news, and durations read as
-    dates of birth.
-
-  About a fifth of institutional look-alikes are still redacted.
-- **Sensitive statements depend on the LLM finders.** They scored well on synthetic text thanks to prompt v2, but
-  real writing is more varied. A dedicated sentence-level classifier is on the roadmap.
+- **Still too much friction.** On split D, 31 of 125 documents with no personal data were held (0.248, against our
+  0.15 rule), down from 40 under v0.2.1's behaviour. About a quarter of institutional look-alikes are still redacted,
+  and on real documents the gate hides most business phone numbers, reference numbers and transaction dates, which
+  limits what a cloud model can do with the output (v0.4's typed placeholders and task profiles address this).
+- **Identifier columns in tables can leak.** On split D, bare licence numbers in a table's licence column were missed
+  in three tables while every other column was covered. Column-aware identifier propagation is the first v0.4 fix.
+- **Sensitive statements depend on the LLM finders, and they miss indirect ones.** On split D they caught 74% of
+  sensitive statements overall, 98% in one half and 67% in the half whose author wrote mostly indirect phrasing
+  (union membership 45%, criminal history 51%). Statements found are substituted and held; statements missed in a
+  released document are leaks. A dedicated sentence-level classifier is on the roadmap.
 - **A small classifier is a helper, never a judge.** We fine-tuned a small decision encoder (Laya, 421M) on synthetic
   data of our own: it answered 92.3% of questions correctly on sentence templates it had never seen, but its wrong
   answers came with a median confidence of 1.000. **It must never be used as a standalone privacy check.** In
@@ -355,6 +356,10 @@ themis-shield ships synthetic evaluation data ([`eval/`](eval/README.md)), all a
 - **The v0.1 set:** 521 cases from two independent generators.
 - **Split C:** 371 cases, the v0.2 held-out test. A separate author (a different Claude model) wrote it, seeing only
   the label taxonomy, the scorer's format and the fictional Harbourline profile, never the gate or the other cases.
+- **Split D:** 404 cases, the v0.3 held-out test, written blind by two authors from different model families (199
+  cases by a Qwen model through a zero-data-retention route, 205 by a Claude model), each with its own invented
+  organisation, re-labelled blind by a DeepSeek model, and committed by hash before the gate ever saw it
+  ([`eval/generator_d/`](eval/generator_d)).
 
 `eval/run_eval.py` runs the real detection and policy (rules, PII-Tracer, Gemma 4 E4B and 26B-A4B through llama.cpp,
 union, allow-list, policy), and `eval/score.py` scores it. Each release follows the same discipline:
@@ -363,7 +368,31 @@ union, allow-list, policy), and `eval/score.py` scores it. Each release follows 
 3. Open the test split once.
 4. Change nothing afterwards.
 
-### v0.2 (current)
+### v0.3 (current)
+
+**Verdict: FAIL** (details: [`eval/RESULTS-v0.3.md`](eval/RESULTS-v0.3.md); plan:
+[`eval/FROZEN-PLAN-v0.3.md`](eval/FROZEN-PLAN-v0.3.md); development: [`eval/V03-DEV-LOG.md`](eval/V03-DEV-LOG.md)).
+
+| Split D pooled (404 cases, 5,841 gold spans, 125 clean) | v0.2.1 control | v0.3 | v0.3 + typed tier (candidate) |
+|---|---|---|---|
+| Released leaks | 28 | 28 | **28** |
+| R_any / R_full | 0.937 / 0.911 | 0.937 / 0.911 | **0.937 / 0.911** |
+| Sensitive statements, R_any | 0.740 | 0.740 | **0.740** |
+| Quasi-identifiers, R_any | 1.000 | 1.000 | **1.000** |
+| Clean documents held (of 125) | 40 | 38 | **31** |
+| Over-redaction | 0.242 | 0.239 | **0.239** |
+
+- **Where it failed:** detection on new authors' text, which no v0.3 change touches (all of them act after the
+  finders). 21 of the 28 released spans are driver licence numbers in table columns. Sensitive-statement recall was
+  0.984 on the Qwen-written half and 0.665 on the Claude-written half, whose author wrote far more indirect
+  statements, so the difference between the halves reflects difficulty at least as much as model family.
+- **What worked:** the friction fixes and the typed tier (31 clean documents held instead of 40), with no safety
+  measure worse; 0 leaks in the 48 prompt-injection cases.
+- **Also measured, privately:** a slice of one of the authors' own personal documents (78, used with his consent,
+  never published), reported in aggregate in the development log. It taught us most of v0.3's real-world fixes and
+  most of v0.4's priorities.
+
+### v0.2 (previous release)
 
 **Method.**
 - **Development data:** all 521 v0.1 cases.
@@ -403,7 +432,7 @@ the 0.005 allowed).
 Details: [`eval/RESULTS-v0.2.md`](eval/RESULTS-v0.2.md). Speed: median 12.6 s and mean 14.2 s per document; 371
 cases took 88 minutes.
 
-### v0.1 (previous release)
+### v0.1 (earlier release)
 
 The v0.1 set: 521 cases (225 dev, 296 test) with 4,483 gold spans in 27 labels, hard negatives (institutional
 look-alikes that must *not* be redacted), and prompt-injection cases. Every identifier in it is invented, and
@@ -517,28 +546,27 @@ attachment live against Strata serving Qwen3.8-Flash-Next on the same laptop.
 The full plan, with the reasoning, the prior art we looked at and how each part will be tested, is in
 [docs/ROADMAP.md](docs/ROADMAP.md). In short, each item a known gap from our own runs:
 
-1. **Friction, round three** (v0.3): deterministic fixes for the causes we can name (vault and template placeholders
-   read as secrets, role mailboxes and switchboards of unprofiled organisations, checksum-valid order numbers read as
-   TFNs, common job titles in tables), and a **typed-decision tier**: a small model answers short multiple-choice
-   questions about what the cheap detectors found (a real person or fiction? a person's own mailbox or an
-   organisation's? a date of birth or a duration?) in a single forward pass. It may lift a hold only when it is the
-   hold's sole cause, and never a marking or injection hold. v0.3 asks the Gemma finder we already run; a small
-   fine-tuned encoder comes later, and only as a helper ([why](docs/SMALL-ENCODER.md)).
-2. **A gate that learns from its misses** (v0.3): a **known-miss register** checked as a final sweep before a document
-   is called clean (rules, context shapes and keyed fingerprints, never the values themselves), a reviewed
-   **false-positive catalogue**, and an optional **cloud trip-wire** that asks the cloud model to flag residual
-   identifiers before the real task. Misses become training and regression cases, never test cases.
-3. **A test author from another model family** (v0.3): split D is being written blind by two authors, half by a Qwen
-   model and half by a Claude model, re-labelled by a DeepSeek model, and sealed by hash before any v0.3 code meets
-   it. The halves are reported separately.
-4. **Indirect statements:** union membership, criminal history and ethnicity written indirectly are still the
-   most-missed spans on split C (all in held documents). The typed tier's last question family targets them.
-5. **Prove the empty-finder rule** on designed double misses.
-6. **A fast path**, a **real-data evaluation protocol** before `synthetic_only` can be unlocked, file inputs (PDF,
-   Word), Linux and macOS runs, a native Anthropic Messages leg and a central register service.
+1. **Detection on new authors' text** (from split D): column-aware identifier propagation (a column headed as a
+   licence, member, account or ID number is protected cell by cell), finders that list each distinct value once (so
+   long tables stop overflowing their answer), and a sentence-level check for indirect sensitive statements that
+   also looks at sentences containing only a name.
+2. **Keep the work possible** (v0.4): typed placeholders with a codebook by default, optional partially synthetic
+   values with per-job date shifting, per-task profiles, and a utility measurement next to the leak measurement
+   ([story](docs/CODEBOOK-AND-SYNTHETIC-DATA.md)).
+3. **A small fine-tuned encoder as a helper** at step 2, calibrated on templates it never trained on
+   ([why it is never a judge](docs/SMALL-ENCODER.md)).
+4. **Runtime memory on an 8 GB laptop:** re-acquiring the 26B while PII-Tracer is loaded can fail closed; fix the
+   scheduler so a long-running gate does not block on memory alone.
+5. **Prove the empty-finder rule** on designed double misses; a **fast path**; a **real-data evaluation protocol**
+   before `synthetic_only` can be unlocked; file inputs that cannot fail silently; Linux and macOS; a native Anthropic
+   Messages leg; a central register service.
 
-Done in v0.2: a narrower empty-finder rule, a column-aware quasi-identifier pass, and fixes for the four tier-1
-false positives found in v0.1. Done in v0.2.1: Unicode hardening (see [CHANGELOG.md](CHANGELOG.md)).
+Each needs a fresh test split nobody has seen: split D is now development data.
+
+Done in v0.3: deterministic and real-document friction fixes, the typed-decision tier (off by default), a known-miss
+register with a final sweep, a reviewed false-positive catalogue, an optional cloud trip-wire, a detector canary, and
+the first test split from authors outside our own model family (see [CHANGELOG.md](CHANGELOG.md)). Done in v0.2.1:
+Unicode hardening.
 
 Contributions, critiques and independent evaluations are welcome. To report a bypass or a leak privately, see
 [SECURITY.md](SECURITY.md).
@@ -612,6 +640,17 @@ model) wrote a fresh test split without ever seeing the gate or the old cases. C
 each two-hour tuning round into minutes. The fixes worked where they were aimed: no released leaks, quasi-identifiers
 in tables caught, most empty-finder holds gone. And v0.2 failed its friction rule anyway, for reasons no development
 case had shown us. That's the point of a fresh split.
+
+**Then v0.3, two days later.** We asked the question we had been avoiding: what if the gate only looks good because
+the same family of models wrote both the gate and its exams? So split D was written blind by two authors from
+different families, half by a Qwen model and half by a Claude model, checked by a DeepSeek model, and sealed by hash.
+In parallel we built the friction fixes, a typed-decision tier, a gate that learns from its misses, and a canary that
+proves the detectors still work, and an independent review found a real bypass in our own fixes before the freeze.
+We also tested on something no model wrote: one author's own personal documents, on his own machine, with his
+consent, which showed us failures the synthetic sets never had and that the gate hides too much for a cloud model to
+be useful. Then the exam: v0.3 failed. The fixes worked where they were aimed, but detection missed licence numbers in
+table columns and a third of the indirect sensitive statements in the harder half. And the harder half was the
+Claude-written one. The question we had been avoiding had a more interesting answer than the one we feared.
 
 ## Sources and acknowledgements
 

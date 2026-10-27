@@ -32,6 +32,17 @@ different Claude model, who saw only `taxonomy.md`, the format sections of this 
 file with `--cases`, can capture and replay finder answers (`--capture-finders`, `--replay-finders`), and selects
 v0.1 or v0.2 behaviour with `--gate-version`.
 
+## Split D: the v0.3 held-out test
+
+`cases/test-d-q.jsonl` (199 cases) and `cases/test-d-c.jsonl` (205 cases): 404 cases, 5,841 gold spans, 125 clean,
+48 injection cases. Written blind by two authors from different model families (half Q by a Qwen model through a
+zero-data-retention route, half C by a Claude model), each from the same one-page brief, the taxonomy, the case format
+and a profile schema, each with its own invented organisation; re-labelled blind by a DeepSeek model, with one review
+round per author; checked by a shared validator with its own checksum code. Generators, profiles, provenance and
+agreement reports: [`generator_d/`](generator_d). sha256: half Q
+`3fb5dc5ec227056cbe3f458356d36bf2089490f9b344cad6c4516bafe8d3a07a`, half C
+`59e127c1414c369cc075833dbd0bdbdc0872a233b671fc6da961888d914063f0`. Results: [`RESULTS-v0.3.md`](RESULTS-v0.3.md).
+
 ## How it was built
 
 **Two independent generators.** A and B share no templates, no name pools (the build fails if a name token appears

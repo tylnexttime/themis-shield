@@ -2,7 +2,13 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
-## Unreleased (v0.3)
+## 0.3.0 (27/10/2026)
+
+**Evaluation: FAIL.** On split D (404 cases written blind by a Qwen and a Claude author, re-labelled by a DeepSeek
+model, committed by hash before the run), v0.3 with the typed tier released 28 personal spans (21 driver licence
+numbers in table columns), reached R_any 0.937 and sensitive-statement R_any 0.740, and held 31 of 125 clean
+documents (v0.2.1 control: 40). Details in `eval/RESULTS-v0.3.md`; split D and its generators are now published in
+`eval/cases/test-d-*.jsonl` and `eval/generator_d/`.
 
 ### Deterministic friction fixes
 
@@ -75,11 +81,43 @@ no-break spaces. Each fix is a named switch:
   real secrets), clean friction 0.235 -> 0.176, R_full 0.962 -> 0.972,
   released leaks unchanged (11). Development sets: no ratchet change.
 
+### Fixes from an independent review (before the freeze)
+
+- A placeholder with a default value (`${NAME:-value}`, `${NAME:=value}`, `${prop:value}`) or a single word in angle
+  brackets is a secret again: only a placeholder with no literal value is exempt (this closed a bypass in the new
+  placeholder fix).
+- `title-tokens` never drops a given name that is also a title word (Dean, Major, Justice, Sister...).
+- A checksum-valid number relabelled by context keeps its checksum result, so the false-positive catalogue's `allow`
+  can never reach it.
+
+### Typed-decision tier (off by default)
+
+- `[typed]`: short multiple-choice questions asked prefill-only of the resident 26B, answered by the option letters'
+  probabilities in one forward pass, two option orders, label-mass floor and margin band; an unsure answer never
+  lifts a hold. Families kept on development data: contact owner, date/duration/number, private person or public
+  figure; each may lift a hold only when it is the hold's sole cause, and never a marking, secret, injection,
+  unmatched-value or failed-stage hold. "Real person or fiction" was rejected (the 26B confidently called some real
+  people fiction) and "unflagged sensitive sentence" was rejected (it only raised friction). `/v1/systemone` adapter
+  for decision models (tested against a fake).
+
+### Detector canary
+
+- Fixed synthetic documents run through every detector at start-up, after every model load and periodically; a
+  detector that finds less than its known minimum puts the gate in a degraded state that blocks cloud-bound work.
+  Catches a model that "succeeds" with nothing (wrong weights, a chat-template change). Per-stage timings recorded.
+
 ### A gate that learns (all off by default)
 
-- Known-miss register with a final sweep on the outbound text, a reviewed false-positive catalogue and an optional
-  cloud trip-wire; see docs/ARCHITECTURE.md. With every feature off, routing, decisions, requests and the audit trail
+- Known-miss register with a final sweep on the outbound text (rules, context shapes and keyed fingerprints of
+  high-entropy strings only; patterns checked for catastrophic backtracking; staleness for imported snapshots only), a
+  reviewed false-positive catalogue and an optional cloud trip-wire; see docs/ARCHITECTURE.md. With every feature off, routing, decisions, requests and the audit trail
   are unchanged (tested).
+
+### Documentation
+
+- `docs/ROADMAP.md`, `docs/CODEBOOK-AND-SYNTHETIC-DATA.md` (v0.4 design: typed placeholders with a codebook,
+  optional partially synthetic values, per-job date shifting), `docs/SMALL-ENCODER.md` (a small classifier is a
+  helper, never a judge) with `eval/ENCODER-RESULTS-2026-10-27.md`, `eval/V03-DEV-LOG.md`.
 
 ### Safety
 
