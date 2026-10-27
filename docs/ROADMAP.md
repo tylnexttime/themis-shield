@@ -95,7 +95,7 @@ text again. Idea from Chris, and from TypeSafe's Jev interface and its open alte
   the training loss reaches zero, and a fresh test split. And no version of the typed tier trusts a confidence score
   on its own: the structural rules above (sole-cause lifts only, two option orders, never a marking or injection
   hold) are what keep it safe.
-- **Where a small encoder fits: step 2, asymmetric.** It runs on the CPU between tier 1 and the GPU finders, and it
+- **Where a small encoder fits: step 2, asymmetric** ([full explanation](SMALL-ENCODER.md), [measurements](../eval/ENCODER-RESULTS-2026-10-27.md)). It runs on the CPU between tier 1 and the GPU finders, and it
   may raise suspicion on its own but never lower it on its own:
   - *recall booster:* it may add an ASK for a sentence nothing else flagged (a confidently wrong "yes" costs a click;
     a wrong "no" is no worse than without it);
