@@ -167,7 +167,13 @@ among the placeholders, and the pricing factors (age, area, vehicle) that compar
 - **A semi-synthetic dictionary, opt-in.** For tasks that read better with real-looking text, values are replaced by
   realistic surrogates, and some classes (transaction dates, for example) pass through unchanged. The cloud model is
   not told which values are real. Each surrogate carries its ID (`Mara Quinlan ⟦P:3fa9c1⟧`), and the model is asked
-  to keep the ID wherever it refers to that value.
+  to keep the ID wherever it refers to that value. This is partially synthetic data, a long-studied technique of
+  statistical disclosure control, and the legend is the codebook that comes with any shared confidentialised dataset.
+- **Randomness, not secrecy.** themis-shield is open source, so a rule such as "dates always pass through" would tell
+  everyone that every date the cloud sees is real. Which values are real can only stay unknown through per-job
+  randomness: dates are shifted by a random per-job offset (whole weeks keep weekdays; intervals, durations and
+  month-to-month patterns survive), as clinical de-identification does, and the decoder shifts them back. Amounts can
+  take a consistent per-job scale (ratios and trends survive), opt-in, because some tasks need exact sums.
 - **Restoration uses the IDs only.** A surrogate that comes back without its ID is never fuzzy-matched; it is flagged
   for the person to check. This answers the reason an earlier design rejected surrogates (models shorten, misspell and
   merge fake names, so exact reversal fails and fuzzy reversal risks the wrong person): the ID, not the name, is what
