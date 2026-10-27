@@ -134,15 +134,23 @@ DEFAULT_MARGIN = 0.2
 DEFAULT_MIN_LABEL_MASS = 0.9
 DEFAULT_MAX_STATE_CHARS = 1100
 DEFAULT_MODEL_ROLE = "gemma4-26b-a4b"
+# Development result (v0.3 lane 4, both development sets, two tuning rounds): Q-M, Q-N and Q-P held every safety
+# limit and each removed a held clean document; Q-S released documents with a finder miss (released leaks rose on the
+# v0.1 set at every temperature and margin tried) and Q-I only added holds to clean documents. So with the tier
+# enabled, only the three lifting families on tracer-only findings are on unless [typed] families says otherwise.
+DEFAULT_FAMILIES = ("Q-M", "Q-N", "Q-P")
+# Fitted on development data (negative log-likelihood of gold-implied answers): the 26B is over-confident on Q-S and
+# Q-I (T ~ 3). Q-M, Q-N and Q-P had too few gold-implied questions (2-4) to fit, so they stay at 1.
+DEFAULT_TEMPERATURES = {"Q-S": 3.03, "Q-M": 1.0, "Q-N": 1.0, "Q-P": 1.0, "Q-I": 3.03}
 
 
 @dataclass(frozen=True, slots=True)
 class TypedSettings:
     enabled: bool = False
     # Per-family switches (only read when ``enabled``).
-    families: frozenset[str] = frozenset(FAMILY_IDS)
+    families: frozenset[str] = frozenset(DEFAULT_FAMILIES)
     # Temperature per family, applied to the option probabilities before averaging the two orders.
-    temperatures: Mapping[str, float] = field(default_factory=lambda: {name: 1.0 for name in FAMILY_IDS})
+    temperatures: Mapping[str, float] = field(default_factory=lambda: dict(DEFAULT_TEMPERATURES))
     # Unsure when the averaged top-1 minus top-2 probability is below this.
     margin: float = DEFAULT_MARGIN
     # Unsure when the option letters carry less than this much of the next-token probability (never below 0.9).

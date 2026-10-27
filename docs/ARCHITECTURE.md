@@ -328,6 +328,13 @@ built.
   text: no finding is removed. Q-I may only add `ASK:typed-indirect` (and, with `indirect_substitute`, substitute the
   sentence as a sensitive statement). What the policy did (`lifted:...`, `kept:...:<why>`, `added:...`) is recorded in
   `DecisionResult.typed`, apart from the reasons, and the evaluation runner writes the model's answers beside it.
+- **Defaults from development.** With `enabled = true` and no `families`, only Q-M, Q-N and Q-P are on: on the two
+  development sets they held every safety limit and each removed one held clean document (one case each, in-sample).
+  Q-S lifted documents that still had a finder miss (released leaks rose on the v0.1 set at every temperature and
+  margin tried: the 26B read requests about a colleague and documents claiming to be examples as fiction, with full
+  confidence), and Q-I only added holds to clean documents (its targets, sentences no detector touched, held none of
+  the missed sensitive statements, which sit beside a found name). Temperatures were fitted on development data
+  (Q-S and Q-I about 3; the others too few to fit). Split D decides.
 - **Evaluation.** `eval/run_eval.py --typed on` with `--capture-typed DIR` / `--replay-typed DIR` (prompt key and
   model identity, like the finder capture; replay refuses anything not captured) and `--typed-ask-all` (asks every
   question any setting could need, changes no decision), so read-out and policy settings can be tuned without a GPU.

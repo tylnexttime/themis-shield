@@ -186,10 +186,12 @@ max_completion_tokens = 2048
 # empty-finder hold that only organisation contacts, durations or other dates, or public figures caused; Q-I may
 # only ADD a hold for a sentence no detector touched. Never a marking, secret, injection or failed-stage hold.
 enabled = false
-# families = ["Q-S", "Q-M", "Q-N", "Q-P", "Q-I"]
+# Families on when enabled. Default: the three that held every safety limit on the development sets.
+# Q-S (released documents with a finder miss) and Q-I (held only clean documents) are off unless named here.
+# families = ["Q-M", "Q-N", "Q-P"]
 # margin = 0.2            # unsure when the top two options are closer than this
 # min_label_mass = 0.9    # unsure when the option letters carry less probability (never below 0.9)
 # mixed_families = false  # true lets several families together lift one hold
 # indirect_substitute = true  # a Q-I sentence is substituted as well as held
 # [typed.temperatures]
-# Q-S = 1.0
+# Q-S = 3.03   # fitted on development data; Q-M, Q-N, Q-P stay at 1.0
