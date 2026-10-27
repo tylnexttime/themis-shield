@@ -19,6 +19,8 @@ A document that cannot be lifted by any answer is not asked lifting questions (n
 from __future__ import annotations
 
 from contextlib import ExitStack
+import logging
+import os
 from dataclasses import replace
 from time import perf_counter
 from types import MappingProxyType
@@ -31,6 +33,7 @@ from .typed import (
 )
 
 STAGE = "typed-decisions"
+_LOG = logging.getLogger("themis_shield.detection")
 INDIRECT_LABELS = {
     "union_membership": Label.UNION,
     "criminal_history": Label.CRIMINAL,
@@ -207,7 +210,10 @@ def run_typed_tier(texts, results, runtime):
                         answered[index] += _ask(decider, text, indirect_targets(text, result), settings)
                     calls[index] = decider.calls - before
                 walls[index] = (perf_counter() - start) * 1000
-    except Exception:
+    except Exception as error:
+        if os.environ.get("THEMIS_DEBUG") == "1":
+            # The exception class only (fixed names such as NotEnoughMemory): never its message or document text.
+            _LOG.info("stage=%s failed=%s", STAGE, type(error).__name__)
         wall = (perf_counter() - began) * 1000
         failed = []
         for index, result in enumerate(results):

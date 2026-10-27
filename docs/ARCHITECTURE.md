@@ -52,6 +52,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | `detectors/contracts.py`, `types.py` | real | Value-free evidence types and the label set. |
 | `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. |
 | `detectors/settings.py` | real | `[detection] version`: `v0.2` (default) turns on the tier-1 fixes and the column-aware table pass; `v0.1` restores the evaluated v0.1 detection. |
+| `detectors/typed.py`, `detectors/typed_tier.py` | real, off by default | v0.3 typed-decision tier (T1.5): multiple-choice questions about what the cheaper tiers found, answered in one forward pass; the policy decides what an answer may change (see [below](#v03-typed-decision-tier-t15)). |
 | `normalise.py` | partial | Real: `detection_view`, the shared detection view (Unicode default-ignorable characters removed, NFKC per character, each view character mapped back to its source character) used by the rule packs, the marking gate and the injection signal. Skeleton: the document-level `normalise` and `OffsetMap` contract. |
 
 ### Substitution, vault, restoration
@@ -290,6 +291,46 @@ job register.
   flags and flag precision, so we know whether the round trip earns its cost.
 - **Injection.** The trip-wire is an LLM reading untrusted text, so an injection can suppress its flags; that only
   weakens an extra layer. The document is only ever user content; the instruction is always first.
+
+## v0.3 typed-decision tier (T1.5)
+
+`detectors/typed.py` and `detectors/typed_tier.py`, configured by `[typed]` and **off by default** (`enabled =
+false`: detection and decisions are exactly v0.3 without it). ROADMAP section 2 describes the idea; this is how it is
+built.
+
+- **Questions, not search.** After the finders, the tier asks short multiple-choice questions about what the cheaper
+  tiers found: **Q-S** for each sentence holding a sensitive-statement finding (a real person, fiction or an example,
+  general information, not sensitive), **Q-M** for each tracer email or phone behind an empty-finder hold (a person's
+  own, an organisation's, unsure), **Q-N** for each tracer date of birth or number there (date of birth, another
+  date, a duration or quantity, a phone, identifier or other number), **Q-P** for each tracer name there (a private
+  individual, a public figure in a public role, unsure), and **Q-I** for each sentence of at least three words that no
+  detector touched, on a document that would otherwise be released (seven special categories, or none). The wording
+  is the training generator's, so a fine-tuned decision model can later answer identical questions. The candidate is
+  wrapped in `[[ ]]` inside a paragraph-sized window (at most about 1,100 characters); a document cannot forge the
+  markers.
+- **One forward pass per order.** Arm 2 asks the resident chat model through llama-server's native endpoints:
+  `/apply-template` (thinking off), `Answer:` appended, `/completion` with one predicted token and the top 20
+  log-probabilities; an option's probability is the summed probability of its letter tokens (`` A`` and `A`, each
+  checked to be one token at start-up, or the stage fails). `OpenAILocalTarget.native_json` allows only those
+  endpoints and `/v1/systemone`, which a later encoder decision model answers with a probability per option (a chat
+  model answers it with 501).
+- **Fail closed to unsure.** Every question is asked in two fixed option orders (canonical and reversed, letters by
+  position). A failed or malformed call, label mass under 0.9, the orders disagreeing on the top option, or a margin
+  between the top two (averaged, after a per-family temperature) inside the band makes the answer unsure, and an
+  unsure answer changes nothing. A tier that cannot start (no model, a letter that is not one token) fails its
+  stage, and a failed stage blocks.
+- **The policy decides.** The answers are evidence (`DetectionResult.typed`); `policy.decide` applies them. Q-S may
+  lift `ASK:sensitive` and Q-M, Q-N, Q-P may lift `ASK:disagreement-empty-llm`, each only when every finding behind
+  that hold has a confident lifting answer, the hold has no other cause and one family is its sole cause (unless
+  `mixed_families`). It never lifts a security marking (decided before detection), a secret, the injection signal,
+  unmatched finder values, the few-persons check, a quasi-identifier hold or a failed stage. An empty-finder hold
+  raised by the document sensitivity score is never lifted either. Lifting a hold means RELEASE of the substituted
+  text: no finding is removed. Q-I may only add `ASK:typed-indirect` (and, with `indirect_substitute`, substitute the
+  sentence as a sensitive statement). What the policy did (`lifted:...`, `kept:...:<why>`, `added:...`) is recorded in
+  `DecisionResult.typed`, apart from the reasons, and the evaluation runner writes the model's answers beside it.
+- **Evaluation.** `eval/run_eval.py --typed on` with `--capture-typed DIR` / `--replay-typed DIR` (prompt key and
+  model identity, like the finder capture; replay refuses anything not captured) and `--typed-ask-all` (asks every
+  question any setting could need, changes no decision), so read-out and policy settings can be tuned without a GPU.
 
 ### Restore safety
 

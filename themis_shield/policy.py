@@ -195,8 +195,9 @@ def _typed_effects(evidence: DetectionResult, reasons: tuple) -> tuple[tuple, tu
             failures = [_cleared(answers, family, items, settings) for family, items in sorted(by_family.items())]
             why[reason] = next((item for item in failures if item), None)
             families.update(by_family)
-        if all(value is None for value in why.values()) and len(families) > 1 and not settings.mixed_families:
-            why = {reason: "mixed-families" for reason in why}
+        if len(families) > 1 and not settings.mixed_families:
+            # Several families behind the holds: not one sole cause, whatever the answers (none are asked then).
+            why = {reason: value if value == "not-liftable" else "mixed-families" for reason, value in why.items()}
         if all(value is None for value in why.values()):
             notes.extend(f"lifted:{reason.value}:{'+'.join(sorted(families))}" for reason in reasons)
             reasons = ()
