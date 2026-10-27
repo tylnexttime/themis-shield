@@ -1,0 +1,168 @@
+{
+  "_about": "Deployment profile of Fernhollow Housing Co-operative Ltd, an invented housing co-operative used only by half C of the test-d set.",
+  "organisation": "Fernhollow Housing Co-operative Ltd",
+  "organisation_forms": [
+    "Fernhollow Housing Co-operative",
+    "Fernhollow",
+    "FHC"
+  ],
+  "description": "Fernhollow is a member-owned housing co-operative that owns and manages about 1,400 homes across five estates, runs tenancy and maintenance services for its members, and employs around 90 staff. Members hold a share and a tenancy; staff and members are people, their personal details are not on this profile.",
+  "business_identifier": {
+    "scheme": "ABN",
+    "value": "81 221 900 574",
+    "forms": [
+      "81 221 900 574",
+      "81221900574",
+      "ABN 81 221 900 574"
+    ]
+  },
+  "email_domain": "fernhollow.example",
+  "sites": [
+    "Cedar Court Estate",
+    "Millrace Gardens",
+    "Tannery Row",
+    "Quarry Hill Village",
+    "Ropewalk Close"
+  ],
+  "site_note": "Sites are the co-operative's own housing estates. Members and some staff live at them, so a unit address on an estate is personal, but the estate name on its own is institutional.",
+  "buildings": [
+    "Hub Building",
+    "Cedar Court Block A",
+    "Cedar Court Block B",
+    "Millrace Community Hall",
+    "Tannery Row Workshop",
+    "Head Office"
+  ],
+  "role_mailboxes": [
+    "enquiries@fernhollow.example",
+    "maintenance@fernhollow.example",
+    "privacy@fernhollow.example",
+    "tenancy@fernhollow.example",
+    "accounts@fernhollow.example",
+    "hr@fernhollow.example",
+    "membership@fernhollow.example"
+  ],
+  "main_lines": [
+    "1300 975 707",
+    "(02) 5550 4410"
+  ],
+  "reception_numbers": [
+    "(02) 5550 4411",
+    "(02) 5550 4412",
+    "(03) 7010 2281"
+  ],
+  "role_titles": [
+    "Tenancy Officer",
+    "Maintenance Coordinator",
+    "Member Services Officer",
+    "Finance Officer",
+    "Chief Executive Officer",
+    "Housing Manager",
+    "Property Services Manager",
+    "Community Development Worker",
+    "Governance and Risk Officer",
+    "Payroll Officer",
+    "WHS Adviser",
+    "Grounds Supervisor"
+  ],
+  "programmes": [
+    "Rent Assistance Review",
+    "Tenant Wellbeing Check-in",
+    "Garden Share Programme",
+    "First Home Co-op Pathway",
+    "Repairs Priority Scheme"
+  ],
+  "research_projects": [
+    "Warm Homes Retrofit",
+    "Solar Roof Rollout",
+    "Lift Replacement Project"
+  ],
+  "committees": [
+    "Tenant Voice Committee",
+    "Audit and Risk Committee",
+    "Staff Wellbeing Network",
+    "Pride at Fernhollow",
+    "Reconciliation Action Group"
+  ],
+  "initiatives": [
+    "Winter Warmth Drive",
+    "Mental Health Week",
+    "Neighbours Day Barbecue",
+    "Ramadan iftar evening",
+    "Safe Homes Awareness Week",
+    "NAIDOC Week morning tea",
+    "Pride Month",
+    "Reasonable Adjustment Request Scheme",
+    "Family Violence Support Pathway",
+    "Health and Safety Audit",
+    "Christmas Closure",
+    "Ramadan"
+  ],
+  "committee_note": "Committees and staff networks are institutional bodies; a person's membership of one is personal but the name of the body is not.",
+  "code_formats": {
+    "programme_code": "FHP-[A-Z]{3}\\d{2}",
+    "project_code": "FHJ-\\d{3}"
+  },
+  "reference_number_formats": {
+    "maintenance_ticket": "MNT-26-\\d{5}",
+    "work_order": "\\d{8}",
+    "purchase_order": "PO\\d{7}",
+    "invoice": "INV-\\d{6}",
+    "asset_tag": "AST-[A-Z]\\d{4}",
+    "cost_centre": "CC\\d{4}",
+    "case_number": "CASE-26-\\d{4}",
+    "build_number": "build \\d{4}",
+    "software_version": "v\\d+\\.\\d+\\.\\d+",
+    "form_number": "FHF-\\d{3}",
+    "payroll_group": "PG-[A-C]"
+  },
+  "public_dates": [
+    "28 February 2026",
+    "28/02/2026",
+    "2026-02-28",
+    "8 March 2026",
+    "08/03/2026",
+    "2026-03-08",
+    "21 March 2026",
+    "21/03/2026",
+    "2026-03-21",
+    "27 March 2026",
+    "27/03/2026",
+    "2026-03-27",
+    "24 April 2026",
+    "24/04/2026",
+    "2026-04-24",
+    "24 May 2026",
+    "24/05/2026",
+    "2026-05-24",
+    "29 May 2026",
+    "29/05/2026",
+    "2026-05-29",
+    "8 June 2026",
+    "08/06/2026",
+    "2026-06-08",
+    "30 August 2026",
+    "30/08/2026",
+    "2026-08-30",
+    "20 October 2026",
+    "20/10/2026",
+    "2026-10-20",
+    "31 October 2026",
+    "31/10/2026",
+    "2026-10-31",
+    "22 November 2026",
+    "22/11/2026",
+    "2026-11-22",
+    "27 November 2026",
+    "27/11/2026",
+    "2026-11-27",
+    "22 December 2026",
+    "22/12/2026",
+    "2026-12-22"
+  ],
+  "personal_identifier_formats_issued": {
+    "staff_number": "FS-\\d{4}",
+    "member_number": "FHM\\d{6}",
+    "tenancy_number": "T\\d{5}-[A-Z]"
+  }
+}
