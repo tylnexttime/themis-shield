@@ -117,11 +117,14 @@ institution_profile = ""
 # Detection behaviour: "v0.2" (default) or "v0.1" (the evaluated v0.1
 # detection, kept as a negative control).
 version = "v0.2"
-# v0.3 friction fixes on top of v0.2: "all" (default), "none" (exact v0.2.1
-# behaviour) or a list of names: "secret-placeholders",
-# "organisation-contacts", "checksum-context", "rule-completeness",
-# "table-role-words", "title-tokens", "contact-brackets".
-# fixes = "all"
+# v0.3 friction fixes on top of v0.2. Default: every fix except
+# "finder-whitespace-trust"; "all" adds it, "none" is exact v0.2.1 behaviour,
+# or list names: "secret-placeholders", "organisation-contacts",
+# "checksum-context", "rule-completeness", "table-role-words", "title-tokens",
+# "contact-brackets", "secret-url-components", "secret-prose-values",
+# "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
+# "finder-whitespace", "finder-whitespace-trust", "address-line-numbers".
+# fixes = ["secret-placeholders", "..."]
 
 [policy]
 # Policy behaviour: "v0.2" (default) or "v0.1" (negative control).
