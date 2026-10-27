@@ -122,7 +122,10 @@ PLACEHOLDER_LINES = [
     "password=@Platform.KeyVault(SecretUri=https://kv.example/secrets/db)",
     "token=projects/demo/secrets/db-token/versions/latest",
     "password is <set in vault>",
-    "password: <your-password-here>",
+    "password: <your password here>",
+    "password: <PASSWORD>",
+    "DB_PASSWORD=${DB_PASSWORD:-}",                 # an empty default carries no value
+    "password=${ssm:/app/db/password}",
 ]
 
 
@@ -146,6 +149,17 @@ def test_placeholders_were_secrets_before_the_fix():
     ("password=<Kelp4471Q>", "<Kelp4471Q>"),                              # angle brackets around a real value
     ("password=hunter2abc", "hunter2abc"),
     ("password=$lowercase_word", "$lowercase_word"),                      # not an upper-case variable reference
+    # Review cases (v0.3 freeze): a default or fallback part is a literal value, and so is one word in brackets.
+    ("POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Xk9pL2mQv7}", "${POSTGRES_PASSWORD:-Xk9pL2mQv7"),
+    ('password: "${DB_PASSWORD:-changeme123}"', "${DB_PASSWORD:-changeme123}"),
+    ("spring.datasource.password=${db.password:Tr0ub4dor3x}", "${db.password:Tr0ub4dor3x"),
+    ('DB_PASSWORD="${DB_PASSWORD:-s3cretValue}"', "${DB_PASSWORD:-s3cretValue}"),
+    ("DB_PASSWORD=${DB_PASSWORD:=Xk9pL2mQv7}", "${DB_PASSWORD:=Xk9pL2mQv7"),
+    ("DB_PASSWORD=${DB_PASSWORD-Xk9pL2mQv7}", "${DB_PASSWORD-Xk9pL2mQv7"),
+    ("password=${VAULT:db:Xk9pL2mQv7}", "${VAULT:db:Xk9pL2mQv7"),           # a value after the reference name
+    ("password = <swordfish>", "<swordfish>"),
+    ("password: <your-password-here>", "<your-password-here>"),            # no space: not clearly descriptive
+    ("password: <Secret>", "<Secret>"),
 ])
 def test_real_values_next_to_placeholder_syntax_are_still_secrets(line, value):
     configure_detection_fixes(["secret-placeholders"])
@@ -157,6 +171,32 @@ def test_high_entropy_string_inside_a_placeholder_is_still_caught():
     hexed = "9f2c4e6a8b0d1f3e5a7c9e1b3d5f7a9c2e4f6a8b"
     text = "DB_PASSWORD=${VAULT:" + hexed + "}"
     assert hexed in secrets(text)  # the hex rule still runs over the whole text
+
+
+def test_review_cases_are_secrets_before_and_after_the_fix():
+    lines = [
+        "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Xk9pL2mQv7}",
+        "spring.datasource.password=${db.password:Tr0ub4dor3x}",
+        "password = <swordfish>",
+    ]
+    for fixes in ("none", ["secret-placeholders"]):
+        configure_detection_fixes(fixes)
+        assert all(secrets(line) for line in lines)
+
+
+def test_compose_file_with_default_values_is_still_blocked():
+    text = (
+        "services:\n"
+        "  db:\n"
+        "    environment:\n"
+        "      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Xk9pL2mQv7}\n"
+        "      API_TOKEN: ${API_TOKEN:-Qe7Rt5Yu3Io1}\n"
+    )
+    configure_detection_fixes(["secret-placeholders"])
+    result = detect(text, {}, thorough(FakeTracer()))
+    assert ReasonCode.SECRET in result.reasons and result.decision == Decision.BLOCK
+    found = {text[f.start:f.end] for f in result.findings if Label.SECRET in f.labels}
+    assert any("Xk9pL2mQv7" in value for value in found) and any("Qe7Rt5Yu3Io1" in value for value in found)
 
 
 def test_placeholder_value_is_whole_value_only():
@@ -321,6 +361,31 @@ def test_medicare_and_abn_context():
     assert (abn, frozenset({Label.INTERNAL_ID})) in rules("Order " + abn)
     assert (abn, frozenset({Label.ABN})) in rules("ABN " + abn)
     assert (abn, frozenset({Label.ABN})) in rules("Supplier " + abn)
+
+
+def test_relabelled_number_keeps_its_checksum_result():
+    configure_detection_fixes(["checksum-context"])
+    found = RulesDetector(packs=("core", "au")).detect("Invoice " + TFN_VALID).findings
+    assert [(f.labels, f.checksum_valid) for f in found] == [(frozenset({Label.INTERNAL_ID}), True)]
+
+
+def test_allow_entry_never_reaches_a_relabelled_checksum_number():
+    from datetime import datetime, timedelta, timezone
+
+    from themis_shield.catalogues.false_positives import ActiveEntry, match, validate
+
+    configure_detection_fixes(["checksum-context"])
+    text = "Invoice " + TFN_VALID + " is attached."
+    found = RulesDetector(packs=("core", "au")).detect(text).findings
+    label, key = validate("INTERNAL_ID", "allow", TFN_VALID, None)
+    entry = ActiveEntry("FPC-0001", label, "allow", key, None, datetime.now(timezone.utc) + timedelta(days=30))
+    no_hold, allowed, overrides = match((entry,), text, found)
+    assert not allowed and no_hold  # downgraded to no-hold: still substituted
+    assert [item.strength for item in overrides] == ["no_hold"]
+    # The guard re-validates the value too, so a finding without a checksum result is covered as well.
+    from dataclasses import replace
+    bare = tuple(replace(f, checksum_valid=None) for f in found)
+    assert not match((entry,), text, bare)[1]
 
 
 def test_context_never_drops_a_checksum_number():
@@ -556,14 +621,33 @@ def test_leading_titles_are_not_propagated_as_names():
 @pytest.mark.parametrize("text, name, kept", [
     ("Bishop, Odalys wrote. Bishop agreed.", "Bishop, Odalys", "Bishop"),      # surname-first list
     ("Odalys Bishop wrote. Bishop agreed.", "Odalys Bishop", "Bishop"),        # a surname that is a title word
-    ("Sister Odalys wrote.", "Sister", None),                                  # a title alone is not a name split
+    # Given names that are also title or role words keep propagating (review fix, v0.3 freeze).
+    ("Dean Okonkwo enrolled. Dean said he had moved.", "Dean Okonkwo", "Dean"),
+    ("Major Tomlin enrolled. Major said she had moved.", "Major Tomlin", "Major"),
+    ("Justice Ng enrolled. Justice said she had moved.", "Justice Ng", "Justice"),
+    ("Sister Rowe called. Sister said the ward was full.", "Sister Rowe", "Sister"),
+    ("Chief Adebayo signed. Chief left early.", "Chief Adebayo", "Chief"),
+    ("Lady Brennecke wrote. Lady agreed.", "Lady Brennecke", "Lady"),
+    ("Agent Moreau arrived. Agent left.", "Agent Moreau", "Agent"),
+    ("Chef Odalys cooked. Chef rested.", "Chef Odalys", "Chef"),
+    ("Coach Tamsin trained. Coach rested.", "Coach Tamsin", "Coach"),
+    ("Head Odalys spoke. Head left.", "Head Odalys", "Head"),
 ])
 def test_title_words_that_are_names_stay_names(text, name, kept):
     configure_detection_fixes(["title-tokens"])
     parent = finding(0, len(name), Label.PERSON, "pii-tracer", 1)
     values = [text[f.start:f.end] for f in extra_spans(text, (parent,))]
-    if kept:
-        assert values.count(kept) == 2
+    assert values.count(kept) == 2
+
+
+@pytest.mark.parametrize("title", ["Captain", "Doctor", "Professor", "Reverend", "Sergeant", "Sir", "Dame"])
+def test_pure_honorifics_are_not_propagated(title):
+    configure_detection_fixes(["title-tokens"])
+    text = f"{title} Odalys Brennecke arrived. The {title.lower()} said Odalys was late."
+    parent = finding(0, len(f"{title} Odalys Brennecke"), Label.PERSON, "pii-tracer", 1)
+    values = [text[f.start:f.end] for f in extra_spans(text, (parent,))]
+    assert title not in values and title.lower() not in values
+    assert values.count("Odalys") == 2
 
 
 def test_title_vocabulary_is_lower_case():
