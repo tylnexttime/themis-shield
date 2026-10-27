@@ -148,6 +148,36 @@ precision is tracked so we know whether it earns its round trip. Never on BLOCK 
   judgments with direct and quasi-identifiers), a small human-written slice when we have one, and
   jev-pii-checker's English cases as an out-of-distribution smoke test.
 
+## v0.4 (design): keep the work possible
+
+A gate that hides everything scores perfectly on leaks and is useless. Ask a cloud model for an expense summary or
+for better deals on a pile of de-identified statements and contracts, and today it loses four things: time
+(transaction dates become placeholders, so there is no monthly breakdown), renewal and contract dates, who "you" are
+among the placeholders, and the pricing factors (age, area, vehicle) that comparisons depend on.
+
+### Contextual toggles and a semi-synthetic dictionary (Chris's design)
+
+- **Per-task profiles** decide, class by class, what passes, what is generalised and what is hidden: an expense
+  summary keeps months and amounts; deal advice keeps an age band, a region and contract months; everything else stays
+  opaque.
+- **A semi-synthetic dictionary.** Values are replaced by realistic surrogates, and some classes (transaction dates,
+  for example) pass through unchanged. The cloud model is not told which values are real. Each surrogate carries its
+  ID (`Mara Quinlan ⟦P:3fa9c1⟧`), and the model is asked to keep the ID wherever it refers to that value.
+- **Restoration uses the IDs only.** A surrogate that comes back without its ID is never fuzzy-matched; it is flagged
+  for the person to check. This answers the reason an earlier design rejected surrogates (models shorten, misspell and
+  merge fake names, so exact reversal fails and fuzzy reversal risks the wrong person): the ID, not the name, is what
+  gets restored. Surrogates are drawn so they collide with nothing in the document.
+- **Generalised attributes:** a date of birth becomes an age band, an address a state and postcode region, a vehicle
+  keeps make, model and year while plate and VIN are hidden, and the requester can mark themselves as "self".
+- **The cost is stated, not hidden:** every kept or generalised attribute adds re-identification risk, because together
+  they become quasi-identifiers. All toggles are off by default, and a risky combination holds the document for ASK.
+
+### A utility measurement next to the leak measurement
+
+The same task runs twice through a cloud model, once on the original documents and once on the gate's output, and a
+judge scores how much worse the de-identified answer is. Reported per task and per profile, next to released leaks:
+privacy and usefulness on one page.
+
 ## Later
 
 - **A tier-1 bake-off** of small span finders: GLiNER PII checkpoints (Apache-2.0 ones only; the original GLiNER
