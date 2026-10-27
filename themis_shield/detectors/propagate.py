@@ -132,18 +132,17 @@ def table_spans(
     return tuple(out)
 
 
-# v0.3 fix "title-tokens": titles, honorifics and ranks in front of a name. A found name such as "Captain Jane Roe"
-# keeps its whole span, but the leading title is never propagated through the document as a name token: the title is
-# beside the name, not part of it. Only a capitalised title before at least one other name token, with no comma after
-# it, is skipped ("Bishop, Jane" keeps "Bishop": surname-first lists put the surname there).
+# v0.3 fix "title-tokens": honorifics and ranks in front of a name. A found name such as "Captain Jane Roe" keeps its
+# whole span, but a leading honorific is never propagated through the document as a name token: the title is beside
+# the name, not part of it. Only words that are not used as given names are listed, so no name token is ever lost
+# (review fix, v0.3 freeze: "Dean", "Major", "Justice", "Sister", "Chief", "Lady", "Agent", "Chef", "Coach" and
+# role words such as "Head" were removed: they are given names too, or not honorifics). A listed word is skipped
+# only when it is capitalised, comes first, is followed by another name part and has no comma after it.
 TITLE_WORDS = frozenset({
-    "captain", "capt", "doctor", "professor", "sister", "brother", "father", "mother", "reverend", "rev", "pastor",
-    "elder", "deacon", "bishop", "rabbi", "imam", "saint", "sergeant", "sgt", "constable", "inspector", "detective",
-    "officer", "lieutenant", "lt", "major", "colonel", "col", "general", "admiral", "commander", "corporal",
-    "private", "judge", "justice", "magistrate", "councillor", "cr", "senator", "minister", "mayor", "president",
-    "director", "manager", "coordinator", "head", "lead", "chief", "chair", "chairperson", "nurse", "coach",
-    "uncle", "aunt", "aunty", "auntie", "sir", "dame", "lady", "lord", "madam", "madame", "mister", "master",
-    "fr", "sr", "br", "dean", "principal", "matron", "chef", "governor", "premier", "sheriff", "agent",
+    "captain", "capt", "doctor", "professor", "reverend", "rev", "revd", "father", "fr", "brother", "br", "pastor",
+    "rabbi", "imam", "sergeant", "sgt", "constable", "inspector", "insp", "detective", "det", "lieutenant", "lt",
+    "colonel", "col", "admiral", "corporal", "cpl", "councillor", "cllr", "cr", "senator", "mister", "madam",
+    "madame", "sir", "dame", "hon",
 })
 
 
