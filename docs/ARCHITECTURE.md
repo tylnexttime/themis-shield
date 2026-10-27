@@ -8,8 +8,9 @@ parts plus a skeleton) or **skeleton** (a specification: types and
 ## Request path in one paragraph
 
 `themis serve` (`web/__main__.py`) checks the configuration and environment
-(`startup.py`), builds a `Router` from the TOML file (`integration.py`) and
-serves the loopback web app (`web/app.py`). A chat request is checked for
+(`startup.py`), builds a `Router` from the TOML file (`integration.py`), runs
+the detector canary (`canary.py`: every detector against fixed synthetic
+documents with known answers) and serves the loopback web app (`web/app.py`). A chat request is checked for
 security markings first (`detectors/markings.py`, `routing.py`); a
 `RESTRICTED`-style banner keeps it local. Otherwise the text goes through the
 detectors (`detectors/engine.py`: rule packs, PII-Tracer, two local LLM
@@ -29,7 +30,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | Module | Status | What it does |
 |---|---|---|
 | `cli.py`, `__main__.py` | real | The `themis` command: `serve`, `hooks`, `register`, `runtime`, `profiles`, `--version`. |
-| `startup.py` | real | Value-free startup checks and reason codes for `themis serve`. |
+| `startup.py` | real | Value-free startup checks and reason codes for `themis serve`, including the start-up detector canary (`CANARY_FAILED`). |
 | `integration.py` | real | TOML configuration to `Router`: gate flags, markings, rule packs, finder prompt, institution profile, cloud, vault, register, runtime, `[hooks]`. |
 | `paths.py` | real | Per-user default locations (`%LOCALAPPDATA%\themis-shield` or `~/.local/share/themis-shield`). |
 | `profiles/` | real | Shipped profiles (markings, institution, catalogue, cloud) plus an external, deployment-owned directory. |
@@ -42,7 +43,8 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 
 | Module | Status | What it does |
 |---|---|---|
-| `detectors/engine.py` | real | Tiered detection, batched so each local model loads once. |
+| `detectors/engine.py` | real | Tiered detection, batched so each local model loads once. Per-tier and (v0.3) per-stage timings. |
+| `canary.py` | real, v0.3, on by default | The detector canary: known-answer checks against silent detector failure, at start-up, after every model load and periodically; a failure blocks cloud-bound work (see [Detector canary](#detector-canary)). |
 | `detectors/rules.py` | real | Checksum, contact and credential rules in packs: `core`, `au` (TFN, Medicare, ABN, USI, phones), `intl` (E.164, IBAN). |
 | `detectors/pii_tracer.py`, `labels.py` | real | PII-Tracer on CPU with exact offset mapping; label adapter. |
 | `detectors/llm_finder.py` | real | Local LLM finders, prompt v1 and v2, structured JSON output. |
@@ -103,13 +105,84 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 
 | Module | Status | What it does |
 |---|---|---|
-| `runtime/scheduler.py`, `lease.py`, `modes.py` | real | One resident model at a time, FIFO queue, per-user GPU lease. |
+| `runtime/scheduler.py`, `lease.py`, `modes.py` | real | One resident model at a time, FIFO queue, per-user GPU lease. The scheduler's `load_listener` (v0.3) runs the finder canary inside the slot after each model load. |
 | `runtime/catalogue.py`, `settings.py`, `planning.py`, `calibration.py` | real | Model catalogue, runtime settings, launch arguments, device-keyed calibration. |
 | `runtime/children.py`, `resources.py`, `occupancy.py`, `backends.py` | real | Owned llama-server processes and the stale-process reaper, resource snapshots, memory held by attached runtimes, back-end status. |
 | `inference/llamacpp.py`, `openai_local.py`, `json_output.py` | real | Owned llama-server lifecycle; loopback OpenAI-compatible client; strict JSON output. |
 | `inference/strata.py`, `marian.py`, `ollama.py` | real, optional | Attach to a user-run Strata server; Marian launch planning from saved profiles; Ollama client. |
 | `inference/laptop_llamacpp.py` | real | Compatibility client for an independently run llama-server. |
 | `inference/dgx_spark.py` | skeleton | A target that reports itself unavailable until configured. |
+
+## Detector canary
+
+Every stage fails closed when it **crashes**: an exception becomes `Status.FAILED` and the policy blocks. A stage
+that **succeeds with nothing** is invisible to that rule. Wrong or damaged weights, a tokenizer that does not match
+its model, or a chat-template change in the inference engine all produce a valid, empty answer. (A real case: with
+the Gemma 4 chat template, llama.cpp turns thinking on unless `chat_template_kwargs: {enable_thinking: false}` is
+passed, so the first token of a prefill became a thought-channel marker; a finder affected like that returns a
+well-formed empty list.) The canary (`canary.py`, `[canary]`, **on by default**) is a known-answer test for that.
+
+**Documents and expectations.** Three fixed synthetic documents, every value invented: a phone number from the
+mobile range set aside for fiction, an address under a domain reserved for documentation (RFC 2606), a TFN and a
+Medicare number whose check digits the code computes from sequential test-style bodies, a person's name that
+appears twice (once as "Ms" and the surname), an indirect health statement (no category word), and a clean control
+sentence. Expectations are conservative minimums, never exact span sets: at least one finding with an expected
+label **overlapping** the expected place.
+
+| Detector | Expectations (fixed names, as recorded) |
+|---|---|
+| `rules` | `EMAIL`; with the `au` pack also `PHONE`, `TFN`, `MEDICARE`; `CONTROL_CLEAN` (no finding at all in the control sentence: the rules are deterministic) |
+| `pii-tracer` | `PERSON`, `EMAIL` |
+| `propagate` | `REPEATED_NAME`: given only the first mention of the name, the second mention of the surname |
+| `gemma4-e4b`, `gemma4-26b-a4b` | `PERSON`, `SENSITIVE_STATEMENT` (any of the nine statement labels on the statement) |
+
+A detector whose stage itself fails (exception, timeout, malformed or truncated output, a model that will not load)
+fails `STAGE_OK` with the stage's fixed error code. Finder canaries cap the answer at 1,024 tokens, so a model that
+wanders into a thinking channel fails quickly instead of running long.
+
+**When it runs.**
+
+- **Start-up** (`at_startup`): `themis serve` runs every detector's canary after the model checks and before
+  serving. A failure refuses to start: `CANARY_FAILED`, naming the detector and the failed expectation names (for
+  example `pii-tracer: PERSON, EMAIL`). `--skip-model-check` skips it; the canary is then pending (below).
+- **After every model load** (`after_reload`): the scheduler calls its `load_listener` inside the slot, after the
+  model is healthy and before any document, and the finder canary runs on that very target (no extra load). On an
+  8 GB GPU both finders load for every request, so this adds one short finder call per model per request; it also
+  warms the prompt cache with the fixed system prompt. The PII-Tracer is not loaded by the scheduler; it is
+  covered by start-up and the periodic check.
+- **Periodically** (`interval_minutes`, default 30; `every_documents`, default off): the tier-1 canary (rules,
+  PII-Tracer, propagation) runs before the next cloud-bound document once due; a finder's runs inside its next
+  residency. A detector whose last canary failed is due again at once, so recovery does not wait an interval.
+- **On demand**: the web app's "Run the detector canary now" (`POST /api/canary/run`, under the detection lock).
+
+**Degraded state.** While any detector's latest canary failed, cloud-bound work is blocked with
+`DETECTOR_CANARY_FAILED`; while a detector has never been checked (start-up skipped), with
+`DETECTOR_CANARY_PENDING`. The check sits in `Router._protect` after detection, so it covers the web and API path and
+the Claude Code hooks path, and in the handover export. Local-only work never reaches it and still runs. A refused
+job gets a `DETECTOR_CANARY_FAILED` (or `_PENDING`) event in its audit trail before `REFUSED`. The web app shows a
+band with the failing detector and expectation names (`GET /api/canary`), and `/health` carries the canary state.
+The degraded state ends when a canary covering the failed detector passes.
+
+**Records.** Every run is appended to the register's `canary_runs` table (append-only like the rest of the
+register's history): version, trigger (`startup`, `reload`, `periodic`, `documents`, `retry`, `pending`, `manual`,
+`eval`), pass or fail, and per detector the status, failed expectation names, a fixed error code and the duration.
+The register refuses free text in any of these fields. The canary only ever handles its own synthetic documents.
+
+**Evaluation runs.** `eval/run_eval.py` runs the canary once at the start of every run (and every resumed
+session), with the gate's own finder client, so it appears in neither `llm_calls.jsonl` nor a finder capture, and
+writes the result into `config.json` (`"canary"`). A failure stops the run as an infrastructure fault before any case
+is processed, unless `--allow-canary-failure` is given. With `--replay-finders` the finder canaries are recorded as
+`skipped` (`replay`): replay never calls a model. The rules, PII-Tracer and propagation canaries still run.
+
+**Per-stage timings.** `DetectionResult.stage_timings_ms` holds each stage's wall time (`rules`, `pii-tracer`,
+`propagate-tier1`, `allowlist-tier1`, each finder, `<finder>:acquire` for the residency on the first document of
+a finder tier, `union-final`, `propagate-final`, `allowlist-final`). The per-tier `timings_ms` is unchanged, and the
+runner's `timings.jsonl` adds `stage_timings_ms` beside `timings_ms`. Stage timings are diagnostic only: no decision
+reads them and they take no part in comparing two results.
+
+**Limits.** The canary proves each detector still finds a known answer on a short synthetic text; it does not prove
+recall on real documents, and a detector damaged in a way that spares the canary passes. It is a smoke alarm, not
+an evaluation.
 
 ## Placeholder tokens
 

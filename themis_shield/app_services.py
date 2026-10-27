@@ -273,10 +273,18 @@ class HandoverStore:
             TOKEN_PATTERN.sub(lambda match: " " * len(match.group()), raw.decode("utf-8"))
             for _, raw in sorted(files.items())
         ]
+        canary = getattr(router, "canary", None)
+        if canary is not None:
+            canary.before_cloud_work(len(texts))
         results = router.batch_detector(
             texts, router.profile, replace(router.targets, thorough=True, local_only=False),
             thorough=True,
         )
+        blocked = canary.block_reason() if canary is not None else None
+        if blocked is not None:
+            # A handover package is for cloud use: a failing detector canary blocks it like a cloud send.
+            from .router import GateFailure
+            raise GateFailure(blocked, 200)
         if len(results) != len(texts) or any(
             result.decision in {None, Decision.BLOCK} or result.findings for result in results
         ):

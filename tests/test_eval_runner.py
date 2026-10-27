@@ -269,3 +269,90 @@ def test_capture_and_replay_folders_must_be_outside_the_repository(tmp_path):
     for flag in ("--capture-finders", "--replay-finders"):
         with pytest.raises(SystemExit):
             run_eval.main(["--split", "dev", "--run-name", "x", "--runs-dir", str(tmp_path), flag, str(EVAL / "cap")])
+
+
+# --------------------------------------------------------------------------------------------------------------------
+# v0.3: the detector canary at the start of every run, and per-stage timings
+# --------------------------------------------------------------------------------------------------------------------
+def test_timings_file_keeps_the_tier_keys_and_adds_stage_keys(tmp_path):
+    out = _process(tmp_path, scorer.load_gold("dev")[:2], run_eval.RecordingClient(FakeFinder()), "timed")
+    rows = [json.loads(line) for line in (out / "timings.jsonl").read_text().splitlines()]
+    assert all(set(row) == {"id", "timings_ms", "stage_timings_ms"} for row in rows)
+    assert set(rows[0]["timings_ms"]) == {"1", "2", "3"}
+    assert {"rules", "pii-tracer", "propagate-tier1", "allowlist-tier1", "gemma4-e4b", "gemma4-26b-a4b",
+            "union-final", "propagate-final", "allowlist-final", "gemma4-e4b:acquire"} <= set(rows[0]["stage_timings_ms"])
+
+
+def _canary_targets():
+    from test_canary import CanaryTracer
+    return DetectionTargets(tracer=CanaryTracer(), thorough=True)
+
+
+def test_eval_canary_live_and_replay(monkeypatch):
+    from test_canary import CanaryFinder
+    from themis_shield.detectors.rules import set_rule_packs
+    set_rule_packs(("core", "au", "intl"))
+    try:
+        live = run_eval.eval_canary(_canary_targets(), CanaryFinder())
+        assert live["passed"] and live["trigger"] == "eval"
+        assert {c["detector"]: c["status"] for c in live["checks"]}["gemma4-26b-a4b"] == "pass"
+        finder = CanaryFinder()
+        replayed = run_eval.eval_canary(_canary_targets(), finder, replay=True)
+        assert replayed["passed"] and finder.calls == []  # replay never calls a model
+        assert [(c["detector"], c["error_code"]) for c in replayed["checks"] if c["status"] == "skipped"] == [
+            ("gemma4-e4b", "replay"), ("gemma4-26b-a4b", "replay")]
+        broken = run_eval.eval_canary(_canary_targets(), CanaryFinder("empty"))
+        assert not broken["passed"]
+    finally:
+        set_rule_packs(None)
+
+
+def test_a_failing_canary_stops_the_run_unless_allowed(tmp_path):
+    from test_canary import CanaryFinder
+    record = run_eval.eval_canary(_canary_targets(), CanaryFinder("empty"))
+    config, path, lines = {"written_utc": "x"}, tmp_path / "config.json", []
+    with pytest.raises(SystemExit):
+        run_eval.apply_canary(record, config, path, lines.append)
+    assert json.loads(path.read_text())["canary"] == record  # recorded before stopping
+    assert "FAILED" in lines[-1]
+    run_eval.apply_canary(record, config, path, lines.append, allow_failure=True)
+
+
+def test_replayed_run_records_the_canary_in_config(tmp_path, monkeypatch):
+    """End to end through main(): a replayed run starts with the canary (finders skipped) and records it."""
+    from themis_shield.detectors import engine
+    from themis_shield.runtime.catalogue import Catalogue
+    from test_canary import CanaryTracer
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    monkeypatch.setattr(engine, "tracer_for", lambda targets: CanaryTracer())
+    from themis_shield.detectors import llm_finder
+    cases = scorer.load_gold("dev")[:2]
+    llm_finder.configure_finder(  # the prompt the run will use, so the capture's prompt hashes match
+        context=run_eval.DEFAULT_CONTEXT, prompt_version="v2",
+        do_not_flag=load_profile_json("institution", run_eval.DEFAULT_PROFILE).get("finder_do_not_flag"),
+    )
+    identities = run_eval.finder_identities(Catalogue.load(None))
+    capture = run_eval.FinderCapture(tmp_path / "cap", identities, {})
+    _process(tmp_path, cases, run_eval.RecordingClient(FakeFinder(), capture=capture), "live")
+    capture.close()
+    runs = tmp_path / "runs"
+    argv = ["--split", "dev", "--run-name", "r", "--runs-dir", str(runs), "--ids", ",".join(c["id"] for c in cases),
+            "--replay-finders", str(tmp_path / "cap")]
+    try:
+        assert run_eval.main(argv) == 0
+        config = json.loads((runs / "r" / "config.json").read_text())
+        assert config["canary"]["passed"] is True and config["finder_mode"] == "replay"
+        assert [c["status"] for c in config["canary"]["checks"]] == ["pass", "pass", "pass", "skipped", "skipped"]
+        assert "detector canary passed" in (runs / "r" / "run.log").read_text()
+        # A tracer that has gone silent stops the next session before any case is processed.
+        monkeypatch.setattr(engine, "tracer_for", lambda targets: CanaryTracer("empty"))
+        with pytest.raises(SystemExit):
+            run_eval.main(argv[:3] + ["r2"] + argv[4:])
+        assert not (runs / "r2" / "predictions.jsonl").exists()
+        assert json.loads((runs / "r2" / "config.json").read_text())["canary"]["passed"] is False
+    finally:
+        from themis_shield.detectors import llm_finder
+        from themis_shield.detectors.rules import set_rule_packs
+        llm_finder.configure_finder()
+        set_rule_packs(None)

@@ -160,6 +160,7 @@ async function checkDraft() {
     })), snapshot, intent };
   } finally { setBusy(false); }
   if (state.preview) { renderPreview(state.preview); notice("Findings ready. Review before choosing a route."); }
+  await loadCanary().catch(() => {});
 }
 function appendUser(turn, intent) {
   $("messages").querySelector(".empty")?.remove();
@@ -232,6 +233,7 @@ async function sendChecked(intent) {
       state.retry = null;
       invalidate();
       notice(metadata.route === "held" ? "Held for approval. This app never sends automatically." : "Response complete.");
+      await loadCanary().catch(() => {});
     } catch (error) {
       if (scheduled) clearTimeout(scheduled);
       render();
@@ -460,6 +462,19 @@ async function loadCapacity() {
       row.measured_label ?? row.label ?? (row.measured === true ? "Measured" : "Estimated")
     ])));
 }
+// v0.3 detector canary: while a detector's known-answer check is failing (or has not yet run), cloud-bound work is
+// blocked by the server and this band says why. Local-only work is unaffected.
+async function loadCanary() {
+  const data = await api("/api/canary");
+  const band = $("canary-band");
+  if (!data.enabled || !data.cloud_blocked) { band.hidden = true; return; }
+  const failing = Object.values(data.detectors || {}).filter(item => item.status === "fail")
+    .map(item => `${item.detector}${item.failed?.length ? " (" + item.failed.join(", ") + ")" : ""}`);
+  $("canary-text").textContent = data.state === "degraded"
+    ? `Detector canary failing: ${failing.join("; ") || "a detector"}. Cloud sending is blocked; local-only work still runs.`
+    : "Detector canary not yet run on every detector. Cloud sending waits for it; local-only work still runs.";
+  band.hidden = false;
+}
 async function loadRuntime() {
   const data = await api("/api/runtime"), resources = data.resources || {};
   $("runtime").replaceChildren(fields([
@@ -644,6 +659,11 @@ $("refresh-models").addEventListener("click", () => action(async () => {
   if (state.busy) throw new GateError("Wait for the current send."); invalidate(); await loadModels(); await loadCapacity(); await loadRuntime();
 }));
 $("refresh-jobs").addEventListener("click", () => action(loadJobs));
+$("canary-run").addEventListener("click", () => action(async () => {
+  $("canary-run").disabled = true;
+  try { notice("Running the detector canary…"); await api("/api/canary/run", { method: "POST", body: {} }); await loadCanary(); }
+  finally { $("canary-run").disabled = false; }
+}));
 $("job-filter").addEventListener("submit", event => { event.preventDefault(); action(loadJobs); });
 $("clear-filter").addEventListener("click", () => { $("job-status").value = ""; action(loadJobs); });
 $("refresh-operator").addEventListener("click", () => action(loadOperator));
@@ -665,7 +685,7 @@ async function boot() {
     state.ready = true; populateModels(); renderSettings(); setBusy(false);
     notice("Local session ready. Synthetic data only; check before sending.");
   });
-  if (state.ready) { await action(loadCapacity); await action(loadRuntime); }
+  if (state.ready) { await action(loadCapacity); await action(loadRuntime); await action(loadCanary); }
   else notice("The app is not ready. Sending remains disabled. Reopen through the local launcher.");
 }
 boot();
