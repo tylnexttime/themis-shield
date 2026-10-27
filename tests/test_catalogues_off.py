@@ -15,8 +15,8 @@ from themis_shield.catalogues.gate import GateDecision, configure, settings
 from themis_shield.chat_boundary import ChatBoundary
 from themis_shield.types import DecisionResult
 
-from catalogue_fakes import PhraseTracer, _replace_tracer
-from router_fakes import NOW, approved_response, harness, request
+from router_fakes import NOW, harness, request
+from v021_golden import CORPUS, run_corpus
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,54 +73,55 @@ def test_configure_on_attaches_each_feature(tmp_path):
     assert (tmp_path / "k.db").is_file() and (tmp_path / "f.db").is_file()
 
 
-def normalised(requests):
-    return TOKEN.sub("⟦T⟧", json.dumps(requests, ensure_ascii=False, sort_keys=True))
+GOLDEN = json.loads(
+    (ROOT / "tests" / "fixtures" / "v021_router_golden.json").read_text(encoding="utf-8")
+)
 
 
-def run(tmp_path, *, configured, text, tracer=None):
+def test_golden_transcript_came_from_main():
+    assert GOLDEN["generated_from"] == "main (v0.2.1)"
+    assert set(GOLDEN["cases"]) == {case["name"] for case in CORPUS}
+
+
+def _configured_off(router):
+    configure(router, example_config())
+
+
+def _enabled_but_empty(tmp_path):
+    from themis_shield.protectors import PassphraseProtector
+
+    def prepare(router):
+        name = str(len(list(tmp_path.glob("k-*.db"))))
+        configure(router, {
+            "known_miss": {"enabled": True, "path": str(tmp_path / f"k-{name}.db")},
+            "false_positives": {"enabled": True, "path": str(tmp_path / f"f-{name}.db")},
+        }, protector_factory=lambda: PassphraseProtector("synthetic-passphrase-not-real-01"))
+    return prepare
+
+
+@pytest.mark.parametrize("setup", ["unconfigured", "configured-off", "enabled-but-empty"])
+def test_off_or_empty_catalogues_reproduce_v021_exactly(tmp_path, setup):
+    """The same fixed corpus, run on main's v0.2.1 code (the golden file) and on this code, gives an identical
+    transcript: routes, reasons, statuses, response text, cloud requests, register rows and audit trail. Lane 1's
+    friction fixes are set to "none" for the comparison (its documented v0.2.1 reproduction)."""
+    stores = tmp_path / "stores"
+    stores.mkdir()
+    prepare = {
+        "unconfigured": None, "configured-off": _configured_off,
+        "enabled-but-empty": _enabled_but_empty(stores),
+    }[setup]
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    assert run_corpus(prepare, runs) == GOLDEN["cases"]
+
+
+def test_switched_off_the_decision_is_the_plain_v021_type(tmp_path):
     h = harness(tmp_path)
-    if tracer is not None:
-        h.router.targets = _replace_tracer(h.router.targets, tracer)
-    if configured:
-        configure(h.router, example_config())
     try:
-        held = h.router.handle(request(text))
-        outcome = [held.route, held.reason, held.status]
-        if held.reason == "REQUESTER_CONFIRM_REQUIRED":
-            headers = {"X-Themis-Confirm": held.job_id}
-            again = h.router.handle(request(text), headers)
-            outcome += [again.route, again.reason]
-        else:
-            headers = None
-        if held.route == "held":
-            h.register.approve(held.job_id)
-            sent = h.router.handle(request(text), headers)
-            outcome += [sent.route, sent.reason, sent.body["choices"][0]["message"]["content"]]
-        with sqlite3.connect(tmp_path / "register.db") as db:
-            extra = {
-                table: db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                for table in ("gate_decisions", "tripwire_records", "tripwire_reviews")
-            }
-            audit = [row[0] for row in db.execute("SELECT event FROM audit ORDER BY audit_id")]
-        boundary = ChatBoundary(request(text), frozenset(), h.router.cloud_model)
+        configure(h.router, example_config())
+        boundary = ChatBoundary(request("Mara Lindahl asks a synthetic question."), frozenset(), h.router.cloud_model)
         decision = h.router._protect(boundary, "synthetic-probe", set())[4]
-        return outcome, normalised(h.fake.requests), extra, audit, decision
+        assert type(decision) is DecisionResult and not isinstance(decision, GateDecision)
+        assert h.register.list_jobs() == ()
     finally:
         h.cloud.close()
-
-
-@pytest.mark.parametrize("text, tracer", [
-    ("Mara Lindahl asks a synthetic question.", None),
-    ("The Harbour Committee met to plan the synthetic roster.", PhraseTracer(("Harbour Committee",))),
-    ("What is a synthetic retention schedule?", None),
-])
-def test_switched_off_the_gate_behaves_exactly_as_before(tmp_path, text, tracer):
-    plain = run(tmp_path / "plain", configured=False, text=text, tracer=tracer)
-    off = run(tmp_path / "off", configured=True, text=text, tracer=tracer)
-    assert off[0] == plain[0]                      # same routes, reasons, statuses and restored answer
-    assert off[1] == plain[1]                      # byte-identical cloud requests (placeholders aside)
-    assert off[2] == plain[2] == {"gate_decisions": 0, "tripwire_records": 0, "tripwire_reviews": 0}
-    assert off[3] == plain[3]                      # identical audit trail
-    assert type(off[4]) is DecisionResult and not isinstance(off[4], GateDecision)
-    assert off[4] == plain[4]
-    assert "TRIPWIRE_SENT" not in off[3]

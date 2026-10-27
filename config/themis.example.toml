@@ -117,11 +117,14 @@ institution_profile = ""
 # Detection behaviour: "v0.2" (default) or "v0.1" (the evaluated v0.1
 # detection, kept as a negative control).
 version = "v0.2"
-# v0.3 friction fixes on top of v0.2: "all" (default), "none" (exact v0.2.1
-# behaviour) or a list of names: "secret-placeholders",
-# "organisation-contacts", "checksum-context", "rule-completeness",
-# "table-role-words", "title-tokens", "contact-brackets".
-# fixes = "all"
+# v0.3 friction fixes on top of v0.2. Default: every fix except
+# "finder-whitespace-trust"; "all" adds it, "none" is exact v0.2.1 behaviour,
+# or list names: "secret-placeholders", "organisation-contacts",
+# "checksum-context", "rule-completeness", "table-role-words", "title-tokens",
+# "contact-brackets", "secret-url-components", "secret-prose-values",
+# "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
+# "finder-whitespace", "finder-whitespace-trust", "address-line-numbers".
+# fixes = ["secret-placeholders", "..."]
 
 [policy]
 # Policy behaviour: "v0.2" (default) or "v0.1" (negative control).
@@ -160,6 +163,8 @@ enabled = false
 # (`themis kmr import`) whose source export is older than this sends cloud-bound work to ASK
 # until a current export is re-imported. An unreadable register blocks.
 max_snapshot_age_days = 7
+# The whole sweep's time limit; past it the job goes to ASK (never RELEASE).
+sweep_deadline_seconds = 5
 
 [false_positives]
 # Reviewed false-positive catalogue: look-alikes accepted by a person, scoped, expiring.
@@ -178,6 +183,30 @@ scope = ""
 # prevent. Review flags with `themis tripwire review`.
 enabled = false
 max_completion_tokens = 2048
+
+# --- v0.3 detector canary: ON by default -------------------------------------------------------
+# Known-answer checks against silent detector failure (wrong weights, a tokenizer mismatch, an
+# inference-engine chat-template change that makes a finder answer with nothing). A fixed set of
+# synthetic canary documents runs through every detector (rules, PII-Tracer, propagation, each
+# local finder) with conservative minimum expectations. Records are value-free (register table
+# canary_runs). See docs/ARCHITECTURE.md, "Detector canary".
+
+[canary]
+enabled = true
+# Run every detector's canary before serving; a failure refuses to start (CANARY_FAILED).
+# (`themis serve --skip-model-check` skips it; cloud-bound work then waits for a first pass.)
+at_startup = true
+# Run the finder canary after every model load by the runtime scheduler, inside the same
+# residency and before any document. On an 8 GB GPU both finders load for every request, so this
+# adds one short finder call per model per request; turn it off only if the periodic check is enough.
+after_reload = true
+# Re-check every detector at most this often (minutes; 0 = off). The tier-1 canary runs before the
+# next cloud-bound document once due; a finder's runs inside its next residency.
+interval_minutes = 30
+# Also re-check after this many cloud-bound documents (0 = off).
+every_documents = 0
+# A failing reload or periodic canary puts the gate in a degraded state: cloud-bound work is
+# blocked (DETECTOR_CANARY_FAILED) and local-only work still runs, until a canary passes again.
 
 [typed]
 # v0.3 typed-decision tier (T1.5): the resident local model answers short multiple-choice questions about what

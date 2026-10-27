@@ -85,8 +85,9 @@ institution_profile = "harbourline-eval"
 # Detection behaviour: "v0.2" (default) or "v0.1" (the evaluated v0.1
 # detection, kept as a negative control).
 version = "v0.2"
-# v0.3 friction fixes: "all" (default), "none" (v0.2.1) or a list of names.
-# fixes = "all"
+# v0.3 friction fixes: default = all but "finder-whitespace-trust"; "all",
+# "none" (v0.2.1) or a list of names.
+# fixes = "none"
 
 [policy]
 # Policy behaviour: "v0.2" (default) or "v0.1" (negative control).

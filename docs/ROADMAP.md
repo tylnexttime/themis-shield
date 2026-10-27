@@ -86,6 +86,24 @@ text again. Idea from Chris, and from TypeSafe's Jev interface and its open alte
   model), and a small fine-tuned encoder such as [Laya](https://huggingface.co/convaiinnovations/laya) (Apache-2.0,
   421M), served by llama.cpp's decision endpoint. Laya is near chance without fine-tuning (0.362), so it is trained on
   a new training generator of ours, never on any test split.
+- **First fine-tune (27/10/2026, development only, not part of v0.3):** trained on 35,851 synthetic examples, it
+  answered 92.3% of questions correctly on sentence templates it had never seen (the untuned model: 34.6%, at chance
+  on the sensitive-statement family), and it converts to GGUF and serves through llama-server's decision endpoint
+  unchanged. But it is **confidently wrong**: its 33 mistakes out of 428 came with a median confidence of 1.000, and
+  its temperature could not be fitted because the calibration data shared templates with training. So the encoder
+  waits for v0.4, with calibration on whole templates held out from both training and scoring, early stopping before
+  the training loss reaches zero, and a fresh test split. And no version of the typed tier trusts a confidence score
+  on its own: the structural rules above (sole-cause lifts only, two option orders, never a marking or injection
+  hold) are what keep it safe.
+- **Where a small encoder fits: step 2, asymmetric** ([full explanation](SMALL-ENCODER.md), [measurements](../eval/ENCODER-RESULTS-2026-10-27.md)). It runs on the CPU between tier 1 and the GPU finders, and it
+  may raise suspicion on its own but never lower it on its own:
+  - *recall booster:* it may add an ASK for a sentence nothing else flagged (a confidently wrong "yes" costs a click;
+    a wrong "no" is no worse than without it);
+  - *second key:* it may help lift a hold only when the Gemma prefill check agrees, and only for a hold it is the sole
+    cause of (two families rarely make the same confident mistake);
+  - *hints for the person* reviewing an ASK ("looks like fiction", "looks like a public figure"), never an action;
+  - *not the fast path:* deciding that a document may skip the finders waits for a calibrated encoder proven on a
+    fresh split, because a confident wrong "clean" there skips the checks that would have caught the miss.
 - The model's answer and the policy's decision are recorded separately, with the reason. Every disagreement is a free
   label for the catalogues below.
 
@@ -148,6 +166,49 @@ precision is tracked so we know whether it earns its round trip. Never on BLOCK 
   judgments with direct and quasi-identifiers), a small human-written slice when we have one, and
   jev-pii-checker's English cases as an out-of-distribution smoke test.
 
+## v0.4 (design): keep the work possible
+
+A gate that hides everything scores perfectly on leaks and is useless. Ask a cloud model for an expense summary or
+for better deals on a pile of de-identified statements and contracts, and today it loses four things: time
+(transaction dates become placeholders, so there is no monthly breakdown), renewal and contract dates, who "you" are
+among the placeholders, and the pricing factors (age, area, vehicle) that comparisons depend on.
+
+### Contextual toggles and a semi-synthetic dictionary (Chris's design)
+
+The story behind this part, with its sources: [A codebook, and data that is partly real](CODEBOOK-AND-SYNTHETIC-DATA.md).
+
+- **Per-task profiles** decide, class by class, what passes, what is generalised and what is hidden: an expense
+  summary keeps months and amounts; deal advice keeps an age band, a region and contract months; everything else stays
+  opaque.
+- **Typed placeholders by default.** Every placeholder says what kind of value it hides, and a short legend travels
+  with the request: `⟦I:3fa9c1⟧` is a bank account number, `⟦D:91b2e0⟧` a date of birth, `⟦P:0c44a7⟧` a person. The
+  model learns the type, never the value, and is asked to answer in the IDs so restoration stays exact. (Today the
+  placeholder carries only a coarse class letter.)
+- **A semi-synthetic dictionary, opt-in.** For tasks that read better with real-looking text, values are replaced by
+  realistic surrogates, and some classes (transaction dates, for example) pass through unchanged. The cloud model is
+  not told which values are real. Each surrogate carries its ID (`Mara Quinlan ⟦P:3fa9c1⟧`), and the model is asked
+  to keep the ID wherever it refers to that value. This is partially synthetic data, a long-studied technique of
+  statistical disclosure control, and the legend is the codebook that comes with any shared confidentialised dataset.
+- **Randomness, not secrecy.** themis-shield is open source, so a rule such as "dates always pass through" would tell
+  everyone that every date the cloud sees is real. Which values are real can only stay unknown through per-job
+  randomness: dates are shifted by a random per-job offset (whole weeks keep weekdays; intervals, durations and
+  month-to-month patterns survive), as clinical de-identification does, and the decoder shifts them back. Amounts can
+  take a consistent per-job scale (ratios and trends survive), opt-in, because some tasks need exact sums.
+- **Restoration uses the IDs only.** A surrogate that comes back without its ID is never fuzzy-matched; it is flagged
+  for the person to check. This answers the reason an earlier design rejected surrogates (models shorten, misspell and
+  merge fake names, so exact reversal fails and fuzzy reversal risks the wrong person): the ID, not the name, is what
+  gets restored. Surrogates are drawn so they collide with nothing in the document.
+- **Generalised attributes:** a date of birth becomes an age band, an address a state and postcode region, a vehicle
+  keeps make, model and year while plate and VIN are hidden, and the requester can mark themselves as "self".
+- **The cost is stated, not hidden:** every kept or generalised attribute adds re-identification risk, because together
+  they become quasi-identifiers. All toggles are off by default, and a risky combination holds the document for ASK.
+
+### A utility measurement next to the leak measurement
+
+The same task runs twice through a cloud model, once on the original documents and once on the gate's output, and a
+judge scores how much worse the de-identified answer is. Reported per task and per profile, next to released leaks:
+privacy and usefulness on one page.
+
 ## Later
 
 - **A tier-1 bake-off** of small span finders: GLiNER PII checkpoints (Apache-2.0 ones only; the original GLiNER
@@ -155,7 +216,12 @@ precision is tracked so we know whether it earns its round trip. Never on BLOCK 
 - **A fast path:** a per-chunk category check decides which tiers run, evaluated before it is offered.
 - **Measured re-identification risk** for tables: [ARX](https://arx.deidentifier.org/) run offline to calibrate the
   table pass's quasi-identifier rule.
-- **File inputs** (PDF, Word, images) through [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) as an external tool.
+- **File inputs** (PDF, Word, images) through [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) as an external tool,
+  with extraction that cannot fail silently: a PDF whose text layer is glyph codes rather than words, or whose page
+  count and extracted text disagree, goes to OCR or to a person, never to the detectors as if it were complete. OCR
+  engines drop whole lines without saying so, so OCR text is checked against line spacing (a gap-fill pass) before it
+  is trusted. Images that carry personal data without text (a signature, a face, a photo of a card's back) are held,
+  because a text gate cannot see them.
 - **A real-data evaluation protocol** before `synthetic_only` can ever be switched off.
 - **A human-written test slice**: 20-40 documents written by people, in their own words.
 - Linux and macOS runs, a native Anthropic Messages leg, a central register service.

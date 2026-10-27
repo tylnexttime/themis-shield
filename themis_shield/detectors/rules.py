@@ -27,6 +27,7 @@ import unicodedata
 from ..normalise import detection_view, strip_default_ignorable
 from ..types import Label
 from .contracts import StageReport, StageResult, Status, finding
+from .secret_context import WORD_MASH, credential_shaped, url_component, words_only_path
 from .settings import fix_on, v02
 
 
@@ -173,23 +174,36 @@ SECRET_PROSE = re.compile(
 
 # ----------------------------------------------------------------------------------------------------------------------
 # v0.3 fix "secret-placeholders": a secret assignment whose WHOLE value is a template placeholder or a reference to a
-# secret manager names where the secret lives; the secret itself is not in the text. Conservative by construction:
+# secret manager names where the secret lives; the secret itself is not in the text. A placeholder is exempt only
+# when it carries no literal value at all:
 # - the placeholder must be the entire value (quoted: everything inside the quotes; bare: up to whitespace, a comma,
 #   a semicolon or the end), so "${VAULT:x}s3cretValue" or "<set>abc123" is still a secret;
+# - no default or fallback part: "${DB_PASSWORD:-Xk9pL2}", "${DB_PASSWORD:=x}", "${db.password:Tr0ub4dor}" and
+#   "${X-x}" are values (only an empty default, "${X:-}", is exempt); a colon inside "${...}" is accepted only after
+#   a short list of secret-manager prefixes ("${VAULT:db-password}", "${ssm:/app/db}");
+# - angle brackets only around descriptive placeholder text: words with a space ("<set in vault>",
+#   "<your password>") or one all-caps word from a short list ("<REDACTED>"); "<swordfish>" is a value;
 # - only the assignment and "password is ..." heuristics consult it; the key, hex and base64 patterns still run over
 #   the whole text, so a high-entropy string written inside a placeholder is still caught by them.
+# Review fix (v0.3 freeze): the first version accepted defaults and single lower-case words; see the development log.
 # ----------------------------------------------------------------------------------------------------------------------
-_REF_NAME = r"[A-Za-z0-9_.][A-Za-z0-9_.:/#@\-]{0,126}"
+_VAR_NAME = r"[A-Za-z_][A-Za-z0-9_.]{0,126}"                 # an environment or property name: no ":" and no "-"
+_REF_NAME = r"[A-Za-z0-9_./][A-Za-z0-9_./#@\-]{0,126}"        # a secret-manager path after a prefix, or a template name
+_REF_PREFIX = r"(?i:vault|ssm|secret|secrets|secretsmanager|kv|keyvault|env|sm|op)"
+PLACEHOLDER_WORDS = frozenset({
+    "REDACTED", "REMOVED", "HIDDEN", "MASKED", "SECRET", "PASSWORD", "TOKEN", "VALUE", "PLACEHOLDER",
+})
 PLACEHOLDER = re.compile(
     r"""(?x)
-    \$\{\{\s*""" + _REF_NAME + r"""\s*\}\}                          # ${{ secrets.DB_PASSWORD }} (CI expressions)
-    | \$\{\s*""" + _REF_NAME + r"""(?::-?[A-Za-z0-9_.\-]{0,40})?\s*\}  # ${VAULT:db-password}, ${DB_PASSWORD}, ${X:-}
-    | \{\{-?\s*""" + _REF_NAME + r"""(?:\s*\|\s*[A-Za-z_]+)*\s*-?\}\}  # {{ secret }}, {{- .Values.db.password -}}
+    \$\{\{\s*""" + _VAR_NAME + r"""\s*\}\}                          # ${{ secrets.DB_PASSWORD }} (CI expressions)
+    | \$\{\s*""" + _REF_PREFIX + r"""\s*:\s*""" + _REF_NAME + r"""\s*\}  # ${VAULT:db-password}, ${ssm:/app/db}
+    | \$\{\s*""" + _VAR_NAME + r"""(?::[-=])?\s*\}                  # ${DB_PASSWORD}, ${X:-} (empty default only)
+    | \{\{-?\s*\.?""" + _VAR_NAME + r"""(?:\s*\|\s*[A-Za-z_]+)*\s*-?\}\}  # {{ secret }}, {{- .Values.db.password -}}
     | \$\(\s*[A-Za-z_][A-Za-z0-9_.\-]{0,80}\s*\)                     # $(DB_PASSWORD), $(var.password)
     | %\([A-Za-z_][A-Za-z0-9_]{0,80}\)[sdr]                            # %(db_password)s
     | %[A-Za-z_][A-Za-z0-9_]{0,80}%                                   # %DB_PASSWORD%
     | \$[A-Z][A-Z0-9]*_[A-Z0-9_]{1,60}                               # $DB_PASSWORD (upper case with an underscore)
-    | <\s*[A-Za-z][A-Za-z_\-]*(?:[ _\-][A-Za-z][A-Za-z_\-]*){0,10}\s*>  # <set in vault>, <your-api-key>, <REDACTED>
+    | <\s*[A-Za-z][A-Za-z_\-]*(?:[ _\-][A-Za-z][A-Za-z_\-]*){0,10}\s*>  # checked by _descriptive_angle below
     | \[\s*(?:REDACTED|REMOVED|HIDDEN|MASKED|SECRET|PASSWORD|TOKEN)\s*\]
     | \((?:REDACTED|REMOVED|HIDDEN|MASKED)\)
     | (?:REDACTED|MASKED)
@@ -203,10 +217,10 @@ PLACEHOLDER = re.compile(
 _VALUE_END = re.compile(r"\s|[,;]|$")
 
 
-def _upper_or_lower_words(value: str) -> bool:
-    """An angle placeholder must read as words: separated words, or one all-lower / all-upper word (no digits)."""
-    inner = value.strip("<> ")
-    return bool(re.search(r"[ _\-]", inner)) or inner.islower() or inner.isupper()
+def _descriptive_angle(value: str) -> bool:
+    """Angle-bracket text that cannot be a value: words with a space, or one all-caps placeholder word."""
+    inner = value.strip("<>").strip()
+    return " " in inner or inner in PLACEHOLDER_WORDS
 
 
 def placeholder_value(view: str, start: int, end: int | None = None) -> bool:
@@ -224,7 +238,7 @@ def placeholder_value(view: str, start: int, end: int | None = None) -> bool:
     elif not _VALUE_END.match(view, match.end()):
         return False
     value = match.group()
-    return not value.startswith("<") or _upper_or_lower_words(value)
+    return not value.startswith("<") or _descriptive_angle(value)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -488,9 +502,10 @@ class RulesDetector:
                         if label == Label.TFN and companies and company_number(view, a, b):
                             # v0.3: a number introduced as an ACN that passes the ACN check is a company number,
                             # even when it also passes the TFN check (about 1 in 11 do). Still substituted.
-                            emit(a, b, Label.INTERNAL_ID)
+                            emit(a, b, Label.INTERNAL_ID, True)
                         elif context and number_context(label, view, a, b) == "negative":
-                            emit(a, b, Label.INTERNAL_ID)
+                            # The label changes; the checksum result does not (it guards the allow strength).
+                            emit(a, b, Label.INTERNAL_ID, True)
                         else:
                             emit(a, b, label, True)
             for match in USI_PATTERN.finditer(view):
@@ -518,15 +533,26 @@ class RulesDetector:
                 for match in CARD.finditer(view):
                     if payment_card_valid(match.group()):
                         emit(match.start(), match.end(), Label.PAYMENT_CARD, True)
+        url_fix, org_fix = fix_on("secret-url-components"), fix_on("secret-org-codes")
         for pattern, label in patterns:
             for match in pattern.finditer(view):
                 end = match.end()
                 if label == Label.URL_PERSONAL:
                     end = match.start() + len(match.group().rstrip(".,;!?)"))
+                if pattern in (HEX_SECRET, B64_SECRET):
+                    # v0.3: slash-joined words in a URL path and run-together words identify nobody and are no
+                    # credential; every other high-entropy string is emitted and judged in context at the end.
+                    if url_fix and url_component(view, match.start(), end) == "path" and words_only_path(
+                        match.group()
+                    ):
+                        continue
+                    if org_fix and WORD_MASH.fullmatch(match.group()):
+                        continue
                 emit(match.start(), end, label)
         for match in LOCAL_PHONE.finditer(view):
             emit(*match.span("number"), Label.PHONE)
         placeholders = fix_on("secret-placeholders")
+        exempt: list[tuple[int, int]] = []
         for match in SECRET_ASSIGNMENT.finditer(view):
             group = next(
                 name for name in ("double", "single", "bare")
@@ -535,6 +561,8 @@ class RulesDetector:
             start, end = match.span(group)
             if placeholders:
                 if placeholder_value(view, start, None if group == "bare" else end):
+                    # The whole placeholder, so the prose rule cannot pick a word out of "<your password here>".
+                    exempt.append((start, PLACEHOLDER.match(view, start).end()))
                     continue
                 if group == "bare" and PLACEHOLDER.match(view, start):
                     # Placeholder syntax with a value attached ("${VAULT:x}Zq8kLm2"): the bare pattern stops at the
@@ -544,7 +572,14 @@ class RulesDetector:
         for match in SECRET_PROSE.finditer(view):
             # Avoid obvious generic prose; assignments and key patterns do not
             # use this heuristic. The LLM stages remain responsible for context.
-            if placeholders and placeholder_value(view, match.start("value")):
+            if placeholders and (
+                placeholder_value(view, match.start("value"))
+                or any(a <= match.start() < b for a, b in exempt)
+            ):
+                continue
+            if fix_on("secret-prose-values") and not credential_shaped(
+                match.group().split(None, 1)[0], match.group("value"),
+            ):
                 continue
             if match.group("value").casefold() not in {
                 "reset", "policy", "requirements", "protected", "required",

@@ -132,18 +132,17 @@ def table_spans(
     return tuple(out)
 
 
-# v0.3 fix "title-tokens": titles, honorifics and ranks in front of a name. A found name such as "Captain Jane Roe"
-# keeps its whole span, but the leading title is never propagated through the document as a name token: the title is
-# beside the name, not part of it. Only a capitalised title before at least one other name token, with no comma after
-# it, is skipped ("Bishop, Jane" keeps "Bishop": surname-first lists put the surname there).
+# v0.3 fix "title-tokens": honorifics and ranks in front of a name. A found name such as "Captain Jane Roe" keeps its
+# whole span, but a leading honorific is never propagated through the document as a name token: the title is beside
+# the name, not part of it. Only words that are not used as given names are listed, so no name token is ever lost
+# (review fix, v0.3 freeze: "Dean", "Major", "Justice", "Sister", "Chief", "Lady", "Agent", "Chef", "Coach" and
+# role words such as "Head" were removed: they are given names too, or not honorifics). A listed word is skipped
+# only when it is capitalised, comes first, is followed by another name part and has no comma after it.
 TITLE_WORDS = frozenset({
-    "captain", "capt", "doctor", "professor", "sister", "brother", "father", "mother", "reverend", "rev", "pastor",
-    "elder", "deacon", "bishop", "rabbi", "imam", "saint", "sergeant", "sgt", "constable", "inspector", "detective",
-    "officer", "lieutenant", "lt", "major", "colonel", "col", "general", "admiral", "commander", "corporal",
-    "private", "judge", "justice", "magistrate", "councillor", "cr", "senator", "minister", "mayor", "president",
-    "director", "manager", "coordinator", "head", "lead", "chief", "chair", "chairperson", "nurse", "coach",
-    "uncle", "aunt", "aunty", "auntie", "sir", "dame", "lady", "lord", "madam", "madame", "mister", "master",
-    "fr", "sr", "br", "dean", "principal", "matron", "chef", "governor", "premier", "sheriff", "agent",
+    "captain", "capt", "doctor", "professor", "reverend", "rev", "revd", "father", "fr", "brother", "br", "pastor",
+    "rabbi", "imam", "sergeant", "sgt", "constable", "inspector", "insp", "detective", "det", "lieutenant", "lt",
+    "colonel", "col", "admiral", "corporal", "cpl", "councillor", "cllr", "cr", "senator", "mister", "madam",
+    "madame", "sir", "dame", "hon",
 })
 
 
@@ -344,6 +343,36 @@ def table_quasi_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
                         out.append(finding(start, end, Label.QUASI_ID, TABLE_QUASI_STAGE, tier))
         index = row_index if rows else index + 1
     return tuple(out)
+
+
+# v0.3 fix "address-line-numbers": scanned letters and statements often break an address after the street number,
+# leaving the number alone on its own line ("48" then "EXAMPLE PDE" then "QUARRYBEND NSW 2999"). When an ADDRESS
+# finding starts a line (only whitespace before it) and the previous non-empty line is only a street, unit or lot
+# number, that number becomes part of the address evidence. Nothing else is added.
+ADDRESS_LINE_STAGE = "address-lines"
+LONE_STREET_NUMBER = re.compile(
+    r"(?i)(?:(?:unit|u|lot|shop|suite|level|lvl|apt|flat)\s*)?[0-9]{1,5}[a-z]?(?:\s*[/\-]\s*[0-9]{1,5}[a-z]?)?"
+)
+
+
+def address_line_numbers(text: str, findings: tuple[DetectionFinding, ...]) -> tuple[DetectionFinding, ...]:
+    added = []
+    for item in findings:
+        if Label.ADDRESS not in item.labels:
+            continue
+        line_start = max(text.rfind("\n", 0, item.start), text.rfind("\r", 0, item.start)) + 1
+        if text[line_start:item.start].strip():
+            continue
+        cursor = line_start
+        while cursor > 0 and text[cursor - 1] in "\r\n \t\u00a0":
+            cursor -= 1
+        previous_start = max(text.rfind("\n", 0, cursor), text.rfind("\r", 0, cursor)) + 1
+        line = text[previous_start:cursor]
+        stripped = line.strip()
+        if stripped and LONE_STREET_NUMBER.fullmatch(stripped):
+            a = previous_start + len(line) - len(line.lstrip())
+            added.append(finding(a, a + len(stripped), Label.ADDRESS, ADDRESS_LINE_STAGE, item.provenance_tiers[-1]))
+    return union_findings(findings, added) if added else findings
 
 
 def propagate(

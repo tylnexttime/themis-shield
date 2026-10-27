@@ -241,7 +241,8 @@ def test_decide_without_catalogue_is_plain(tmp_path):
 
 def test_cli_propose_accept_list_expire(tmp_path, capsys):
     db = str(tmp_path / "cli.db")
-    assert fpc_main(["--db", db, "propose", "--label", "PERSON", "--identity", "synthetic-operator-a"],
+    assert fpc_main(["--db", db, "list"]) == 2  # no file: never created by accident
+    assert fpc_main(["--db", db, "--create", "propose", "--label", "PERSON", "--identity", "synthetic-operator-a"],
                     read=lambda _: "Harbour Committee") == 0
     assert "FPC-0001: proposed" in capsys.readouterr().out
     assert fpc_main(["--db", db, "accept", "FPC-0001", "--identity", "synthetic-operator-a"]) == 2

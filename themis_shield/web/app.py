@@ -227,6 +227,32 @@ def create_app(
     async def capacity():
         return await operation(services.capacity, router)
 
+    @app.get("/api/canary")
+    async def canary_status():
+        # v0.3 detector canary: value-free state (healthy, degraded, pending), per detector and the latest runs.
+        monitor = getattr(router, "canary", None)
+        if monitor is None:
+            return {"enabled": False, "cloud_blocked": False}
+        try:
+            value = await run_in_threadpool(monitor.status)
+            value["recent"] = list(monitor.history)[-10:]
+            return value
+        except Exception:
+            return error("REQUIRED_SERVICE_UNAVAILABLE")
+
+    @app.post("/api/canary/run")
+    async def canary_run():
+        # Run every detector's canary now (also the way to clear a degraded state once the cause is fixed). It takes
+        # the detection lock, so it never interleaves with a document's detection.
+        monitor = getattr(router, "canary", None)
+        if monitor is None:
+            return error("OPERATION_REFUSED", 403)
+        run = control.wrap(lambda: monitor.run("manual"))
+        result = await operation(run)
+        if isinstance(result, Response):
+            return result
+        return {**monitor.status(), "result": result.record()}
+
     @app.post("/api/preview")
     async def preview(request: Request):
         try:

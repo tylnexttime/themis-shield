@@ -372,6 +372,10 @@ def build_router(config_path):
         # v0.3 catalogues ([known_miss], [false_positives], [tripwire]): all off unless enabled.
         from .catalogues.gate import configure as configure_catalogues
         configure_catalogues(router, config, protector_factory=lambda: build_protector(vault_config))
+        # v0.3 detector canary ([canary], on by default): known-answer checks at start-up (run by `themis serve`),
+        # after every model load by the scheduler, and periodically; a failure blocks cloud-bound work.
+        from .canary import configure as configure_canary
+        configure_canary(router, config)
         return router
     except BaseException:
         if cloud is not None:

@@ -22,9 +22,14 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
 import re
+import unicodedata
 
+from ..normalise import detection_view
 from ..types import Label
 from .contracts import ChatJSONClient, StageReport, StageResult, Status, finding
+from .settings import fix_on
+
+WHITESPACE_RUN = r"\s+"  # str patterns: \s covers CR, LF, tab, NBSP U+00A0, U+202F, U+2009 and the other spaces
 
 
 class FinderModel(StrEnum):
@@ -393,17 +398,55 @@ def spans_for(text: str, entities: list[dict]) -> tuple[list[dict], int]:
     Values are transient local variables. They never enter returned evidence.
     """
     out, missing = [], 0
+    tolerant = fix_on("finder-whitespace")
+    view = None
     for entity in entities:
         value = entity["value"].strip()
         matches = list(re.finditer(re.escape(value), text))
         if not matches:
             matches = list(re.finditer(re.escape(value), text, re.IGNORECASE))
-        if not matches:
+        spans = [(match.start(), match.end()) for match in matches]
+        verbatim = bool(spans)
+        if not spans and tolerant:
+            if view is None:
+                view = detection_view(text)
+            spans = whitespace_tolerant_spans(text, value, view)
+        # A value found only by tolerant matching is substituted, but it still counts as "not in the text verbatim"
+        # for the unmatched-values hold unless finder-whitespace-trust is on: on the real slice that hold was also
+        # holding documents with genuine misses, and trusting tolerant matches released them (development log).
+        if not spans or not (verbatim or fix_on("finder-whitespace-trust")):
             missing += 1
-        out.extend({
-            "start": match.start(), "end": match.end(), "label": entity["label"]
-        } for match in matches)
+        out.extend({"start": a, "end": b, "label": entity["label"]} for a, b in spans)
     return out, missing
+
+
+def _token_patterns(value: str) -> tuple[re.Pattern, ...]:
+    tokens = value.split()
+    if not tokens:
+        return ()
+    # Exactly the value's own tokens, in order; any run of whitespace (CR/LF, NBSP U+00A0, U+202F, U+2009 ...) for
+    # any run of whitespace. Never more tokens than the value has. Case-sensitive first, as for exact matches.
+    body = WHITESPACE_RUN.join(re.escape(token) for token in tokens)
+    return re.compile(body), re.compile(body, re.IGNORECASE)
+
+
+def whitespace_tolerant_spans(text: str, value: str, view) -> list[tuple[int, int]]:
+    """v0.3 ``finder-whitespace``: the value with any whitespace run matching any whitespace run, on the text and then
+    on the NFKC detection view (offsets mapped back to the text). Empty when nothing matches (fail closed as before).
+    """
+    value = unicodedata.normalize("NFKC", value)
+    for pattern in _token_patterns(value):
+        found = [(m.start(), m.end()) for m in pattern.finditer(text) if m.end() > m.start()]
+        if found:
+            return found
+    for pattern in _token_patterns(value):
+        found = [
+            (view.offsets[m.start()][0], view.offsets[m.end() - 1][1])
+            for m in pattern.finditer(view.text) if m.end() > m.start()
+        ]
+        if found:
+            return found
+    return []
 
 
 @dataclass(frozen=True, slots=True)

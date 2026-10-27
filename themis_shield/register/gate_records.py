@@ -6,6 +6,9 @@ Written only when a v0.3 catalogue feature is enabled; with all of them off thes
   override, kept apart, with the known-miss register version and age used by the final sweep.
 - ``tripwire_records`` / ``tripwire_reviews``: what the cloud trip-wire said (spans and placeholder ids only, never
   text) and the Operator's verdict on each flag, so flag precision can be tracked.
+- ``canary_runs`` (written whenever the detector canary is enabled, which is the default): one row per canary run,
+  value-free (trigger, pass or fail, and per detector the status, the fixed names of failed expectations, a fixed
+  error code and the duration). The canary only ever handles its own fixed synthetic documents.
 
 Like the rest of the register's history these tables refuse UPDATE and DELETE.
 """
@@ -26,14 +29,25 @@ GATE_RECORD_REASONS = {
     "TRIPWIRE_CLEAR": "The cloud trip-wire reported nothing (no evidence either way).",
     "TRIPWIRE_FLAGGED": "The cloud trip-wire flagged possible residual personal information; the job stopped.",
     "TRIPWIRE_MALFORMED": "The cloud trip-wire reply was malformed; the job stopped.",
+    "TRIPWIRE_UNAVAILABLE": "The cloud trip-wire could not be completed (transport or protocol); the job stopped.",
+    "KNOWN_MISS_ASK": "The known-miss sweep now needs a person to check this package before approval.",
     "TRIPWIRE_CONFIRMED": "An Operator confirmed the trip-wire flag; the job is refused.",
     "TRIPWIRE_REJECTED": "An Operator rejected the trip-wire flag as a false flag.",
+    "DETECTOR_CANARY_FAILED": (
+        "The detector canary is failing; cloud-bound work is blocked until a canary passes again."
+    ),
+    "DETECTOR_CANARY_PENDING": (
+        "The detector canary has not yet checked every detector; cloud-bound work waits for it."
+    ),
 }
 REASONS.update(GATE_RECORD_REASONS)
 OUTCOMES = ("clear", "flagged", "malformed", "failed")
 VERDICTS = ("confirmed", "rejected")
 OPERATOR_ROLES = {"operator", "security-admin"}
 _HASH = re.compile(r"[0-9a-f]{64}")
+CANARY_STATUSES = ("pass", "fail", "skipped")
+_CANARY_NAME = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+_CANARY_TRIGGERS = ("startup", "reload", "periodic", "documents", "retry", "pending", "manual", "eval")
 
 
 class GateRecords:
@@ -69,7 +83,17 @@ class GateRecords:
                 review_id INTEGER PRIMARY KEY REFERENCES tripwire_reviews(review_id),
                 actor_identity TEXT NOT NULL
             )""")
-            for table in ("gate_decisions", "tripwire_records", "tripwire_reviews", "tripwire_review_actors"):
+            db.execute("""CREATE TABLE IF NOT EXISTS canary_runs (
+                run_id INTEGER PRIMARY KEY,
+                version TEXT NOT NULL,
+                trigger TEXT NOT NULL,
+                passed INTEGER NOT NULL CHECK(passed IN (0, 1)),
+                checks_json TEXT NOT NULL,
+                occurred_utc TEXT NOT NULL
+            )""")
+            for table in (
+                "gate_decisions", "tripwire_records", "tripwire_reviews", "tripwire_review_actors", "canary_runs",
+            ):
                 for action in ("UPDATE", "DELETE"):
                     db.execute(
                         f"CREATE TRIGGER IF NOT EXISTS {table}_{action.lower()}_denied "
@@ -80,7 +104,11 @@ class GateRecords:
     # -- decision records ---------------------------------------------------------------------------------------
 
     def record_gate_decision(self, job_id, manifest_hash, record, *, now=None):
-        """Append the decision record once per job and clean package (idempotent for a re-send)."""
+        """Append the decision record for a job and clean package.
+
+        A re-send with the same outcome adds nothing; a changed outcome for the same package (a known-miss entry that
+        started matching, an import that went stale) appends a new row, so the history shows what changed and when.
+        """
         from .sqlite_store import stamp, utc
         if not isinstance(manifest_hash, str) or not _HASH.fullmatch(manifest_hash) or type(record) is not dict:
             raise ValueError("invalid decision record")
@@ -88,9 +116,11 @@ class GateRecords:
         version = (record.get("known_miss") or {}).get("version")
         with self._transaction() as db:
             self._row(db, job_id)
-            if db.execute(
-                "SELECT 1 FROM gate_decisions WHERE job_id=? AND manifest_hash=?", (job_id, manifest_hash),
-            ).fetchone() is None:
+            latest = db.execute(
+                "SELECT record_json FROM gate_decisions WHERE job_id=? AND manifest_hash=? "
+                "ORDER BY decision_id DESC LIMIT 1", (job_id, manifest_hash),
+            ).fetchone()
+            if latest is None or latest[0] != text:
                 db.execute(
                     "INSERT INTO gate_decisions (job_id,manifest_hash,record_json,known_miss_version,occurred_utc) "
                     "VALUES (?,?,?,?,?)",
@@ -105,6 +135,86 @@ class GateRecords:
                     "SELECT * FROM gate_decisions WHERE job_id=? ORDER BY decision_id", (job_id,),
                 )
             )
+
+    def require_confirmation(self, job_id, manifest_hash, *, now=None):
+        """Raise a not-yet-approved package to "confirmation required" (never the reverse).
+
+        Used when the known-miss sweep starts asking about a package that was built without a hold. Allowed only
+        while no approval exists (Logged, Awaiting Operator or Escalated); otherwise the caller refuses the job.
+        Changing the flag changes the stage-two binding, so any earlier stage decision no longer completes it.
+        """
+        from .sqlite_store import utc
+        now = utc(now)
+        with self._transaction() as db:
+            row = self._row(db, job_id)
+            if (
+                row["manifest_hash"] != manifest_hash
+                or S(row["status"]) not in {S.LOGGED, S.AWAITING_OPERATOR, S.ESCALATED_REVIEW}
+                or self._approval_for(db, row, now) is not None
+            ):
+                raise PermissionError("an approved or closed package cannot be re-assessed")
+            if not row["confirmation_required"]:
+                self._update(db, job_id, {"confirmation_required": 1})
+                self._stage_update(db, job_id, stage2="pending", stage2_manifest_hash=None)
+                row = self._row(db, job_id)
+                self._stage_event(db, row, "KNOWN_MISS_ASK", now)
+
+    # -- detector canary ----------------------------------------------------------------------------------------
+
+    def record_canary(self, record, *, now=None):
+        """Append one canary run. Only fixed names, codes, statuses and durations are accepted: never text."""
+        from .sqlite_store import stamp, utc
+        if type(record) is not dict or not isinstance(record.get("checks"), list):
+            raise ValueError("invalid canary record")
+        version, trigger = record.get("version"), record.get("trigger")
+        if not isinstance(version, str) or not _CANARY_NAME.fullmatch(version) or trigger not in _CANARY_TRIGGERS:
+            raise ValueError("invalid canary record")
+        checks = []
+        for item in record["checks"]:
+            if type(item) is not dict:
+                raise ValueError("invalid canary check")
+            detector, status, failed = item.get("detector"), item.get("status"), item.get("failed")
+            error, duration = item.get("error_code"), item.get("duration_ms")
+            if (
+                not isinstance(detector, str) or not _CANARY_NAME.fullmatch(detector)
+                or status not in CANARY_STATUSES
+                or not isinstance(failed, list)
+                or any(not isinstance(name, str) or not _CANARY_NAME.fullmatch(name) for name in failed)
+                or (error is not None and (not isinstance(error, str) or not _CANARY_NAME.fullmatch(error)))
+                or isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration < 0
+            ):
+                raise ValueError("invalid canary check")
+            checks.append({
+                "detector": detector, "status": status, "failed": failed, "error_code": error,
+                "duration_ms": round(float(duration), 1), "trigger": item.get("trigger") or trigger,
+            })
+        passed = all(item["status"] != "fail" for item in checks)
+        if record.get("passed") is not None and record.get("passed") is not passed:
+            raise ValueError("inconsistent canary record")
+        with self._transaction() as db:
+            cursor = db.execute(
+                "INSERT INTO canary_runs (version,trigger,passed,checks_json,occurred_utc) VALUES (?,?,?,?,?)",
+                (version, trigger, int(passed), canonical_json(checks), stamp(utc(now))),
+            )
+            return cursor.lastrowid
+
+    def canary_runs(self, limit=50):
+        """The latest canary runs, newest first (value-free)."""
+        if type(limit) is not int or not 1 <= limit <= 10000:
+            raise ValueError("invalid limit")
+        with self._transaction() as db:
+            return tuple(
+                dict(row, checks=json.loads(row["checks_json"]), passed=bool(row["passed"]))
+                for row in db.execute("SELECT * FROM canary_runs ORDER BY run_id DESC LIMIT ?", (limit,))
+            )
+
+    def record_canary_block(self, job_id, code, *, now=None):
+        """Audit why a cloud-bound job was stopped: the detector canary was failing or had not yet run."""
+        from .sqlite_store import utc
+        if code not in {"DETECTOR_CANARY_FAILED", "DETECTOR_CANARY_PENDING"}:
+            raise ValueError("invalid canary block code")
+        with self._transaction() as db:
+            self._stage_event(db, self._row(db, job_id), code, utc(now))
 
     # -- cloud trip-wire ----------------------------------------------------------------------------------------
 
@@ -147,6 +257,8 @@ class GateRecords:
                 )
             elif outcome == "clear":
                 self._stage_event(db, row, "TRIPWIRE_CLEAR", now)
+            elif outcome == "failed":
+                self._stage_event(db, row, "TRIPWIRE_UNAVAILABLE", now)
             else:
                 self._stage_event(db, row, "TRIPWIRE_MALFORMED", now)
             return cursor.lastrowid

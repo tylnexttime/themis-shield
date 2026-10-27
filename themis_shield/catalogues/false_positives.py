@@ -27,6 +27,7 @@ import re
 from typing import Callable
 
 from ..detectors.allowlist import NEVER_TRIM
+from ..detectors.rules import validate_identifier
 from ..normalise import detection_view
 from .known_miss import check_pattern_safety
 from ..types import Label
@@ -286,6 +287,18 @@ class Override:
         return {"entry_id": self.entry_id, "strength": self.strength, "label": self.label, "count": self.count}
 
 
+def _allow_forbidden(item, text: str) -> bool:
+    """``allow`` never applies to a checksum-valid identifier, whatever label it now carries.
+
+    The finding's own checksum result counts, and the value is validated again: a number the checksum-context fix
+    relabelled as a generic identifier is still a checksum-valid TFN, Medicare number or ABN.
+    """
+    if item.checksum_valid is True or item.labels & ALLOW_FORBIDDEN:
+        return True
+    value = text[item.span.start:item.span.end]
+    return any(validate_identifier(label, value).checksum_valid for label in (Label.TFN, Label.MEDICARE, Label.ABN))
+
+
 def match(entries, text: str, findings) -> tuple[frozenset[int], frozenset[int], tuple[Override, ...]]:
     """Indexes of findings set aside for holds (any strength) and removed from substitution (``allow``).
 
@@ -315,7 +328,7 @@ def match(entries, text: str, findings) -> tuple[frozenset[int], frozenset[int],
                 if entry.context.search(window) is None:
                     continue
             strength = entry.strength
-            if strength == "allow" and (item.checksum_valid is True or item.labels & ALLOW_FORBIDDEN):
+            if strength == "allow" and _allow_forbidden(item, text):
                 strength = "no_hold"
             if best is None or (strength == "allow" and best[1] != "allow"):
                 best = (entry, strength)
@@ -335,7 +348,7 @@ def match(entries, text: str, findings) -> tuple[frozenset[int], frozenset[int],
             continue
         for start, end, label, entry, strength in direct:
             if item.labels == frozenset({label}) and start <= item.span.start and item.span.end <= end:
-                if strength == "allow" and (item.checksum_valid is True or item.labels & ALLOW_FORBIDDEN):
+                if strength == "allow" and _allow_forbidden(item, text):
                     strength = "no_hold"
                 no_hold.add(index)
                 if strength == "allow":

@@ -176,6 +176,12 @@ Read this section before you rely on anything above.
   About a fifth of institutional look-alikes are still redacted.
 - **Sensitive statements depend on the LLM finders.** They scored well on synthetic text thanks to prompt v2, but
   real writing is more varied. A dedicated sentence-level classifier is on the roadmap.
+- **A small classifier is a helper, never a judge.** We fine-tuned a small decision encoder (Laya, 421M) on synthetic
+  data of our own: it answered 92.3% of questions correctly on sentence templates it had never seen, but its wrong
+  answers came with a median confidence of 1.000. **It must never be used as a standalone privacy check.** In
+  themis-shield it may only add caution, or act as the second of two independent keys; it is not part of v0.3. See
+  [docs/SMALL-ENCODER.md](docs/SMALL-ENCODER.md) and the
+  [measurements](eval/ENCODER-RESULTS-2026-10-27.md).
 - **Prompt injection against the detectors** is tested only with our own synthetic injection cases. We found no
   published study of injection attacks on PII detectors; treat it as an open risk.
 - **English first, Australian-first taxonomy.** The label set includes Australian identifiers (TFN, Medicare, ABN,
@@ -516,7 +522,8 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
    TFNs, common job titles in tables), and a **typed-decision tier**: a small model answers short multiple-choice
    questions about what the cheap detectors found (a real person or fiction? a person's own mailbox or an
    organisation's? a date of birth or a duration?) in a single forward pass. It may lift a hold only when it is the
-   hold's sole cause, and never a marking or injection hold.
+   hold's sole cause, and never a marking or injection hold. v0.3 asks the Gemma finder we already run; a small
+   fine-tuned encoder comes later, and only as a helper ([why](docs/SMALL-ENCODER.md)).
 2. **A gate that learns from its misses** (v0.3): a **known-miss register** checked as a final sweep before a document
    is called clean (rules, context shapes and keyed fingerprints, never the values themselves), a reviewed
    **false-positive catalogue**, and an optional **cloud trip-wire** that asks the cloud model to flag residual

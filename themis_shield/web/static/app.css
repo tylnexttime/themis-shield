@@ -34,6 +34,7 @@ label { display:grid; gap:.3rem; }
 .masthead strong span { font-weight:400; }
 .masthead > span { color:var(--muted); font-size:.86rem; }
 .pilot { grid-column:1/-1; padding:.55rem 1.25rem; background:#ffe18b; color:#312500; font-weight:700; }
+.canary { grid-column:1/-1; padding:.55rem 1.25rem; border-bottom:2px solid var(--danger); background:var(--danger-bg); color:var(--danger); font-weight:700; display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
 nav { grid-column:1; grid-row:3; border-right:1px solid var(--line); padding:1rem .65rem; background:var(--surface); display:flex; flex-direction:column; gap:.4rem; }
 nav button { text-align:left; border-color:transparent; }
 nav button[aria-current="page"] { background:var(--soft); color:var(--accent); font-weight:700; }

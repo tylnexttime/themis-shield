@@ -96,6 +96,8 @@ FIXED = {
     "CHECKED": "The clean package was peer-checked.",
     "REVIEW_REQUIRED": "Further peer review is required.",
     "KNOWN_MISS_HIT": "The de-identified text matches the known-miss register; check the listed findings, then confirm.",
+    "KNOWN_MISS_STALE": "An imported known-miss snapshot is older than the configured limit; a person checks the text, or an Operator re-imports a current export.",
+    "TRIPWIRE_UNAVAILABLE": "The cloud trip-wire could not be completed; the job stopped (fail closed).",
     "TRIPWIRE_FLAGGED": "The cloud trip-wire flagged possible residual personal information; the job stopped for an Operator.",
     "TRIPWIRE_REVIEW_REQUIRED": "An Operator must review the trip-wire flag before this job can continue.",
 }
@@ -113,8 +115,9 @@ POLICY = {
     "QUASI_ID": "A detail that can single someone out without naming them (a quasi-identifier) requires confirmation and review.",
     "INJECTION_SIGNAL": "Possible instruction injection requires confirmation and review.",
     "KNOWN_MISS_HIT": "The de-identified text matches an entry in the known-miss register; check the finding before confirming.",
-    "KNOWN_MISS_STALE": "The known-miss register snapshot is older than the configured limit; the job needs a human check.",
+    "KNOWN_MISS_STALE": "An imported known-miss snapshot is older than the configured limit; the job needs a human check.",
     "KNOWN_MISS_UNREADABLE": "The known-miss register could not be read; release is blocked.",
+    "KNOWN_MISS_DEADLINE": "The known-miss sweep did not finish within its deadline; a person checks the text before it is sent.",
     "TYPED_INDIRECT": "A sentence no detector flagged may reveal a sensitive fact about a person; check it before confirming.",
 }
 

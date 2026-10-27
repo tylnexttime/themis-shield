@@ -12,10 +12,13 @@ real policy (`themis_shield.policy.decide`). Nothing here reads gold spans or ha
 Outputs (in <runs-dir>/<run-name>/, never inside the repository):
   predictions.jsonl  one line per case in score.py's format (gate labels; the label map is applied by the scorer)
   decisions.jsonl    decision, reason codes and stage statuses per case
-  timings.jsonl      per-tier timings per case (kept apart so predictions and decisions reproduce byte for byte)
+  timings.jsonl      per-tier timings per case (kept apart so predictions and decisions reproduce byte for byte);
+                     since v0.3 also per-stage timings ("stage_timings_ms": rules, pii-tracer, propagation,
+                     allow-list, union, each finder call and "<finder>:acquire"), beside the per-tier "timings_ms"
   llm_calls.jsonl    one line per finder call: model, case id, wall time, llama-server timings (no text)
   prompt-<model>.txt the finder messages with the case text replaced by <<TEXT>>, as sent
-  config.json        arguments, git commit, case-file hashes, runtime settings, finder catalogue entries
+  config.json        arguments, git commit, case-file hashes, runtime settings, finder catalogue entries, and the
+                     detector canary result of this session ("canary")
   score.json / score.txt / summary.json   the scorer's report and the headline numbers
   run.log            progress
 
@@ -27,6 +30,12 @@ Finder capture and replay: --capture-finders DIR writes every finder response (t
 kind), with the case id, the model, the prompt hash and the model identity (weights file, arguments, context).
 --replay-finders DIR serves those responses instead of starting llama-server and refuses any call whose prompt hash
 or model identity differs from the capture. Rules, PII-Tracer, union, propagation, allow-list and policy still run.
+
+Detector canary: every run (and every resumed session) starts with the gate's detector canary (themis_shield.canary):
+fixed synthetic documents with known minimum findings per detector. A failure is an infrastructure fault (wrong
+weights, a tokenizer mismatch, an engine template change) and stops the run before any case is processed, unless
+--allow-canary-failure is given. With --replay-finders the finder canaries are skipped (replay never calls a model)
+and recorded as skipped. The result is written to config.json.
 
 Typed-decision tier (v0.3, T1.5): --typed on runs it (off by default) with --typed-families and --typed-settings
 (a JSON file of temperatures, margin, label-mass floor, mixed_families, indirect_substitute). --capture-typed DIR
@@ -481,8 +490,10 @@ def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk
                         for stage, r in result.stage_status.items()
                     },
                 }
+                # "stage_timings_ms" (v0.3) sits beside the per-tier "timings_ms", which older analyses read.
                 timing = {
                     "id": case["id"], "timings_ms": {str(k): round(v, 1) for k, v in result.timings_ms.items()},
+                    "stage_timings_ms": {k: round(v, 1) for k, v in result.stage_timings_ms.items()},
                 }
                 if typed_on:
                     # The model's answers and the policy's use of them, kept apart (keys only with the tier on, so
@@ -502,6 +513,31 @@ def process_cases(todo, profile, targets, client, use_case, run_dir: Path, chunk
             times.flush()
             log(f"chunk {first // chunk_size + 1}: {len(chunk)} cases in {time.perf_counter() - t0:.0f} s "
                 f"({done_before + first + len(chunk)}/{total})")
+
+
+def eval_canary(targets, finder_client=None, *, replay: bool = False) -> dict:
+    """The gate's detector canary, once, before any case (value-free record for config.json).
+
+    ``finder_client`` is the gate's own finder client (never the recording client, so the canary appears in neither
+    llm_calls.jsonl nor a finder capture). With replay no model is called: the finder canaries are recorded as skipped.
+    """
+    from themis_shield.canary import run_canary
+
+    if replay:
+        return run_canary(targets, trigger="eval", finders_skipped="replay").record()
+    return run_canary(targets, finder_client=finder_client, trigger="eval").record()
+
+
+def apply_canary(record: dict, config: dict, config_path: Path, log, *, allow_failure: bool = False) -> None:
+    """Write the canary result into config.json; a failure stops the run unless explicitly allowed."""
+    config["canary"] = record
+    config_path.write_text(json.dumps(config, indent=1), encoding="utf-8")
+    checks = ", ".join(f"{c['detector']}={c['status']}" + (f" {c['failed']}" if c["failed"] else "")
+                       for c in record["checks"])
+    log(f"detector canary {'passed' if record['passed'] else 'FAILED'}: {checks}")
+    if not record["passed"] and not allow_failure:
+        raise SystemExit("detector canary failed (infrastructure: weights, tokenizer or engine template); "
+                         "fix it, or pass --allow-canary-failure to run anyway")
 
 
 def build_typed_runtime(args, catalogue, config, configured, runtime, client, sink, log):
@@ -605,6 +641,14 @@ def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict
     history = []
     typed_sink = open(run_dir / "typed_calls.jsonl", "a", encoding="utf-8", newline="\n") if typed_on else None
     try:
+        canary_targets = DetectionTargets(
+            thorough=True, tracer_model_directory=str(tracer_dir), llm_max_tokens=args.max_tokens,
+        )
+        apply_canary(
+            eval_canary(canary_targets, None if replay is not None else SequentialFinderClient(runtime),
+                        replay=replay is not None),
+            config, config_path, log, allow_failure=getattr(args, "allow_canary_failure", False),
+        )
         with open(run_dir / "llm_calls.jsonl", "a", encoding="utf-8", newline="\n") as sink:
             inner = object() if replay is not None else SequentialFinderClient(runtime)
             client = RecordingClient(inner, sink, capture=capture, replay=replay)
@@ -769,6 +813,8 @@ def main(argv=None) -> int:
                     help="how long the scheduler waits for GPU memory to be released before refusing a load")
     ap.add_argument("--allow-stage-failures", action="store_true",
                     help="score FAILED finder stages as the gate would (BLOCK) instead of stopping")
+    ap.add_argument("--allow-canary-failure", action="store_true",
+                    help="run even when the start-of-run detector canary fails (recorded in config.json)")
     ap.add_argument("--resume", action="store_true", help="continue a crashed run in the same folder")
     ap.add_argument("--frozen-tag", default=None, help="required for --split test: the tag on HEAD")
     ap.add_argument("--score-only", action="store_true", help="re-score an existing run folder")

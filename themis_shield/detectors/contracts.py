@@ -155,6 +155,12 @@ class DetectionResult:
     timings_ms: Mapping[int, float] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    # v0.3: per-stage wall times in ms (stage name -> ms; "<finder>:acquire" for a finder's residency on the first
+    # document of its tier). Diagnostic only: nothing decides on it and it takes no part in equality, so two
+    # detections of the same text compare equal as before. ``timings_ms`` keeps the per-tier totals.
+    stage_timings_ms: Mapping[str, float] = field(
+        default_factory=lambda: MappingProxyType({}), compare=False,
+    )
     redaction_counts: Mapping[Label, int] = field(
         default_factory=lambda: MappingProxyType({})
     )
@@ -188,6 +194,7 @@ class DetectionResult:
                 for key, item in self.stage_status.items()
             },
             "timings_ms": dict(self.timings_ms),
+            "stage_timings_ms": dict(self.stage_timings_ms),
             "redaction_counts": {
                 label.value: count for label, count in self.redaction_counts.items()
             },

@@ -68,6 +68,11 @@ REASONS = {
         "A finder model file named in the catalogue is missing from the models directory "
         "(see `themis runtime list`)."
     ),
+    "CANARY_FAILED": (
+        "The detector canary failed: a detector returned less than its known answer on the fixed synthetic "
+        "canary documents (wrong weights, a tokenizer mismatch or an inference-engine template change). "
+        "Check the named detector, or set [canary] enabled = false only for diagnosis."
+    ),
     "STARTUP_FAILED": "Startup failed for another reason; check the configuration and dependencies.",
 }
 
@@ -82,8 +87,9 @@ class StartupRefused(Exception):
             raise ValueError("unknown startup reason")
         super().__init__(code)
         self.code = code
-        # Only fixed, non-personal detail is allowed (an exception class name or
-        # a catalogue model file name), never a value from the configuration.
+        # Only fixed, non-personal detail is allowed (an exception class name,
+        # a catalogue model file name, or a canary detector and expectation
+        # name), never a value from the configuration.
         self.detail = detail
 
     @property
@@ -203,3 +209,22 @@ def check_models(router: Any, *, module_present=_module_present) -> None:
             raise StartupRefused("ENGINE_MISSING")
         if not (Path(settings.models_dir) / entry.file).is_file():
             raise StartupRefused("MODEL_MISSING", Path(entry.file).name)
+
+
+def check_canary(router: Any):
+    """Run the detector canary before serving (``[canary] enabled`` and ``at_startup``, both on by default).
+
+    A failure refuses to start, naming the first failing detector and its fixed expectation name. Returns the
+    canary result, or None when the canary is off or deferred (it then runs before the first cloud-bound work).
+    """
+    monitor = getattr(router, "canary", None)
+    if monitor is None or not monitor.settings.at_startup:
+        return None
+    result = monitor.startup()
+    if not result.passed:
+        first = result.failures[0]
+        detail = first.detector + ": " + ", ".join(first.failed)
+        if first.error_code:
+            detail += f" [{first.error_code}]"
+        raise StartupRefused("CANARY_FAILED", detail)
+    return result

@@ -173,6 +173,8 @@ class Router:
         self._active_jobs = set()
         self._job_activity = {}
         self._detection_status = "not-yet-tested"
+        # v0.3 detector canary (themis_shield.canary); None means no canary gating. Set from [canary] by integration.
+        self.canary = None
 
     @property
     def cloud_model(self):
@@ -301,7 +303,17 @@ class Router:
             starts.append(position)
             position += len(surface.text) + 2
         scanned = "\n\n".join(surface.text for surface in boundary.surfaces)
+        canary = self.canary
+        if canary is not None:
+            # A due tier-1 canary runs now; the finder canaries run inside their residencies during the scan.
+            canary.before_cloud_work()
         evidence = self._scan(scanned)
+        if canary is not None:
+            # Cloud-bound work only (local-only work never reaches this method): a failing, or not yet run,
+            # detector canary blocks.
+            blocked = canary.block_reason()
+            if blocked is not None:
+                raise GateFailure(blocked, 200)
         # v0.3: exactly decide(evidence) unless the reviewed false-positive catalogue is enabled.
         result, evidence = decide_with_catalogue(self, scanned, evidence)
         timings = dict(evidence.timings_ms)
@@ -544,7 +556,9 @@ class Router:
             )}
         except Exception:
             scheduler = {"status": "unavailable"}
+        canary = self.canary
         return {
+            "canary": canary.status() if canary is not None else {"enabled": False},
             "gate": "ok" if register_ok and vault_ok else "unavailable",
             "register": "ok" if register_ok else "unavailable",
             "vault": "ok" if vault_ok else "unavailable",

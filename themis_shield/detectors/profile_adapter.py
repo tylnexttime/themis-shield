@@ -75,7 +75,7 @@ def adapt(profile: DeploymentProfile | Mapping) -> dict:
     for key in ("courses", "units", "programmes", "projects"):
         for item in profile.get(key, []):
             literals.extend([
-                item["code"], item["title"], f"{item['code']} {item['title']}",
+                item["code"], item["title"], " ".join(part for part in (item["code"], item["title"]) if part),
             ])
     literals.extend(profile.get("provider_code_forms", []))
     literals.extend(profile.get("abn_forms", []))

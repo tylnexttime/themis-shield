@@ -100,9 +100,9 @@ def test_pattern_entries_store_shapes(tmp_path):
     )
     assert register.entry(entry)["pattern"].startswith(r"\bQX")
     with pytest.raises(CatalogueError):
-        register.add_pattern("rule", r"\d+", entity_type="NOT_A_LABEL", source="operator", proposed_by="a")
+        register.add_pattern("rule", r"\d{1,9}", entity_type="NOT_A_LABEL", source="operator", proposed_by="a")
     with pytest.raises(CatalogueError):
-        register.add_pattern("rule", r"\d+", entity_type="PERSON", source="rumour", proposed_by="a")
+        register.add_pattern("rule", r"\d{1,9}", entity_type="PERSON", source="rumour", proposed_by="a")
 
 
 # -- lifecycle and append-only history ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ def test_pattern_entries_store_shapes(tmp_path):
 def test_lifecycle_needs_a_second_person_and_a_regression_case(tmp_path):
     register = known_miss(tmp_path)
     entry = register.add_pattern(
-        "context", r"the only \w+ on the night shift", entity_type="QUASI_ID", source="peer_check",
+        "context", r"the only \w{1,30} on the night shift", entity_type="QUASI_ID", source="peer_check",
         proposed_by="synthetic-operator-a", job_id="JOB-2026-0001",
     )
     with pytest.raises(CatalogueError, match="other than its proposer"):
@@ -384,9 +384,43 @@ def test_router_stale_import_asks(tmp_path):
     h = sweeping_harness(tmp_path, register)
     try:
         response = h.router.handle(request())
-        assert response.reason == "REQUESTER_CONFIRM_REQUIRED"
+        assert response.reason == "KNOWN_MISS_STALE"
         text = response.body["choices"][0]["message"]["content"]
         assert "older than the configured limit" in text and "themis kmr import" in text
+    finally:
+        h.cloud.close()
+
+
+def test_entry_added_before_approval_asks_and_records_the_change(tmp_path):
+    h = sweeping_harness(tmp_path)
+    try:
+        body = request(f"Mara Lindahl asked about reference {MISSED}.")
+        held = h.router.handle(body)
+        assert held.reason == "OPERATOR_APPROVAL_REQUIRED"
+        add_missed(h.kmr)
+        again = h.router.handle(body)
+        assert again.route == "held" and again.reason == "KNOWN_MISS_HIT"
+        assert h.register.get_job(held.job_id).status.value != "Refused"
+        assert h.register.get_details(held.job_id)["confirmation_required"] == 1
+        records = h.register.gate_decisions(held.job_id)
+        assert [item["record"]["known_miss"]["status"] for item in records] == ["clear", "hit"]
+        assert h.fake.requests == []
+    finally:
+        h.cloud.close()
+
+
+def test_import_going_stale_after_approval_refuses_with_its_own_reason(tmp_path):
+    register = known_miss(tmp_path)
+    register.import_snapshot(central_export(tmp_path, 1), actor_identity="synthetic-operator-b")
+    h = sweeping_harness(tmp_path, register, max_age_days=1)
+    try:
+        held = h.router.handle(request())
+        assert held.reason == "OPERATOR_APPROVAL_REQUIRED"
+        h.register.approve(held.job_id)
+        h.router.clock = lambda: NOW + timedelta(hours=1)
+        refused = h.router.handle(request())
+        assert refused.route == "blocked" and refused.reason == "KNOWN_MISS_STALE"
+        assert h.fake.requests == []
     finally:
         h.cloud.close()
 
@@ -417,7 +451,7 @@ def test_cli_reads_values_through_a_hidden_prompt_only(tmp_path, capsys):
         prompts.append(text)
         return MISSED
 
-    argv = ["--db", str(db), "add", "--kind", "fingerprint", "--entity-type", "INTERNAL_ID",
+    argv = ["--db", str(db), "--create", "add", "--kind", "fingerprint", "--entity-type", "INTERNAL_ID",
             "--identity", "synthetic-operator-a", "--job", "JOB-2026-0007"]
     assert kmr_main(argv, protector=protector(), prompt=hidden) == 0
     assert len(prompts) == 2 and all("hidden" in item for item in prompts)
@@ -437,14 +471,14 @@ def test_cli_reads_values_through_a_hidden_prompt_only(tmp_path, capsys):
 
 
 def test_cli_refuses_low_entropy_fingerprints_with_advice(tmp_path, capsys):
-    argv = ["--db", str(tmp_path / "cli.db"), "add", "--kind", "fingerprint", "--entity-type", "PHONE"]
+    argv = ["--db", str(tmp_path / "cli.db"), "--create", "add", "--kind", "fingerprint", "--entity-type", "PHONE"]
     assert kmr_main(argv, protector=protector(), prompt=lambda _: "0412 345 678") == 2
     error = capsys.readouterr().err
     assert "rule" in error and "0412" not in error
 
 
 def test_cli_rule_pattern_comes_from_a_prompt(tmp_path, capsys):
-    argv = ["--db", str(tmp_path / "cli.db"), "add", "--kind", "rule", "--entity-type", "INTERNAL_ID"]
+    argv = ["--db", str(tmp_path / "cli.db"), "--create", "add", "--kind", "rule", "--entity-type", "INTERNAL_ID"]
     assert kmr_main(argv, read=lambda _: r"\bQX[0-9A-Z]{2}-[0-9A-Z]{4}\b") == 0
     assert "KMR-0001" in capsys.readouterr().out
 
@@ -455,6 +489,7 @@ def test_cli_rule_pattern_comes_from_a_prompt(tmp_path, capsys):
 @pytest.mark.parametrize("pattern", [
     r"(a+)+$", r"(a|aa)*b", r"(\d+-)+x", r"(?:ab|cd){2,}", r"(\w)\1", r"(?P<x>a)(?P=x)", r"(a)?(?(1)b|c)",
     r"(?=QX)\w+", r"(?<!x)\d+", r"(?!a)\w+", r"\w*\w*x", r"\w+\d+x", r"[a-z]+[a-z]{1,16}x",
+    r"\d+", r"\w{2,}", r"\w{1,65}", r"\w{1,30}\w{1,30}", r"\w?\w?\w?\w?x", r"\w{1,7}\w{1,8}x",
 ])
 def test_catastrophic_patterns_are_refused(pattern):
     with pytest.raises(CatalogueError):
@@ -462,8 +497,8 @@ def test_catastrophic_patterns_are_refused(pattern):
 
 
 @pytest.mark.parametrize("pattern", [
-    r"\bQX[0-9A-Z]{2}-[0-9A-Z]{4}\b", r"the only \w+ on the night shift",
-    r"the only \w{1,30} on the \w{1,30} shift", r"(?:ref|case)[ :][0-9]{4,8}", r"[A-Z]{2}[0-9]{6}",
+    r"\bQX[0-9A-Z]{2}-[0-9A-Z]{4}\b", r"the only \w{1,30} on the night shift", r"\d{1,20}",
+    r"(?:ref|case)[ :][0-9]{4,8}", r"[A-Z]{2}[0-9]{6}", r"\w{1,7}\w{1,7}x",
     r"\d{3}-\d{3}-\d{4}", r"(?i)\bward [0-9]{1,2}[a-d]\b",
 ])
 def test_ordinary_patterns_pass(pattern):
@@ -506,27 +541,70 @@ def test_scanned_text_is_bounded_per_entry_and_windows_overlap(tmp_path):
         snapshot.sweep([(("stop",), "a " * (MAX_SCAN_PER_ENTRY // 2 + 1))])
 
 
-def test_worst_allowed_pattern_finishes_on_the_largest_request(tmp_path):
+# The costliest shapes the budget accepts (measured on the reference laptop: \w{1,7}\w{1,7}x is the worst,
+# about 0.5 s per entry at the per-entry bound). Each must stay well under one second per entry on the largest
+# text the sweep will scan for one entry.
+WORST_ACCEPTED = [r"\w{1,7}\w{1,7}x", r"\w{0,6}\w{0,6}x", r"\w{1,63}x", r"\w{1,3}\w{1,3}\w{1,3}x"]
+
+
+def largest_leaf():
+    from themis_shield.catalogues.known_miss import MAX_SCAN_PER_ENTRY, _windows
+    size = MAX_SCAN_PER_ENTRY
+    while sum(len(window) for _, window in _windows("a" * size)) > MAX_SCAN_PER_ENTRY:
+        size -= 256
+    return "a" * size
+
+
+@pytest.mark.parametrize("pattern", WORST_ACCEPTED)
+def test_worst_accepted_patterns_cost_under_a_second_at_the_scan_bound(tmp_path, pattern):
     import time
+    from themis_shield.catalogues.known_miss import MAX_SCAN_PER_ENTRY, _windows
+    check_pattern(pattern)
     register = known_miss(tmp_path)
     in_sweep(register, register.add_pattern(
-        "rule", r"\w+[a-z]{1,4}x", entity_type="INTERNAL_ID", source="operator",
-        proposed_by="synthetic-operator-a",
+        "rule", pattern, entity_type="INTERNAL_ID", source="operator", proposed_by="synthetic-operator-a",
     ))
+    leaf = largest_leaf()
+    assert sum(len(window) for _, window in _windows(leaf)) > MAX_SCAN_PER_ENTRY - 1024
+    snapshot = register.snapshot()
     started = time.perf_counter()
-    assert register.snapshot().sweep([(("stop",), "a" * 200000)]) == ()
-    assert time.perf_counter() - started < 30
+    assert snapshot.sweep([(("stop",), leaf)]) == ()
+    assert time.perf_counter() - started < 1.0
+
+
+def test_sweep_deadline_sends_the_job_to_ask(tmp_path):
+    register = known_miss(tmp_path)
+    for _ in range(3):
+        in_sweep(register, register.add_pattern(
+            "rule", r"\w{1,7}\w{1,7}x", entity_type="INTERNAL_ID", source="operator",
+            proposed_by="synthetic-operator-a",
+        ))
+    raw = canonical({"model": "m", "messages": [{"role": "user", "content": "a" * 150000}]})
+    sweeper = KnownMissSweep(register, timedelta(days=7), deadline_seconds=0.05)
+    result = final_sweep(_Router(sweeper), raw, DecisionResult(Decision.RELEASE, ()))
+    assert result.decision == Decision.ASK and result.reasons == (ReasonCode.KNOWN_MISS_DEADLINE,)
+    assert result.sweep.status == "deadline" and result.sweep.reason == "KNOWN_MISS_DEADLINE"
+    blocked = final_sweep(_Router(sweeper), raw, DecisionResult(Decision.ASK, (ReasonCode.SENSITIVE,)))
+    assert blocked.decision == Decision.ASK
+
+
+def test_cli_never_creates_a_register_by_accident(tmp_path, capsys):
+    missing = tmp_path / "typo.db"
+    assert kmr_main(["--db", str(missing), "list"]) == 2
+    assert kmr_main(["--db", str(missing), "verify", "KMR-0001", "--identity", "synthetic-operator-b"]) == 2
+    assert not missing.exists()
+    assert "--create" in capsys.readouterr().err
 
 
 def test_cli_export_and_import(tmp_path, capsys):
     source, local = str(tmp_path / "central.db"), str(tmp_path / "local.db")
-    assert kmr_main(["--db", source, "add", "--kind", "rule", "--entity-type", "INTERNAL_ID",
+    assert kmr_main(["--db", source, "--create", "add", "--kind", "rule", "--entity-type", "INTERNAL_ID",
                      "--identity", "synthetic-operator-a"], read=lambda _: r"[A-Z]{2}[0-9]{6}") == 0
     for command in (["verify", "KMR-0001"], ["promote", "KMR-0001", "--to", "in_sweep"]):
         assert kmr_main(["--db", source, *command, "--identity", "synthetic-operator-b"]) == 0
     out = tmp_path / "export.json"
     assert kmr_main(["--db", source, "export", "--source-id", "central-register", "--out", str(out)]) == 0
-    assert kmr_main(["--db", local, "import", str(out), "--identity", "synthetic-operator-b"]) == 0
+    assert kmr_main(["--db", local, "--create", "import", str(out), "--identity", "synthetic-operator-b"]) == 0
     capsys.readouterr()
     assert kmr_main(["--db", local, "imports"]) == 0
     assert "central-register" in capsys.readouterr().out
