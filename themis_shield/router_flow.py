@@ -107,6 +107,12 @@ def log(
 def fail_job(router, job, code):
     if job is None:
         return
+    if code in {"DETECTOR_CANARY_FAILED", "DETECTOR_CANARY_PENDING"}:
+        # The audit trail says why: the detector canary, not the document, stopped this job.
+        try:
+            router._register_call("record_canary_block", job.job_id, code, now=router.clock())
+        except Exception:
+            pass
     try:
         transition(router, job, S.HELD_OFFLINE if code.startswith("REGISTER_") else S.REFUSED)
     except Exception:

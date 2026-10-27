@@ -45,7 +45,8 @@ def main(argv=None):
     parser.add_argument("--provision-token", action="store_true",
                         help="create the local gate token for hook clients and API callers, then exit")
     parser.add_argument("--skip-model-check", action="store_true",
-                        help="start without the local detection stack; every request that needs it is blocked")
+                        help="start without the local detection stack (and without the start-up detector "
+                             "canary); every request that needs it is blocked until the canary has passed")
     args = parser.parse_args(argv)
     if args.open and args.port != 8742:
         parser.error("--open uses the contract port")
@@ -65,6 +66,8 @@ def main(argv=None):
         startup.check_vault(router)
         if not args.skip_model_check:
             startup.check_models(router)
+            # Known-answer check of every detector before serving (v0.3 detector canary).
+            startup.check_canary(router)
         code = secrets.token_urlsafe(32) if args.open else None
         app = create_app(router, token=token, port=args.port, launcher_code=code)
         server = uvicorn.Server(uvicorn.Config(

@@ -71,6 +71,10 @@ class Scheduler:
         self.ram_margin_gb = ram_margin_gb
         self.memory_settle_seconds = memory_settle_seconds
         self.launch_planner = launch_planner
+        # v0.3 detector canary: called as listener(entry, target, loaded) inside the slot, after the model is ready
+        # and before the caller gets it; ``loaded`` is True when this acquisition started the model. It runs in the
+        # caller's thread and must not acquire this scheduler. An exception fails the acquisition (fail closed).
+        self.load_listener: Callable[[ModelEntry, LocalInferenceTarget, bool], None] | None = None
         self._launch_plan: dict[str, Any] | None = None
         self._condition = threading.Condition()
         self._queue: deque[object] = deque()
@@ -265,7 +269,11 @@ class Scheduler:
             load_ms = 0.0
             outcome = "failed"
             try:
+                previous = self._target
                 target, load_ms = self._load(entry, mode)
+                listener = self.load_listener
+                if listener is not None:
+                    listener(entry, target, target is not previous)
                 target.last_timings = {}
                 if cancel_event is not None and cancel_event.is_set():
                     raise TargetUnavailable("local inference request cancelled")

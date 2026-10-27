@@ -74,6 +74,23 @@ def main() -> None:
                 content = '{"entities":[],"entities":[]}'
             elif args.output_case == "truncated":
                 finish = "length"
+            elif args.output_case == "empty":
+                # A valid, empty answer: what a finder returns when its template silently changed.
+                content = '{"entities":[]}'
+            elif args.output_case == "thought-channel":
+                # A chat template that turns thinking on: the answer starts in a thought channel.
+                content = '<|channel>thought\n<channel|>{"entities":[]}'
+            elif args.output_case == "bare-list":
+                # A bare empty list instead of the schema's object.
+                content = "[]"
+            elif args.output_case == "canary":
+                # A healthy finder on the detector canary's fixed synthetic note: the name and the statement.
+                document = body["messages"][-1]["content"]
+                entities = []
+                for label, value in (("PERSON", "Oriel Brackenbury"), ("HEALTH", "is on dialysis three mornings a week")):
+                    if value in document:
+                        entities.append({"label": label, "value": value})
+                content = json.dumps({"entities": entities})
             self.reply(200, {
                 "choices": [{
                     "index": 0,

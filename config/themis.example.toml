@@ -180,3 +180,27 @@ scope = ""
 # prevent. Review flags with `themis tripwire review`.
 enabled = false
 max_completion_tokens = 2048
+
+# --- v0.3 detector canary: ON by default -------------------------------------------------------
+# Known-answer checks against silent detector failure (wrong weights, a tokenizer mismatch, an
+# inference-engine chat-template change that makes a finder answer with nothing). A fixed set of
+# synthetic canary documents runs through every detector (rules, PII-Tracer, propagation, each
+# local finder) with conservative minimum expectations. Records are value-free (register table
+# canary_runs). See docs/ARCHITECTURE.md, "Detector canary".
+
+[canary]
+enabled = true
+# Run every detector's canary before serving; a failure refuses to start (CANARY_FAILED).
+# (`themis serve --skip-model-check` skips it; cloud-bound work then waits for a first pass.)
+at_startup = true
+# Run the finder canary after every model load by the runtime scheduler, inside the same
+# residency and before any document. On an 8 GB GPU both finders load for every request, so this
+# adds one short finder call per model per request; turn it off only if the periodic check is enough.
+after_reload = true
+# Re-check every detector at most this often (minutes; 0 = off). The tier-1 canary runs before the
+# next cloud-bound document once due; a finder's runs inside its next residency.
+interval_minutes = 30
+# Also re-check after this many cloud-bound documents (0 = off).
+every_documents = 0
+# A failing reload or periodic canary puts the gate in a degraded state: cloud-bound work is
+# blocked (DETECTOR_CANARY_FAILED) and local-only work still runs, until a canary passes again.

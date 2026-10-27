@@ -46,7 +46,11 @@ def _simple(stage, findings):
     return StageResult(findings, StageReport(stage, Status.OK))
 
 
-def _run(text: str, stage: str, call: Callable[[], StageResult]) -> StageResult:
+def _run(text: str, stage: str, call: Callable[[], StageResult], timings: dict | None = None) -> StageResult:
+    """Run one stage, validating its output and mapping any failure to a fixed status (fail closed).
+
+    With ``timings``, the stage's wall time in milliseconds is added under its stage name (diagnostic only).
+    """
     began = perf_counter()
     try:
         result = call()
@@ -78,9 +82,27 @@ def _run(text: str, stage: str, call: Callable[[], StageResult]) -> StageResult:
     except Exception:
         return StageResult((), StageReport(stage, Status.FAILED, error_code="stage-failed"))
     finally:
+        elapsed = (perf_counter() - began) * 1000
+        if timings is not None:
+            timings[stage] = timings.get(stage, 0.0) + elapsed
         if os.environ.get("THEMIS_DEBUG") == "1":
             # Fixed stage identifier and duration only. No exception formatting.
-            _LOG.info("stage=%s duration_ms=%.3f", stage, (perf_counter() - began) * 1000)
+            _LOG.info("stage=%s duration_ms=%.3f", stage, elapsed)
+
+
+# Public name for other gate components that run a single stage the same way (the detector canary).
+run_stage = _run
+
+
+def tracer_for(targets: DetectionTargets):
+    """The PII-Tracer stage for ``targets``: the injected one, else the configured CPU model (lazily loaded)."""
+    if targets.tracer is not None:
+        return targets.tracer
+    return PIITracerDetector(PIITracerSpec(
+        Path(targets.tracer_model_directory),
+        targets.tracer_artefact_manifest_id,
+        targets.tracer_cpu_threads,
+    ))
 
 
 @dataclass
@@ -88,6 +110,9 @@ class _Document:
     text: str = field(repr=False)
     statuses: dict = field(default_factory=dict)
     timings: dict = field(default_factory=dict)
+    # v0.3: per-stage wall times (ms), diagnostic only: tier-1 stages, each finder call (and, on the first document
+    # of a finder tier, "<model>:acquire" for the residency), and the final union, propagation and allow-list.
+    stage_timings: dict = field(default_factory=dict)
     compiled: AllowList | None = None
     raw: tuple = ()
     tracer: StageReport | None = None
@@ -110,8 +135,9 @@ def _public_dates(profile) -> tuple[str, ...]:
 def _tier1(document, profile, targets):
     text = document.text
     began = perf_counter()
-    rules = _run(text, "rules", lambda: RulesDetector().detect(text))
-    tracer = _run(text, "pii-tracer", lambda: targets.tracer.detect(text))
+    stages = document.stage_timings
+    rules = _run(text, "rules", lambda: RulesDetector().detect(text), stages)
+    tracer = _run(text, "pii-tracer", lambda: targets.tracer.detect(text), stages)
     if v02() and tracer.report.status == Status.OK:
         tracer = StageResult(
             normalise_tracer_dates(text, tracer.findings, _public_dates(profile)), tracer.report,
@@ -121,7 +147,7 @@ def _tier1(document, profile, targets):
     document.raw = union_findings(rules.findings, tracer.findings)
     propagated = _run(
         text, "propagate-tier1",
-        lambda: _simple("propagate-tier1", propagate(text, document.raw)),
+        lambda: _simple("propagate-tier1", propagate(text, document.raw)), stages,
     )
     document.statuses["propagate-tier1"] = propagated.report
 
@@ -132,7 +158,7 @@ def _tier1(document, profile, targets):
             apply_allowlist(text, propagated.findings, document.compiled),
         )
 
-    projected = _run(text, "allowlist-tier1", project)
+    projected = _run(text, "allowlist-tier1", project, stages)
     document.statuses["allowlist-tier1"] = projected.report
     findings = (
         projected.findings if projected.report.status == Status.OK
@@ -172,11 +198,14 @@ def _finder_tier(documents, targets, tier, model):
             acquisition_ms = (perf_counter() - began) * 1000
             for index, document in enumerate(selected):
                 start = perf_counter()
+                if index == 0:
+                    document.stage_timings[f"{model.value}:acquire"] = acquisition_ms
                 result = _run(
                     document.text, model.value,
                     lambda document=document: LLMFinder(
                         model, resident, targets.llm_max_tokens,
                     ).detect(document.text),
+                    document.stage_timings,
                 )
                 document.statuses[model.value] = result.report
                 document.llm_findings.append(result.findings)
@@ -191,10 +220,12 @@ def _finder_tier(documents, targets, tier, model):
         for index, document in enumerate(selected):
             result = _run(
                 document.text, model.value,
-                lambda error=error: _raise(error),
+                lambda error=error: _raise(error), document.stage_timings,
             )
             document.statuses[model.value] = result.report
             document.timings.setdefault(tier, elapsed if index == 0 else 0.0)
+            if index == 0:
+                document.stage_timings.setdefault(f"{model.value}:acquire", elapsed)
 
 
 def mark_organisation_values(text, findings, *, contacts, companies):
@@ -210,9 +241,10 @@ def mark_organisation_values(text, findings, *, contacts, companies):
 def _finish(document):
     text = document.text
     began = perf_counter()
+    stages = document.stage_timings
     merged = _run(
         text, "union-final",
-        lambda: _simple("union-final", union_findings(document.raw, *document.llm_findings)),
+        lambda: _simple("union-final", union_findings(document.raw, *document.llm_findings)), stages,
     )
     document.statuses["union-final"] = merged.report
     tier = document.tiers[-1]
@@ -221,7 +253,7 @@ def _finish(document):
         lambda: _simple(
             "propagate-final",
             propagate(text, merged.findings, "propagate-final", tier),
-        ),
+        ), stages,
     )
     document.statuses["propagate-final"] = propagated.report
 
@@ -233,7 +265,7 @@ def _finish(document):
             apply_allowlist(text, propagated.findings, document.compiled),
         )
 
-    final = _run(text, "allowlist-final", project)
+    final = _run(text, "allowlist-final", project, stages)
     document.statuses["allowlist-final"] = final.report
     findings = (
         final.findings if final.report.status == Status.OK
@@ -243,7 +275,10 @@ def _finish(document):
     if contacts or companies:
         findings = mark_organisation_values(text, findings, contacts=contacts, companies=companies)
     document.timings[tier] += (perf_counter() - began) * 1000
-    if any(not isfinite(value) or value < 0 for value in document.timings.values()):
+    if any(
+        not isfinite(value) or value < 0
+        for value in (*document.timings.values(), *document.stage_timings.values())
+    ):
         raise RuntimeError("invalid-timing")
     result = DetectionResult(
         findings=findings,
@@ -252,6 +287,7 @@ def _finish(document):
         escalation_reasons=document.reasons,
         stage_status=MappingProxyType(document.statuses),
         timings_ms=MappingProxyType(document.timings),
+        stage_timings_ms=MappingProxyType(dict(document.stage_timings)),
         redaction_counts=MappingProxyType(dict(Counter(
             label for item in findings for label in item.labels
         ))),
@@ -287,11 +323,7 @@ def detect_batch(texts, profile, targets=None, *, thorough):
         return []
     targets = replace(targets, thorough=targets.thorough or thorough)
     if targets.tracer is None:
-        targets = replace(targets, tracer=PIITracerDetector(PIITracerSpec(
-            Path(targets.tracer_model_directory),
-            targets.tracer_artefact_manifest_id,
-            targets.tracer_cpu_threads,
-        )))
+        targets = replace(targets, tracer=tracer_for(targets))
     documents = [_Document(text) for text in texts]
     for document in documents:
         _tier1(document, profile, targets)
