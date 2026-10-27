@@ -27,6 +27,7 @@ import unicodedata
 from ..normalise import detection_view, strip_default_ignorable
 from ..types import Label
 from .contracts import StageReport, StageResult, Status, finding
+from .secret_context import WORD_MASH, credential_shaped, url_component, words_only_path
 from .settings import fix_on, v02
 
 
@@ -532,11 +533,21 @@ class RulesDetector:
                 for match in CARD.finditer(view):
                     if payment_card_valid(match.group()):
                         emit(match.start(), match.end(), Label.PAYMENT_CARD, True)
+        url_fix, org_fix = fix_on("secret-url-components"), fix_on("secret-org-codes")
         for pattern, label in patterns:
             for match in pattern.finditer(view):
                 end = match.end()
                 if label == Label.URL_PERSONAL:
                     end = match.start() + len(match.group().rstrip(".,;!?)"))
+                if pattern in (HEX_SECRET, B64_SECRET):
+                    # v0.3: slash-joined words in a URL path and run-together words identify nobody and are no
+                    # credential; every other high-entropy string is emitted and judged in context at the end.
+                    if url_fix and url_component(view, match.start(), end) == "path" and words_only_path(
+                        match.group()
+                    ):
+                        continue
+                    if org_fix and WORD_MASH.fullmatch(match.group()):
+                        continue
                 emit(match.start(), end, label)
         for match in LOCAL_PHONE.finditer(view):
             emit(*match.span("number"), Label.PHONE)
@@ -564,6 +575,10 @@ class RulesDetector:
             if placeholders and (
                 placeholder_value(view, match.start("value"))
                 or any(a <= match.start() < b for a, b in exempt)
+            ):
+                continue
+            if fix_on("secret-prose-values") and not credential_shaped(
+                match.group().split(None, 1)[0], match.group("value"),
             ):
                 continue
             if match.group("value").casefold() not in {

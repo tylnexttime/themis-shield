@@ -42,6 +42,39 @@ split C); no new held-out split has been run.
   0.761 -> 0.781; released leaks 0, R_any, sensitive and quasi-identifier
   recall unchanged. The v0.1 set is unchanged on every metric.
 
+### Friction found on real documents (on by default)
+
+A first run over a private slice of real documents (78, never published)
+showed causes the synthetic sets never had: secret rules taking URL
+components, prose words, card authorisation codes, document identifiers,
+SWIFT codes and a passport's machine-readable zone for credentials, and
+finder answers that do not match the text only because of line breaks or
+no-break spaces. Each fix is a named switch:
+
+- `secret-url-components`: a high-entropy string in a URL is a secret only as
+  the value of a credential-named parameter (`token`, `password`, `key`,
+  `sig`, `session`, `code` with `state`, ...); any other query value is
+  substituted as an identifier; word-only URL paths are not emitted.
+- `secret-prose-values`: "PIN <value>" needs digits; "password <word>." is
+  not a value.
+- `secret-auth-codes`, `secret-document-ids`, `secret-org-codes`,
+  `secret-mrz`: card authorisation and promo codes, document and transaction
+  identifiers, long digit strings, SWIFT/BIC and biller codes, BIC-prefixed
+  bank references and run-together words, and machine-readable zones are
+  relabelled (identifier, passport, person) and still substituted, without
+  the SECRET block.
+- `finder-whitespace`: a finder value not found verbatim is matched token
+  for token with any whitespace run standing for any whitespace run (CR/LF,
+  NBSP, narrow spaces), then on the NFKC view; such a value is substituted
+  but still counts toward the unmatched-values hold. `finder-whitespace-trust`
+  (off) would count it as matched: on the real slice that released two
+  documents with genuine misses.
+- `address-line-numbers`: a street or unit number alone on the line before
+  an address joins the address.
+- Real slice, replay: BLOCK:secret 17 -> 4 cases (the 4 left include both
+  real secrets), clean friction 0.235 -> 0.176, R_full 0.962 -> 0.972,
+  released leaks unchanged (11). Development sets: no ratchet change.
+
 ### A gate that learns (all off by default)
 
 - Known-miss register with a final sweep on the outbound text, a reviewed false-positive catalogue and an optional

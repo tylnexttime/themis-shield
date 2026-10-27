@@ -345,6 +345,36 @@ def table_quasi_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
     return tuple(out)
 
 
+# v0.3 fix "address-line-numbers": scanned letters and statements often break an address after the street number,
+# leaving the number alone on its own line ("48" then "EXAMPLE PDE" then "QUARRYBEND NSW 2999"). When an ADDRESS
+# finding starts a line (only whitespace before it) and the previous non-empty line is only a street, unit or lot
+# number, that number becomes part of the address evidence. Nothing else is added.
+ADDRESS_LINE_STAGE = "address-lines"
+LONE_STREET_NUMBER = re.compile(
+    r"(?i)(?:(?:unit|u|lot|shop|suite|level|lvl|apt|flat)\s*)?[0-9]{1,5}[a-z]?(?:\s*[/\-]\s*[0-9]{1,5}[a-z]?)?"
+)
+
+
+def address_line_numbers(text: str, findings: tuple[DetectionFinding, ...]) -> tuple[DetectionFinding, ...]:
+    added = []
+    for item in findings:
+        if Label.ADDRESS not in item.labels:
+            continue
+        line_start = max(text.rfind("\n", 0, item.start), text.rfind("\r", 0, item.start)) + 1
+        if text[line_start:item.start].strip():
+            continue
+        cursor = line_start
+        while cursor > 0 and text[cursor - 1] in "\r\n \t\u00a0":
+            cursor -= 1
+        previous_start = max(text.rfind("\n", 0, cursor), text.rfind("\r", 0, cursor)) + 1
+        line = text[previous_start:cursor]
+        stripped = line.strip()
+        if stripped and LONE_STREET_NUMBER.fullmatch(stripped):
+            a = previous_start + len(line) - len(line.lstrip())
+            added.append(finding(a, a + len(stripped), Label.ADDRESS, ADDRESS_LINE_STAGE, item.provenance_tiers[-1]))
+    return union_findings(findings, added) if added else findings
+
+
 def propagate(
     text: str,
     spans: tuple[DetectionFinding, ...],

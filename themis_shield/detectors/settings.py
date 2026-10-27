@@ -28,6 +28,18 @@ default; ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte.
   through the document as a name token; the title stays beside the name, never part of it.
 - ``contact-brackets``: a contact span that lost its opening bracket ("07) 5550 0145") still matches the whole
   public number it belongs to.
+- ``secret-url-components``, ``secret-prose-values``, ``secret-auth-codes``, ``secret-document-ids``,
+  ``secret-org-codes``, ``secret-mrz``: values the secret rules (or a detector's SECRET label) took for credentials
+  that are URL components, prose words, card authorisation codes, document identifiers, organisation codes or a
+  machine-readable zone; see ``detectors/secret_context.py``. Never dropped when they could identify someone:
+  relabelled (identifier, passport, person) and substituted, without the SECRET block.
+- ``finder-whitespace``: a finder value that is not in the text verbatim is matched with any run of whitespace
+  (line breaks, no-break spaces) standing for any run of whitespace, token for token, then on the NFKC view.
+  Such a value is substituted but still counts as not verbatim for the unmatched-values hold;
+  ``finder-whitespace-trust`` counts it as matched (measured; see the development log before turning it on).
+- ``address-line-numbers``: an address found from the start of a line takes in a street or unit number that stands
+  alone on the line just before it ("48" / "EXAMPLE PDE ..." in scanned statements), so the number is not left in
+  clear.
 """
 
 from __future__ import annotations
@@ -40,12 +52,21 @@ DEFAULT_DETECTION_VERSION = "v0.2"
 DETECTION_FIXES = (
     "secret-placeholders", "organisation-contacts", "checksum-context", "rule-completeness",
     "table-role-words", "title-tokens", "contact-brackets",
+    # From the first run on real documents (v0.3 pre-freeze); see detectors/secret_context.py and llm_finder.py.
+    "secret-url-components", "secret-prose-values", "secret-auth-codes", "secret-document-ids", "secret-org-codes",
+    "secret-mrz", "finder-whitespace", "finder-whitespace-trust", "address-line-numbers",
+)
+SECRET_CONTEXT_FIXES = (
+    "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
 )
 # Every fix held the ratchet (released leaks, R_any, sensitive R_any, QUASI_ID R_any) on both development sets
 # (the v0.1 set and split C, replayed from captured finder answers) and is on by default. Three of them
 # (organisation-contacts, checksum-context, and the ACN half of rule-completeness) changed no decision or metric
 # there: no development case exercises the situation they are for, so they are adopted on their unit tests.
-DEFAULT_DETECTION_FIXES: tuple[str, ...] = DETECTION_FIXES
+# The real-document fixes (secret context classes, finder-whitespace, address-line-numbers) held the ratchet on the
+# development sets and on the private real slice. finder-whitespace-trust is off: on the real slice it released
+# documents whose only hold was the unmatched-values rule and that also had genuine finder misses (+2 leaks).
+DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(name for name in DETECTION_FIXES if name != "finder-whitespace-trust")
 _lock = Lock()
 _version = DEFAULT_DETECTION_VERSION
 _fixes: frozenset[str] = frozenset(DEFAULT_DETECTION_FIXES)

@@ -30,9 +30,10 @@ from .labels import normalise_tracer_dates
 from .llm_finder import FinderModel, LLMFinder
 from .pii_tracer import PIITracerDetector, PIITracerSpec
 from .profile_adapter import adapt
-from .propagate import propagate
+from .propagate import address_line_numbers, propagate
 from .rules import RulesDetector, organisation_value
-from .settings import fix_on, v02
+from .secret_context import relabel_secrets
+from .settings import SECRET_CONTEXT_FIXES, fix_on, v02
 from .union import union_findings
 
 
@@ -274,6 +275,11 @@ def _finish(document):
     contacts, companies = fix_on("organisation-contacts"), fix_on("rule-completeness")
     if contacts or companies:
         findings = mark_organisation_values(text, findings, contacts=contacts, companies=companies)
+    secret_fixes = frozenset(name for name in SECRET_CONTEXT_FIXES if fix_on(name))
+    if secret_fixes:
+        findings = relabel_secrets(text, findings, secret_fixes)
+    if fix_on("address-line-numbers"):
+        findings = address_line_numbers(text, findings)
     document.timings[tier] += (perf_counter() - began) * 1000
     if any(
         not isfinite(value) or value < 0
