@@ -157,6 +157,8 @@ among the placeholders, and the pricing factors (age, area, vehicle) that compar
 
 ### Contextual toggles and a semi-synthetic dictionary (Chris's design)
 
+The story behind this part, with its sources: [A codebook, and data that is partly real](CODEBOOK-AND-SYNTHETIC-DATA.md).
+
 - **Per-task profiles** decide, class by class, what passes, what is generalised and what is hidden: an expense
   summary keeps months and amounts; deal advice keeps an age band, a region and contract months; everything else stays
   opaque.
