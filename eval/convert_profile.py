@@ -34,15 +34,29 @@ def _examples(items, count=2):
     return ", ".join(picked)
 
 
-def convert(source: dict) -> dict:
-    sites = source.get("sites", [])
-    programmes = source.get("programmes", [])
+HARBOURLINE_ABOUT = (
+    "Institution profile for the fictional Harbourline Institute of the synthetic evaluation set, converted "
+    "from eval/profiles/harbourline.json by eval/convert_profile.py (do not edit by hand). Every value is "
+    "institutional and invented; none is personal information."
+)
+
+
+def _site(item):
+    # A profile may list a site as a bare string. A string cannot say whether it is a facility or a suburb where
+    # people live, so it becomes the campus town and is never allow-listed (the adapter skips forms equal to a town).
+    return item if isinstance(item, dict) else {"name": item, "forms": [item]}
+
+
+def _coded(item):
+    return item if isinstance(item, dict) else {"code": "", "title": item}
+
+
+def convert(source: dict, about: str = HARBOURLINE_ABOUT) -> dict:
+    """Profile entries may be objects (as in harbourline.json) or bare strings (other authors' profiles)."""
+    sites = [_site(item) for item in source.get("sites", [])]
+    programmes = [_coded(item) for item in source.get("programmes", [])]
     out = {
-        "_about": (
-            "Institution profile for the fictional Harbourline Institute of the synthetic evaluation set, converted "
-            "from eval/profiles/harbourline.json by eval/convert_profile.py (do not edit by hand). Every value is "
-            "institutional and invented; none is personal information."
-        ),
+        "_about": about,
         "institution": source["organisation"],
         "institution_forms": [form for form in source.get("organisation_forms", []) if form != source["organisation"]],
         "email_domain": source.get("email_domain"),
@@ -56,16 +70,25 @@ def convert(source: dict) -> dict:
         ],
         "buildings": list(source.get("buildings", [])),
         "role_mailboxes": list(source.get("role_mailboxes", [])),
-        "main_lines": [dict(line) for line in source.get("main_lines", [])],
+        "main_lines": [
+            dict(line) if isinstance(line, dict) else {"purpose": "main", "number": line}
+            for line in source.get("main_lines", [])
+        ],
         "reception_numbers": list(source.get("reception_numbers", [])),
         "role_titles": list(source.get("role_titles", [])),
         "programmes": [{"code": item["code"], "title": item["title"]} for item in programmes],
-        "projects": [{"code": item["code"], "title": item["title"]} for item in source.get("research_projects", [])],
+        "projects": [
+            {"code": item["code"], "title": item["title"]}
+            for item in map(_coded, source.get("research_projects", []))
+        ],
         "committees": list(source.get("committees", [])),
         "initiatives": list(source.get("initiatives", [])),
         "code_formats": dict(source.get("code_formats", {})),
         "reference_number_formats": dict(source.get("reference_number_formats", {})),
-        "public_dates": [{"event": item["event"], "date": item["date"]} for item in source.get("public_dates", [])],
+        "public_dates": [
+            {"event": item["event"], "date": item["date"]} if isinstance(item, dict) else {"event": item, "date": item}
+            for item in source.get("public_dates", [])
+        ],
     }
     business = source.get("business_identifier") or {}
     if business.get("value"):
@@ -79,7 +102,8 @@ def convert(source: dict) -> dict:
         dnf.append(f"building and room names ({_examples(out['buildings'])})")
     if programmes:
         dnf.append(
-            f"programme, course and project codes and titles ({programmes[0]['code']}, {programmes[0]['title']})"
+            "programme, course and project codes and titles "
+            f"({_examples([programmes[0]['code'], programmes[0]['title']])})"
         )
     if out["committees"] or out["initiatives"]:
         dnf.append(
