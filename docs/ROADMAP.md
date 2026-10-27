@@ -95,6 +95,15 @@ text again. Idea from Chris, and from TypeSafe's Jev interface and its open alte
   the training loss reaches zero, and a fresh test split. And no version of the typed tier trusts a confidence score
   on its own: the structural rules above (sole-cause lifts only, two option orders, never a marking or injection
   hold) are what keep it safe.
+- **Where a small encoder fits: step 2, asymmetric.** It runs on the CPU between tier 1 and the GPU finders, and it
+  may raise suspicion on its own but never lower it on its own:
+  - *recall booster:* it may add an ASK for a sentence nothing else flagged (a confidently wrong "yes" costs a click;
+    a wrong "no" is no worse than without it);
+  - *second key:* it may help lift a hold only when the Gemma prefill check agrees, and only for a hold it is the sole
+    cause of (two families rarely make the same confident mistake);
+  - *hints for the person* reviewing an ASK ("looks like fiction", "looks like a public figure"), never an action;
+  - *not the fast path:* deciding that a document may skip the finders waits for a calibrated encoder proven on a
+    fresh split, because a confident wrong "clean" there skips the checks that would have caught the miss.
 - The model's answer and the policy's decision are recorded separately, with the reason. Every disagreement is a free
   label for the catalogues below.
 
