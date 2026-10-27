@@ -198,7 +198,12 @@ privacy and usefulness on one page.
 - **A fast path:** a per-chunk category check decides which tiers run, evaluated before it is offered.
 - **Measured re-identification risk** for tables: [ARX](https://arx.deidentifier.org/) run offline to calibrate the
   table pass's quasi-identifier rule.
-- **File inputs** (PDF, Word, images) through [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) as an external tool.
+- **File inputs** (PDF, Word, images) through [OCRmyPDF](https://github.com/ocrmypdf/OCRmyPDF) as an external tool,
+  with extraction that cannot fail silently: a PDF whose text layer is glyph codes rather than words, or whose page
+  count and extracted text disagree, goes to OCR or to a person, never to the detectors as if it were complete. OCR
+  engines drop whole lines without saying so, so OCR text is checked against line spacing (a gap-fill pass) before it
+  is trusted. Images that carry personal data without text (a signature, a face, a photo of a card's back) are held,
+  because a text gate cannot see them.
 - **A real-data evaluation protocol** before `synthetic_only` can ever be switched off.
 - **A human-written test slice**: 20-40 documents written by people, in their own words.
 - Linux and macOS runs, a native Anthropic Messages leg, a central register service.
