@@ -14,17 +14,21 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from pathlib import Path
+import time
 from typing import Any, Iterator, Mapping
 
 from ..paths import app_data_dir
 from ..policy import decide
 from ..types import Decision, DecisionResult, ReasonCode
 from .false_positives import FalsePositiveCatalogue, Override, match
-from .known_miss import DEFAULT_MAX_SNAPSHOT_AGE_DAYS, KnownMissRegister, SweepHit, max_age
+from .known_miss import (
+    DEFAULT_MAX_SNAPSHOT_AGE_DAYS, DEFAULT_SWEEP_DEADLINE_SECONDS, KnownMissRegister, SweepDeadline, SweepHit,
+    max_age,
+)
 from .store import CatalogueUnavailable
 
 
-KNOWN_MISS_KEYS = {"enabled", "path", "max_snapshot_age_days"}
+KNOWN_MISS_KEYS = {"enabled", "path", "max_snapshot_age_days", "sweep_deadline_seconds"}
 FALSE_POSITIVE_KEYS = {"enabled", "path", "scope"}
 TRIPWIRE_KEYS = {"enabled", "max_completion_tokens"}
 DEFAULT_TRIPWIRE_TOKENS = 2048
@@ -38,14 +42,31 @@ class SweepOutcome:
     hits: tuple[SweepHit, ...] = ()
     imports: tuple[tuple[str, datetime], ...] = ()
     stale_sources: tuple[str, ...] = ()
+    deadline: bool = False
 
     @property
     def stale(self) -> bool:
         return bool(self.stale_sources)
 
     @property
+    def needs_ask(self) -> bool:
+        return bool(self.hits) or self.stale or self.deadline
+
+    @property
+    def reason(self) -> str | None:
+        """The response code for a hold or refusal caused by the sweep: a hit wins, then a deadline, then age."""
+        if self.hits:
+            return "KNOWN_MISS_HIT"
+        if self.deadline:
+            return "KNOWN_MISS_DEADLINE"
+        if self.stale:
+            return "KNOWN_MISS_STALE"
+        return None
+
+    @property
     def status(self) -> str:
-        return "+".join(name for name, on in (("hit", bool(self.hits)), ("stale", self.stale)) if on) or "clear"
+        parts = (("hit", bool(self.hits)), ("stale", self.stale), ("deadline", self.deadline))
+        return "+".join(name for name, on in parts if on) or "clear"
 
     def as_record(self) -> dict:
         return {
@@ -143,13 +164,18 @@ def decide_with_catalogue(router, text: str, evidence):
 class KnownMissSweep:
     register: KnownMissRegister = field(repr=False)
     max_age: timedelta = timedelta(days=DEFAULT_MAX_SNAPSHOT_AGE_DAYS)
+    deadline_seconds: float = DEFAULT_SWEEP_DEADLINE_SECONDS
 
 
 _SWEPT_ROOTS = ("messages", "tools", "stop")
 
 
 def outbound_leaves(body) -> Iterator[tuple[tuple, str]]:
-    """Every text leaf the cloud will read, with its path. Tool-call arguments are decoded too."""
+    """Every text leaf the cloud will read, with its path. Tool-call arguments are decoded too.
+
+    For a Chat Completions body that is the message and tool text and ``stop``; for any other outbound object (the
+    hooks path's prompts and tool outputs) it is every string value.
+    """
     from ..cloud.openai_compat import strict_json
 
     def walk(value, path):
@@ -168,37 +194,49 @@ def outbound_leaves(body) -> Iterator[tuple[tuple, str]]:
             for key, item in value.items():
                 yield from walk(item, (*path, key))
 
-    for root in _SWEPT_ROOTS:
-        if isinstance(body, dict) and root in body:
-            yield from walk(body[root], (root,))
+    if isinstance(body, dict) and "model" in body and isinstance(body.get("messages"), list):
+        # A Chat Completions body: the text the model reads (protocol fields such as model and role are not).
+        for root in _SWEPT_ROOTS:
+            if root in body:
+                yield from walk(body[root], (root,))
+    else:
+        # Anything else (a hook prompt, a tool output): every string value is outbound text.
+        yield from walk(body, ())
 
 
 def final_sweep(router, raw: bytes, result: DecisionResult) -> DecisionResult:
     """Sweep the exact outbound JSON. Without a register: ``result`` unchanged.
 
-    A hit or a stale imported snapshot adds ASK reasons (RELEASE becomes ASK); nothing is redacted. An unreadable
-    register raises ``GateFailure(BLOCK:known-miss-unreadable)``.
+    A hit, a stale imported snapshot or a sweep that runs past its deadline adds ASK reasons (RELEASE becomes ASK);
+    nothing is redacted. An unreadable register raises ``GateFailure(BLOCK:known-miss-unreadable)``.
     """
     sweeper = getattr(router, "known_miss", None)
     if sweeper is None:
         return result
     from ..cloud.openai_compat import strict_json
     from ..router import GateFailure
+    timed_out = False
     try:
         snapshot = sweeper.register.snapshot()
-        hits = snapshot.sweep(outbound_leaves(strict_json(raw)))
+        try:
+            hits = snapshot.sweep(
+                outbound_leaves(strict_json(raw)), deadline=time.monotonic() + sweeper.deadline_seconds,
+            )
+        except SweepDeadline:
+            hits, timed_out = (), True
     except Exception:
         raise GateFailure(ReasonCode.KNOWN_MISS_UNREADABLE.value, 200) from None
     stale_sources = snapshot.stale_sources(router.clock(), sweeper.max_age)
-    stale = bool(stale_sources)
-    outcome = SweepOutcome(snapshot.version, hits, snapshot.imports, stale_sources)
+    outcome = SweepOutcome(snapshot.version, hits, snapshot.imports, stale_sources, timed_out)
     reasons = list(result.reasons)
     if hits:
         reasons.append(ReasonCode.KNOWN_MISS_HIT)
-    if stale:
+    if timed_out:
+        reasons.append(ReasonCode.KNOWN_MISS_DEADLINE)
+    if stale_sources:
         reasons.append(ReasonCode.KNOWN_MISS_STALE)
     decision = result.decision
-    if (hits or stale) and decision == Decision.RELEASE:
+    if outcome.needs_ask and decision == Decision.RELEASE:
         decision = Decision.ASK
     return _gate(result, decision=decision, reasons=tuple(dict.fromkeys(reasons)), sweep=outcome)
 
@@ -206,12 +244,17 @@ def final_sweep(router, raw: bytes, result: DecisionResult) -> DecisionResult:
 def sweep_findings_text(result) -> str:
     """The plain-text finding list shown with a held job (value-free: entries and offsets only)."""
     sweep = getattr(result, "sweep", None)
-    if sweep is None or (not sweep.hits and not sweep.stale):
+    if sweep is None or not sweep.needs_ask:
         return ""
     lines = []
     if sweep.hits:
         lines.append("Known-miss register hits in the de-identified text (check them before confirming):")
         lines.extend("- " + hit.describe() for hit in sweep.hits)
+    if sweep.deadline:
+        lines.append(
+            "The known-miss sweep did not finish within its deadline, so the text was not fully checked; "
+            "a person checks it before it is sent."
+        )
     if sweep.stale:
         lines.append(
             "An imported known-miss snapshot is older than the configured limit (source "
@@ -248,6 +291,9 @@ def settings(config: Mapping[str, Any]) -> dict:
     trip = _section(config, "tripwire", TRIPWIRE_KEYS)
     age = known.get("max_snapshot_age_days", DEFAULT_MAX_SNAPSHOT_AGE_DAYS)
     max_age(age)
+    deadline = known.get("sweep_deadline_seconds", DEFAULT_SWEEP_DEADLINE_SECONDS)
+    if type(deadline) not in (int, float) or not 0 < deadline <= 60:
+        raise ValueError("[known_miss] sweep_deadline_seconds must be above 0 and at most 60")
     tokens = trip.get("max_completion_tokens", DEFAULT_TRIPWIRE_TOKENS)
     if type(tokens) is not int or not 64 <= tokens <= 32768:
         raise ValueError("[tripwire] max_completion_tokens must be between 64 and 32768")
@@ -259,7 +305,7 @@ def settings(config: Mapping[str, Any]) -> dict:
     return {
         "known_miss": {
             "enabled": known.get("enabled", False), "path": _path(known, "known-miss.db"),
-            "max_age": max_age(age),
+            "max_age": max_age(age), "deadline_seconds": float(deadline),
         },
         "false_positives": {
             "enabled": false.get("enabled", False), "path": _path(false, "false-positives.db"), "scope": scope,
@@ -282,7 +328,7 @@ def configure(router, config: Mapping[str, Any], *, protector_factory=None) -> d
                 known["path"], protector=protector, clock=router.clock, create=True,
                 insecure_test_only=(config.get("vault") or {}).get("insecure_test_only") is True,
             ),
-            known["max_age"],
+            known["max_age"], known["deadline_seconds"],
         )
     false = values["false_positives"]
     if false["enabled"]:

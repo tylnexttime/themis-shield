@@ -282,16 +282,22 @@ def handle(router, request, headers=None, *, source_document_count=1):
             )
         row = router._register_call("get_details", job.job_id)
         sweep = getattr(policy, "sweep", None)
-        if sweep is not None and (sweep.hits or sweep.stale) and not row["confirmation_required"]:
-            # The bound package was assessed without this finding; it cannot be released as it stands.
-            raise GateFailure("KNOWN_MISS_HIT", 200)
+        if sweep is not None and sweep.needs_ask and not row["confirmation_required"]:
+            # The package was assessed before the sweep asked. Not yet approved: it now needs a person (ASK).
+            # Already approved: it cannot be released as it stands (fail closed), under the sweep's own reason.
+            if job.status not in {S.LOGGED, S.AWAITING_OPERATOR, S.ESCALATED_REVIEW}:
+                raise GateFailure(sweep.reason, 200)
+            router._register_call("require_confirmation", job.job_id, digest, now=router.clock())
+            job = refresh(router, job.job_id)
+            row = router._register_call("get_details", job.job_id)
         confirmed = cloud_confirm if routing.local_alternative_offered else headers.get("x-themis-confirm") == job.job_id
         if policy.decision == Decision.ASK:
             confirmed = confirmed and headers.get("x-themis-confirm") == job.job_id
         if row["confirmation_required"] and not confirmed:
             shown = sweep_findings_text(policy)
             return router._response(
-                job, "held", "KNOWN_MISS_HIT" if sweep is not None and sweep.hits else "REQUESTER_CONFIRM_REQUIRED",
+                job, "held", (sweep.reason if sweep is not None and sweep.needs_ask else None)
+                or "REQUESTER_CONFIRM_REQUIRED",
                 f"Held for confirmation of the clean package {job.job_id}.{shown}", timings=timings,
             )
         if row["confirmation_required"] and router._register_call("get_approval", job.job_id) is None:

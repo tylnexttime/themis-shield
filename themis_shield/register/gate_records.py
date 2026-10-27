@@ -26,6 +26,8 @@ GATE_RECORD_REASONS = {
     "TRIPWIRE_CLEAR": "The cloud trip-wire reported nothing (no evidence either way).",
     "TRIPWIRE_FLAGGED": "The cloud trip-wire flagged possible residual personal information; the job stopped.",
     "TRIPWIRE_MALFORMED": "The cloud trip-wire reply was malformed; the job stopped.",
+    "TRIPWIRE_UNAVAILABLE": "The cloud trip-wire could not be completed (transport or protocol); the job stopped.",
+    "KNOWN_MISS_ASK": "The known-miss sweep now needs a person to check this package before approval.",
     "TRIPWIRE_CONFIRMED": "An Operator confirmed the trip-wire flag; the job is refused.",
     "TRIPWIRE_REJECTED": "An Operator rejected the trip-wire flag as a false flag.",
 }
@@ -80,7 +82,11 @@ class GateRecords:
     # -- decision records ---------------------------------------------------------------------------------------
 
     def record_gate_decision(self, job_id, manifest_hash, record, *, now=None):
-        """Append the decision record once per job and clean package (idempotent for a re-send)."""
+        """Append the decision record for a job and clean package.
+
+        A re-send with the same outcome adds nothing; a changed outcome for the same package (a known-miss entry that
+        started matching, an import that went stale) appends a new row, so the history shows what changed and when.
+        """
         from .sqlite_store import stamp, utc
         if not isinstance(manifest_hash, str) or not _HASH.fullmatch(manifest_hash) or type(record) is not dict:
             raise ValueError("invalid decision record")
@@ -88,9 +94,11 @@ class GateRecords:
         version = (record.get("known_miss") or {}).get("version")
         with self._transaction() as db:
             self._row(db, job_id)
-            if db.execute(
-                "SELECT 1 FROM gate_decisions WHERE job_id=? AND manifest_hash=?", (job_id, manifest_hash),
-            ).fetchone() is None:
+            latest = db.execute(
+                "SELECT record_json FROM gate_decisions WHERE job_id=? AND manifest_hash=? "
+                "ORDER BY decision_id DESC LIMIT 1", (job_id, manifest_hash),
+            ).fetchone()
+            if latest is None or latest[0] != text:
                 db.execute(
                     "INSERT INTO gate_decisions (job_id,manifest_hash,record_json,known_miss_version,occurred_utc) "
                     "VALUES (?,?,?,?,?)",
@@ -105,6 +113,29 @@ class GateRecords:
                     "SELECT * FROM gate_decisions WHERE job_id=? ORDER BY decision_id", (job_id,),
                 )
             )
+
+    def require_confirmation(self, job_id, manifest_hash, *, now=None):
+        """Raise a not-yet-approved package to "confirmation required" (never the reverse).
+
+        Used when the known-miss sweep starts asking about a package that was built without a hold. Allowed only
+        while no approval exists (Logged, Awaiting Operator or Escalated); otherwise the caller refuses the job.
+        Changing the flag changes the stage-two binding, so any earlier stage decision no longer completes it.
+        """
+        from .sqlite_store import utc
+        now = utc(now)
+        with self._transaction() as db:
+            row = self._row(db, job_id)
+            if (
+                row["manifest_hash"] != manifest_hash
+                or S(row["status"]) not in {S.LOGGED, S.AWAITING_OPERATOR, S.ESCALATED_REVIEW}
+                or self._approval_for(db, row, now) is not None
+            ):
+                raise PermissionError("an approved or closed package cannot be re-assessed")
+            if not row["confirmation_required"]:
+                self._update(db, job_id, {"confirmation_required": 1})
+                self._stage_update(db, job_id, stage2="pending", stage2_manifest_hash=None)
+                row = self._row(db, job_id)
+                self._stage_event(db, row, "KNOWN_MISS_ASK", now)
 
     # -- cloud trip-wire ----------------------------------------------------------------------------------------
 
@@ -147,6 +178,8 @@ class GateRecords:
                 )
             elif outcome == "clear":
                 self._stage_event(db, row, "TRIPWIRE_CLEAR", now)
+            elif outcome == "failed":
+                self._stage_event(db, row, "TRIPWIRE_UNAVAILABLE", now)
             else:
                 self._stage_event(db, row, "TRIPWIRE_MALFORMED", now)
             return cursor.lastrowid

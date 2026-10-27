@@ -177,8 +177,10 @@ def test_reply_echoing_an_original_value_fails_closed(tmp_path):
     h = tripwire_harness(tmp_path, reply)
     try:
         held, stopped = approve_and_send(h, request())
-        assert stopped.route == "blocked" and stopped.reason.startswith("CLOUD_")
+        assert stopped.route == "blocked" and stopped.reason == "TRIPWIRE_UNAVAILABLE"
         assert h.register.tripwire_records(held.job_id)[0]["outcome"] == "failed"
+        events = [row["event"] for row in h.register.audit_rows(held.job_id)]
+        assert "TRIPWIRE_UNAVAILABLE" in events and "TRIPWIRE_MALFORMED" not in events
         assert len(h.fake.requests) == 1
         assert h.register.get_job(held.job_id).status.value == "Refused"
         assert "Mara Lindahl" not in json.dumps(stopped.body)

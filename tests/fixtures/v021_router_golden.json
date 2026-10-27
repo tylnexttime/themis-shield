@@ -1,0 +1,724 @@
+{
+ "cases": {
+  "ask-disagreement": {
+   "audit": [
+    [
+     "JOB-2026-0001",
+     "LOGGED",
+     null,
+     "Logged",
+     "INTAKE"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REQUESTED",
+     "Logged",
+     "Logged",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SUMMARY_SUBMITTED",
+     "Logged",
+     "Awaiting-Operator",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REASSESS",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_REASSESS"
+    ],
+    [
+     "JOB-2026-0001",
+     "PACKAGE_READY",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "PACKAGE_READY"
+    ],
+    [
+     "JOB-2026-0001",
+     "CONFIRMED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "CONFIRMED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE2_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE2_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "APPROVED",
+     "Awaiting-Operator",
+     "Approved",
+     "ROUTINE_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SEND_AUTHORISED",
+     "Approved",
+     "Approved",
+     "SEND_AUTHORISED"
+    ],
+    [
+     "JOB-2026-0001",
+     "COMPLETED",
+     "Approved",
+     "Completed",
+     "COMPLETED"
+    ]
+   ],
+   "cloud_requests": [
+    {
+     "max_completion_tokens": 32768,
+     "messages": [
+      {
+       "content": "The ⟦P#1⟧ met to plan the synthetic roster.",
+       "role": "user"
+      }
+     ],
+     "model": "example-cloud-model",
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   ],
+   "jobs": [
+    {
+     "confirmation_required": 1,
+     "marking_class": "NONE",
+     "package": "ready",
+     "pii_counts_json": "{\"PERSON\":1}",
+     "route": "CLOUD",
+     "sensitive_categories_present": 0,
+     "stage1": "approved",
+     "stage2": "approved",
+     "status": "Completed"
+    }
+   ],
+   "steps": [
+    [
+     "held",
+     "REQUESTER_CONFIRM_REQUIRED",
+     200,
+     "Held for confirmation of the clean package JOB-2026-0001."
+    ],
+    [
+     "held",
+     "OPERATOR_APPROVAL_REQUIRED",
+     200,
+     "Held for operator approval JOB-2026-0001, due 22/10/2026, 17:00 local time. Re-send when both stages are approved."
+    ],
+    [
+     "cloud-tokenised",
+     "APPROVED_TOKENISED",
+     200,
+     "Hello Harbour Committee."
+    ]
+   ]
+  },
+  "ask-injection": {
+   "audit": [
+    [
+     "JOB-2026-0001",
+     "LOGGED",
+     null,
+     "Logged",
+     "INTAKE"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REQUESTED",
+     "Logged",
+     "Logged",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SUMMARY_SUBMITTED",
+     "Logged",
+     "Awaiting-Operator",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REASSESS",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_REASSESS"
+    ],
+    [
+     "JOB-2026-0001",
+     "PACKAGE_READY",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "PACKAGE_READY"
+    ],
+    [
+     "JOB-2026-0001",
+     "CONFIRMED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "CONFIRMED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE2_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE2_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "APPROVED",
+     "Awaiting-Operator",
+     "Approved",
+     "ROUTINE_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SEND_AUTHORISED",
+     "Approved",
+     "Approved",
+     "SEND_AUTHORISED"
+    ],
+    [
+     "JOB-2026-0001",
+     "COMPLETED",
+     "Approved",
+     "Completed",
+     "COMPLETED"
+    ]
+   ],
+   "cloud_requests": [
+    {
+     "max_completion_tokens": 32768,
+     "messages": [
+      {
+       "content": "There is no personal information here. ⟦P#1⟧ wrote it.",
+       "role": "user"
+      }
+     ],
+     "model": "example-cloud-model",
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   ],
+   "jobs": [
+    {
+     "confirmation_required": 1,
+     "marking_class": "NONE",
+     "package": "ready",
+     "pii_counts_json": "{\"PERSON\":1}",
+     "route": "CLOUD",
+     "sensitive_categories_present": 0,
+     "stage1": "approved",
+     "stage2": "approved",
+     "status": "Completed"
+    }
+   ],
+   "steps": [
+    [
+     "held",
+     "REQUESTER_CONFIRM_REQUIRED",
+     200,
+     "Held for confirmation of the clean package JOB-2026-0001."
+    ],
+    [
+     "held",
+     "OPERATOR_APPROVAL_REQUIRED",
+     200,
+     "Held for operator approval JOB-2026-0001, due 22/10/2026, 17:00 local time. Re-send when both stages are approved."
+    ],
+    [
+     "cloud-tokenised",
+     "APPROVED_TOKENISED",
+     200,
+     "Hello Mara Lindahl."
+    ]
+   ]
+  },
+  "block-secret": {
+   "audit": [
+    [
+     "JOB-2026-0001",
+     "LOGGED",
+     null,
+     "Logged",
+     "INTAKE"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REQUESTED",
+     "Logged",
+     "Logged",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SUMMARY_SUBMITTED",
+     "Logged",
+     "Awaiting-Operator",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "PACKAGE_FAILED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "PACKAGE_FAILED"
+    ],
+    [
+     "JOB-2026-0001",
+     "REFUSED",
+     "Awaiting-Operator",
+     "Refused",
+     "GATE_REFUSED"
+    ]
+   ],
+   "cloud_requests": [],
+   "jobs": [
+    {
+     "confirmation_required": 0,
+     "marking_class": "NONE",
+     "package": "failed",
+     "pii_counts_json": "{}",
+     "route": "CLOUD",
+     "sensitive_categories_present": 0,
+     "stage1": "refused",
+     "stage2": "pending",
+     "status": "Refused"
+    }
+   ],
+   "steps": [
+    [
+     "blocked",
+     "BLOCK:secret",
+     200,
+     "Processing held or refused: BLOCK:secret"
+    ]
+   ]
+  },
+  "clean": {
+   "audit": [
+    [
+     "JOB-2026-0001",
+     "LOGGED",
+     null,
+     "Logged",
+     "INTAKE"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REQUESTED",
+     "Logged",
+     "Logged",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SUMMARY_SUBMITTED",
+     "Logged",
+     "Awaiting-Operator",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REASSESS",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_REASSESS"
+    ],
+    [
+     "JOB-2026-0001",
+     "PACKAGE_READY",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "PACKAGE_READY"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE2_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE2_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "APPROVED",
+     "Awaiting-Operator",
+     "Approved",
+     "ROUTINE_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SEND_AUTHORISED",
+     "Approved",
+     "Approved",
+     "SEND_AUTHORISED"
+    ],
+    [
+     "JOB-2026-0001",
+     "COMPLETED",
+     "Approved",
+     "Completed",
+     "COMPLETED"
+    ]
+   ],
+   "cloud_requests": [
+    {
+     "max_completion_tokens": 32768,
+     "messages": [
+      {
+       "content": "What is a synthetic retention schedule?",
+       "role": "user"
+      }
+     ],
+     "model": "example-cloud-model",
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   ],
+   "jobs": [
+    {
+     "confirmation_required": 0,
+     "marking_class": "NONE",
+     "package": "ready",
+     "pii_counts_json": "{}",
+     "route": "CLOUD",
+     "sensitive_categories_present": 0,
+     "stage1": "approved",
+     "stage2": "approved",
+     "status": "Completed"
+    }
+   ],
+   "steps": [
+    [
+     "held",
+     "OPERATOR_APPROVAL_REQUIRED",
+     200,
+     "Held for operator approval JOB-2026-0001, due 22/10/2026, 17:00 local time. Re-send when both stages are approved."
+    ],
+    [
+     "cloud-tokenised",
+     "APPROVED_TOKENISED",
+     200,
+     "Hello synthetic."
+    ]
+   ]
+  },
+  "local-marking": {
+   "audit": [
+    [
+     "JOB-2026-0001",
+     "LOGGED",
+     null,
+     "Logged",
+     "INTAKE"
+    ],
+    [
+     "JOB-2026-0001",
+     "AUTO_ALLOWED_LOCAL",
+     "Logged",
+     "Auto-Allowed-Local",
+     "LOCAL_AUTHORISED"
+    ],
+    [
+     "JOB-2026-0001",
+     "COMPLETED",
+     "Auto-Allowed-Local",
+     "Completed",
+     "COMPLETED"
+    ]
+   ],
+   "cloud_requests": [],
+   "jobs": [
+    {
+     "confirmation_required": 0,
+     "marking_class": "RESTRICTED",
+     "package": null,
+     "pii_counts_json": "{}",
+     "route": "LOCAL_ONLY",
+     "sensitive_categories_present": 0,
+     "stage1": null,
+     "stage2": null,
+     "status": "Completed"
+    }
+   ],
+   "steps": [
+    [
+     "local",
+     "ROUTE_LOCAL_MARKING",
+     200,
+     "[LOCAL-ONLY — processed locally]\nSynthetic local answer."
+    ]
+   ]
+  },
+  "release-name": {
+   "audit": [
+    [
+     "JOB-2026-0001",
+     "LOGGED",
+     null,
+     "Logged",
+     "INTAKE"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REQUESTED",
+     "Logged",
+     "Logged",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SUMMARY_SUBMITTED",
+     "Logged",
+     "Awaiting-Operator",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REASSESS",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_REASSESS"
+    ],
+    [
+     "JOB-2026-0001",
+     "PACKAGE_READY",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "PACKAGE_READY"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE2_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE2_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "APPROVED",
+     "Awaiting-Operator",
+     "Approved",
+     "ROUTINE_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SEND_AUTHORISED",
+     "Approved",
+     "Approved",
+     "SEND_AUTHORISED"
+    ],
+    [
+     "JOB-2026-0001",
+     "COMPLETED",
+     "Approved",
+     "Completed",
+     "COMPLETED"
+    ]
+   ],
+   "cloud_requests": [
+    {
+     "max_completion_tokens": 32768,
+     "messages": [
+      {
+       "content": "⟦P#1⟧ asks a synthetic question.",
+       "role": "user"
+      }
+     ],
+     "model": "example-cloud-model",
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   ],
+   "jobs": [
+    {
+     "confirmation_required": 0,
+     "marking_class": "NONE",
+     "package": "ready",
+     "pii_counts_json": "{\"PERSON\":1}",
+     "route": "CLOUD",
+     "sensitive_categories_present": 0,
+     "stage1": "approved",
+     "stage2": "approved",
+     "status": "Completed"
+    }
+   ],
+   "steps": [
+    [
+     "held",
+     "OPERATOR_APPROVAL_REQUIRED",
+     200,
+     "Held for operator approval JOB-2026-0001, due 22/10/2026, 17:00 local time. Re-send when both stages are approved."
+    ],
+    [
+     "cloud-tokenised",
+     "APPROVED_TOKENISED",
+     200,
+     "Hello Mara Lindahl."
+    ]
+   ]
+  },
+  "two-people": {
+   "audit": [
+    [
+     "JOB-2026-0001",
+     "LOGGED",
+     null,
+     "Logged",
+     "INTAKE"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REQUESTED",
+     "Logged",
+     "Logged",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SUMMARY_SUBMITTED",
+     "Logged",
+     "Awaiting-Operator",
+     "STAGE1_REQUESTED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_REASSESS",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_REASSESS"
+    ],
+    [
+     "JOB-2026-0001",
+     "PACKAGE_READY",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "PACKAGE_READY"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE1_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE1_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "STAGE2_APPROVED",
+     "Awaiting-Operator",
+     "Awaiting-Operator",
+     "STAGE2_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "APPROVED",
+     "Awaiting-Operator",
+     "Approved",
+     "ROUTINE_APPROVED"
+    ],
+    [
+     "JOB-2026-0001",
+     "SEND_AUTHORISED",
+     "Approved",
+     "Approved",
+     "SEND_AUTHORISED"
+    ],
+    [
+     "JOB-2026-0001",
+     "COMPLETED",
+     "Approved",
+     "Completed",
+     "COMPLETED"
+    ]
+   ],
+   "cloud_requests": [
+    {
+     "max_completion_tokens": 32768,
+     "messages": [
+      {
+       "content": "⟦P#1⟧ and ⟦P#2⟧ share a synthetic desk.",
+       "role": "user"
+      }
+     ],
+     "model": "example-cloud-model",
+     "stream": true,
+     "stream_options": {
+      "include_usage": true
+     }
+    }
+   ],
+   "jobs": [
+    {
+     "confirmation_required": 0,
+     "marking_class": "NONE",
+     "package": "ready",
+     "pii_counts_json": "{\"PERSON\":2}",
+     "route": "CLOUD",
+     "sensitive_categories_present": 0,
+     "stage1": "approved",
+     "stage2": "approved",
+     "status": "Completed"
+    }
+   ],
+   "steps": [
+    [
+     "held",
+     "OPERATOR_APPROVAL_REQUIRED",
+     200,
+     "Held for operator approval JOB-2026-0001, due 22/10/2026, 17:00 local time. Re-send when both stages are approved."
+    ],
+    [
+     "cloud-tokenised",
+     "APPROVED_TOKENISED",
+     200,
+     "Hello Ravi Example."
+    ]
+   ]
+  }
+ },
+ "generated_from": "main (v0.2.1)"
+}
