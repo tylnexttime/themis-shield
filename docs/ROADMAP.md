@@ -160,9 +160,14 @@ among the placeholders, and the pricing factors (age, area, vehicle) that compar
 - **Per-task profiles** decide, class by class, what passes, what is generalised and what is hidden: an expense
   summary keeps months and amounts; deal advice keeps an age band, a region and contract months; everything else stays
   opaque.
-- **A semi-synthetic dictionary.** Values are replaced by realistic surrogates, and some classes (transaction dates,
-  for example) pass through unchanged. The cloud model is not told which values are real. Each surrogate carries its
-  ID (`Mara Quinlan ⟦P:3fa9c1⟧`), and the model is asked to keep the ID wherever it refers to that value.
+- **Typed placeholders by default.** Every placeholder says what kind of value it hides, and a short legend travels
+  with the request: `⟦I:3fa9c1⟧` is a bank account number, `⟦D:91b2e0⟧` a date of birth, `⟦P:0c44a7⟧` a person. The
+  model learns the type, never the value, and is asked to answer in the IDs so restoration stays exact. (Today the
+  placeholder carries only a coarse class letter.)
+- **A semi-synthetic dictionary, opt-in.** For tasks that read better with real-looking text, values are replaced by
+  realistic surrogates, and some classes (transaction dates, for example) pass through unchanged. The cloud model is
+  not told which values are real. Each surrogate carries its ID (`Mara Quinlan ⟦P:3fa9c1⟧`), and the model is asked
+  to keep the ID wherever it refers to that value.
 - **Restoration uses the IDs only.** A surrogate that comes back without its ID is never fuzzy-matched; it is flagged
   for the person to check. This answers the reason an earlier design rejected surrogates (models shorten, misspell and
   merge fake names, so exact reversal fails and fuzzy reversal risks the wrong person): the ID, not the name, is what
