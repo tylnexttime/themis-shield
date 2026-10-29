@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "themis-shield"
-version = "0.3.1"
+version = "0.3.2"
 description = "A local-first privacy gate in front of cloud AI: detect, de-identify, decide, restore."
 readme = "README.md"
 license = "Apache-2.0"

@@ -2,6 +2,63 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## 0.3.2 (30/10/2026)
+
+**Development measurement only.** These are the first v0.4 detection fixes, measured on the development sets (the
+v0.1 set, split C, and split D, which became development data after its v0.3 run). No fresh split has tested them:
+a vetting record still quotes 0.3.0's frozen result (FAIL) as the method baseline, and says it is inherited.
+
+### Detection
+
+- `column-identifiers`: a table column headed as a personal identifier (licence, passport, Medicare, tax file,
+  national ID, bank account, card, or a staff, employee, student, member, customer, client or patient number) is
+  protected cell by cell. Organisation identifiers (incident, order, invoice, asset, ticket, case, reference), row
+  counters and properties of an identifier (type, class, expiry, issue date, balance) are not; a bare "ID" counts
+  only beside a name or another identifier column. An unquoted comma that shifts later cells protects both candidate
+  cells. Such a cell is never cancelled by the organisation's terms or formats.
+- `bare-number-formats`: a profile format with no letters in it allow-listed every number of that shape. On split D
+  an eight-digit work-order format cancelled every licence number the column pass found. Such a format now counts
+  only after its own key words ("Work order 12345678"); a nameless one allow-lists nothing.
+- `finder-windows`: a document over 6,000 characters is read by the LLM finders in line-bounded windows (the table
+  header repeated, one line of overlap), and every window's values are matched against the whole document. Four
+  split D documents (10,000-21,000 characters, 394-504 personal spans) had overflowed one answer and been BLOCKed.
+- `detectors-detection-view`: PII-Tracer and the LLM finders read the detection view (invisible characters removed,
+  NFKC per character), like the rules and the marking gate, with spans mapped back to the source.
+- All four are named switches, on by default; `[detection] fixes = "none"` still reproduces 0.2.1.
+- A failed stage now names its kind from a fixed list (`stage-failed:not-enough-memory`, `:target-unavailable`,
+  `:runtime`, `:transport`, ...; never a message).
+
+### Measured on development data
+
+Confirmation replay at the release commit, all four development sets, with the earlier finder captures and, for the
+54 documents whose prompts changed, today's live answers (both checked: replaying today's capture reproduces the
+live run byte for byte):
+
+| Set | Released leaks | R_any | R_full | Sensitive R_any | Clean friction | Hard negatives touched |
+|---|---|---|---|---|---|---|
+| v0.1 set | 0 -> 0 | 0.9989 -> 0.9989 | 0.9871 -> 0.9871 | 0.997 -> 0.997 | 0.050 -> 0.050 | 306 -> 306 |
+| split C | 0 -> 0 | 0.9902 -> 0.9905 | 0.9786 -> 0.9788 | 0.954 -> 0.955 | 0.147 -> 0.147 | 600 -> 562 |
+| split D half Q | 2 -> 2 | 0.9809 -> 0.9809 | 0.9801 -> 0.9801 | 0.984 -> 0.984 | 0.286 -> 0.286 | 75 -> 75 |
+| split D half C | **26 -> 3** | 0.925 -> **0.993** | 0.893 -> **0.989** | 0.666 -> **0.986** | 0.323 -> 0.323 | 477 -> 475 |
+
+Split D pooled: 28 released spans -> 5. Unprotected spans held only by a finder failure on half C: 274 -> 0. Most of
+half C's gain is the long, dense documents now being read at all; for those documents the comparison is today's
+live finder answers against 27/10's captured ones, so it includes run-to-run variation. Development data, not an
+exam: friction is unchanged and still above the 0.15 rule, and indirect sensitive statements remain the next item.
+
+### Evaluation tooling
+
+- Finder replays are keyed by (case, model, prompt hash), so a windowed document replays every window, and
+  `--replay-finders` takes several capture folders (a later one wins).
+- The recording client attributes finder calls to the document the engine announces, not by counting calls: a
+  windowed document had shifted every later document's capture label in its chunk (detection was unaffected).
+- The offset-map contract is property-tested against the detection view; the unused `OffsetMap` skeleton is gone.
+- `pytest --shift-clock-days N` runs the suite with the wall clock moved ahead (no date-dependent test at +400 days).
+
+### Development debt
+
+- None open. `docs/DEV-DEBT.md` lists the fourteen items found and fixed or closed on 30/10/2026.
+
 ## 0.3.1 (30/10/2026)
 
 No new frozen test: detection is unchanged, so 0.3.0's split D result (FAIL) is the method baseline a

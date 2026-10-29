@@ -13,7 +13,9 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   on new authors' text is what failed. Split D is now development data.
 - **0.3.1 (30/10/2026):** [vetting records](VETTING-RECORD.md) (`themis vet`), which give the people who sign off a data
   release one value-free record of what was done, and the evaluation-tooling fixes in the [changelog](../CHANGELOG.md).
-- **Next:** the v0.4 detection fixes below, in order, then v0.4's "keep the work possible" design.
+- **0.3.2 (30/10/2026):** v0.4 detection fixes 1-3 below, measured on development data only (split D half C: released
+  leaks 26 -> 3, R_any 0.925 -> 0.993, sensitive R_any 0.666 -> 0.986; friction unchanged).
+- **Next:** item 4 below, then v0.4's "keep the work possible" design, then a fresh split E for v0.4.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
 
@@ -187,13 +189,14 @@ precision is tracked so we know whether it earns its round trip. Never on BLOCK 
 From split D's leaks and misses. Each is measured on development data (split D included) with the held-by-reason
 split, and the release is tested once on a fresh split.
 
-1. **Column-aware identifier propagation.** When a table column's header names a personal identifier (licence,
+1. **Column-aware identifier propagation** (done, 0.3.2). When a table column's header names a personal identifier (licence,
    member, account, ID number), every cell in it is protected. 21 of split D's 28 released spans were bare licence
    numbers in such a column.
-2. **Finders list each distinct value once** (DD-05), so long tables stop overflowing the answer. This lands *after*
+2. **Finder windows** (done, 0.3.2; DD-05). The prompt already asked for each distinct value once; a dense document
+   still had more than one answer can hold, so a document over 6,000 characters is read in windows. Long tables stop overflowing the answer. This lands *after*
    item 1, never before it: 274 of split D's unprotected-but-held spans were held only because the finder failed on
    such a table.
-3. **Finders read the detection view** (DD-06), in the same new finder capture.
+3. **Finders read the detection view** (done, 0.3.2; DD-06), measured in the same live capture.
 4. **Indirect sensitive statements:** a sentence-level check that also asks about sentences containing only a name
    (the misses sat in sentences a detector had already touched).
 

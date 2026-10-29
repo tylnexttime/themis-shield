@@ -18,7 +18,7 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.3.1, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status: v0.3.2, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
 - **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
   is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
@@ -172,8 +172,11 @@ Read this section before you rely on anything above.
   0.15 rule), down from 40 under v0.2.1's behaviour. About a quarter of institutional look-alikes are still redacted,
   and on real documents the gate hides most business phone numbers, reference numbers and transaction dates, which
   limits what a cloud model can do with the output (v0.4's typed placeholders and task profiles address this).
-- **Identifier columns in tables can leak.** On split D, bare licence numbers in a table's licence column were missed
-  in three tables while every other column was covered. Column-aware identifier propagation is the first v0.4 fix.
+- **Identifier columns in tables, fixed in development only.** On split D, bare licence numbers in a table's licence
+  column were missed in three tables while every other column was covered. Since 0.3.2 a column headed as a personal
+  identifier is protected cell by cell, and an organisation's format that is only digits no longer cancels such
+  numbers: on split D (now development data) released spans fell from 28 to 5. That is a development measurement;
+  the fresh split that will test it has not been written yet.
 - **Sensitive statements depend on the LLM finders, and they miss indirect ones.** On split D they caught 74% of
   sensitive statements overall, 98% in one half and 67% in the half whose author wrote mostly indirect phrasing
   (union membership 45%, criminal history 51%). Statements found are substituted and held; statements missed in a
@@ -550,10 +553,9 @@ attachment live against Strata serving Qwen3.8-Flash-Next on the same laptop.
 The full plan, with the reasoning, the prior art we looked at and how each part will be tested, is in
 [docs/ROADMAP.md](docs/ROADMAP.md). In short, each item a known gap from our own runs:
 
-1. **Detection on new authors' text** (from split D): column-aware identifier propagation (a column headed as a
-   licence, member, account or ID number is protected cell by cell), finders that list each distinct value once (so
-   long tables stop overflowing their answer), and a sentence-level check for indirect sensitive statements that
-   also looks at sentences containing only a name.
+1. **Detection on new authors' text** (from split D): column-aware identifier propagation, finder windows for long
+   documents and detection-view readers are in 0.3.2 (development data only); still to come is a sentence-level check
+   for indirect sensitive statements that also looks at sentences containing only a name, then a fresh split E.
 2. **Keep the work possible** (v0.4): typed placeholders with a codebook by default, optional partially synthetic
    values with per-job date shifting, per-task profiles, and a utility measurement next to the leak measurement
    ([story](docs/CODEBOOK-AND-SYNTHETIC-DATA.md)).
