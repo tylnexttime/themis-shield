@@ -253,6 +253,25 @@ def test_replayed_errors_keep_their_stage_meaning(tmp_path):
             replay.serve(case_id, "gemma4-e4b", digest)
 
 
+def test_calls_after_a_windowed_document_keep_their_own_case_ids(tmp_path):
+    # DD-14: "the k-th call is the k-th document" broke once a long document took several calls.
+    from themis_shield.detectors.llm_finder import FINDER_WINDOW_THRESHOLD
+
+    cases = scorer.load_gold("dev")[:3]
+    long_case = dict(cases[0], id="LONG-1", text=(cases[0]["text"] + "\n") * (FINDER_WINDOW_THRESHOLD // 200 + 30))
+    cases = [long_case] + cases
+    capture = run_eval.FinderCapture(tmp_path / "cap", IDENTITIES, {})
+    live = _process(tmp_path, cases, run_eval.RecordingClient(FakeFinder(), capture=capture), "live")
+    capture.close()
+    records = [json.loads(line) for line in (tmp_path / "cap" / "finders.jsonl").read_text().splitlines()]
+    per_case = {c["id"]: sum(r["case_id"] == c["id"] for r in records) for c in cases}
+    assert per_case["LONG-1"] > 2 and all(per_case[c["id"]] == 2 for c in cases[1:])
+    replay = run_eval.FinderReplay(tmp_path / "cap", IDENTITIES)
+    replayed = _process(tmp_path, cases, run_eval.RecordingClient(object(), replay=replay), "replay")
+    for name in ("predictions.jsonl", "decisions.jsonl"):
+        assert (live / name).read_bytes() == (replayed / name).read_bytes()
+
+
 def test_each_window_replays_its_own_answer_and_later_folders_win(tmp_path):
     # v0.4 finder-windows: several calls per case and model, told apart by prompt hash (DD-13).
     old = run_eval.FinderCapture(tmp_path / "old", IDENTITIES, {})

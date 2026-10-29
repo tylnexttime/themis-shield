@@ -110,8 +110,9 @@ def now() -> str:
 class RecordingClient:
     """Delegates to the gate's SequentialFinderClient; records one entry per finder call.
 
-    The engine calls the resident target once per selected document, in input order, so the k-th call inside a
-    residency belongs to the k-th document of the batch (every document is selected when detection is thorough).
+    The engine announces each document (``begin_document(position)``) before its calls, and every call until the next
+    announcement belongs to that document: a long document read in windows makes several calls (v0.4). Counting calls
+    instead ("the k-th call is the k-th document") misattributed every document after a windowed one (DD-14).
     """
 
     def __init__(self, inner, sink=None, capture=None, replay=None):
@@ -159,11 +160,16 @@ class _RecordingTarget:
     def __init__(self, owner: RecordingClient, target, model_role: str, acquire_ms: float):
         self.owner, self.target, self.model_role = owner, target, model_role
         self.index = 0
+        self.document = None
         self.acquire_ms = acquire_ms
+
+    def begin_document(self, position):
+        self.document = position
 
     def chat_json(self, model_role, messages, schema, max_tokens):
         owner = self.owner
-        index = self.index
+        first_call = self.index == 0
+        index = self.document if self.document is not None else self.index
         self.index += 1
         case_id = owner.case_ids[index] if index < len(owner.case_ids) else None
         text = owner.texts[index] if index < len(owner.texts) else None
@@ -201,7 +207,7 @@ class _RecordingTarget:
             record = {
                 "case_id": case_id, "model": model_role, "status": status,
                 "wall_ms": round((time.perf_counter() - began) * 1000, 1),
-                "acquire_ms": round(self.acquire_ms, 1) if index == 0 else 0.0,
+                "acquire_ms": round(self.acquire_ms, 1) if first_call else 0.0,
                 "timings": dict(getattr(self.target, "last_timings", {}) or {}),
                 "template_sha256": key, "system_prefix_sha256": prefix_sha, "prompt_sha256": prompt_sha,
                 "text_chars": len(text) if text else None,

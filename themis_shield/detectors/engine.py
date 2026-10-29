@@ -123,6 +123,7 @@ class _Document:
     reasons: tuple = ()
     tiers: list = field(default_factory=lambda: [1])
     llm_findings: list = field(default_factory=list)
+    position: int = 0  # the document's index in the batch (for clients that attribute calls to documents)
 
 
 def _public_dates(profile) -> tuple[str, ...]:
@@ -199,10 +200,14 @@ def _finder_tier(documents, targets, tier, model):
         context = residency(model.value) if residency is not None else nullcontext(client)
         with context as resident:
             acquisition_ms = (perf_counter() - began) * 1000
+            begin = getattr(resident, "begin_document", None)
             for index, document in enumerate(selected):
                 start = perf_counter()
                 if index == 0:
                     document.stage_timings[f"{model.value}:acquire"] = acquisition_ms
+                if begin is not None:
+                    # A document may take several calls (finder windows); a recording client must not count calls.
+                    begin(document.position)
                 result = _run(
                     document.text, model.value,
                     lambda document=document: LLMFinder(
@@ -332,7 +337,7 @@ def detect_batch(texts, profile, targets=None, *, thorough):
     targets = replace(targets, thorough=targets.thorough or thorough)
     if targets.tracer is None:
         targets = replace(targets, tracer=tracer_for(targets))
-    documents = [_Document(text) for text in texts]
+    documents = [_Document(text, position=index) for index, text in enumerate(texts)]
     for document in documents:
         _tier1(document, profile, targets)
     _finder_tier(documents, targets, 2, FinderModel.E4B)
