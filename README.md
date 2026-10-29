@@ -18,7 +18,7 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.3.0, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status: v0.3.1, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
 - **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
   is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
@@ -567,7 +567,7 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
 
 Each needs a fresh test split nobody has seen: split D is now development data.
 
-Not yet released: `themis vet` and vetting records ([docs/VETTING-RECORD.md](docs/VETTING-RECORD.md)). Known
+New in 0.3.1: `themis vet` and vetting records ([docs/VETTING-RECORD.md](docs/VETTING-RECORD.md)). Known
 debt is listed, and kept short, in [docs/DEV-DEBT.md](docs/DEV-DEBT.md).
 
 Done in v0.3: deterministic and real-document friction fixes, the typed-decision tier (off by default), a known-miss

@@ -11,7 +11,7 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
 - **v0.3.0 shipped on 27/10/2026 and failed its frozen test** (split D: 28 released spans, sensitive-statement recall
   0.740, friction 0.248 against a 0.15 rule; [results](../eval/RESULTS-v0.3.md)). Its friction changes worked; detection
   on new authors' text is what failed. Split D is now development data.
-- **Not yet released:** [vetting records](VETTING-RECORD.md) (`themis vet`), which give the people who sign off a data
+- **0.3.1 (30/10/2026):** [vetting records](VETTING-RECORD.md) (`themis vet`), which give the people who sign off a data
   release one value-free record of what was done, and the evaluation-tooling fixes in the [changelog](../CHANGELOG.md).
 - **Next:** the v0.4 detection fixes below, in order, then v0.4's "keep the work possible" design.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the

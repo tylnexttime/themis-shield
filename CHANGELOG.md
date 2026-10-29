@@ -2,7 +2,10 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
-## Unreleased
+## 0.3.1 (30/10/2026)
+
+No new frozen test: detection is unchanged, so 0.3.0's split D result (FAIL) is the method baseline a
+vetting record quotes for this version, and it says so.
 
 ### Vetting records
 
