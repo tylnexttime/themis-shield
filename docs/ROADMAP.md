@@ -215,6 +215,16 @@ The story behind this part, with its sources: [A codebook, and data that is part
   with the request: `⟦I:3fa9c1⟧` is a bank account number, `⟦D:91b2e0⟧` a date of birth, `⟦P:0c44a7⟧` a person. The
   model learns the type, never the value, and is asked to answer in the IDs so restoration stays exact. (Today the
   placeholder carries only a coarse class letter.)
+  *Design notes (30/10/2026):*
+  - The token format stays as it is (`⟦I:3fa9c1⟧`), so restoration, the vault and every parser are unchanged. The
+    finer type travels in a legend: one system-message line per placeholder sent, built inside the protected request
+    so the approval stays bound to exactly what the cloud sees.
+  - The legend says only what the finding's label says ("a bank account number", "a date of birth"), never where it
+    came from, how sure the detector was, or anything about other values.
+  - **One open decision: sensitive statements.** "`⟦S:…⟧` is a statement about someone's criminal history" tells the
+    cloud a special-category fact exists even though the statement is hidden. The default should be the generic "a
+    sensitive statement about a person"; naming the category is a per-task profile choice, off by default.
+  - Measured by the utility measurement below: the same tasks with and without the legend.
 - **A semi-synthetic dictionary, opt-in.** For tasks that read better with real-looking text, values are replaced by
   realistic surrogates, and some classes (transaction dates, for example) pass through unchanged. The cloud model is
   not told which values are real. Each surrogate carries its ID (`Mara Quinlan ⟦P:3fa9c1⟧`), and the model is asked
