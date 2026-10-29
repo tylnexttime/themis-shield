@@ -255,7 +255,9 @@ privacy and usefulness on one page.
   because a text gate cannot see them.
 - **A real-data evaluation protocol** before `synthetic_only` can ever be switched off.
 - **A human-written test slice**: 20-40 documents written by people, in their own words.
-- Linux and macOS runs, a native Anthropic Messages leg, a central register service.
+- Linux and macOS runs, a native Anthropic Messages leg, a central register service, and with it the per-request evidence
+  ledger specified in `themis_shield/ledger.py` (locally, the register's append-only records already carry the
+  evidence).
 
 ## What we looked at and decided against
 

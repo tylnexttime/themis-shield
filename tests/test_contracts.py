@@ -1,6 +1,7 @@
-"""Substitution and router contracts; offset-map and ledger contracts remain deferred."""
+"""Substitution, router and offset-map contracts. (The per-request evidence ledger is on the roadmap, DEV-DEBT DD-03.)"""
 
 import json
+import random
 
 import pytest
 
@@ -18,14 +19,33 @@ from router_fakes import approved_response, harness, request
 pytestmark = pytest.mark.usefixtures("au_pspf_markings")
 
 
-@pytest.mark.xfail(reason="M2 offset map deferred", strict=True, raises=NotImplementedError)
 def test_offset_map_is_conservative():
-    raise NotImplementedError("M2: conservative Unicode source mapping")
+    """Every view span maps to a source span covering each contributing character and every removed invisible one.
 
+    Random text from letters, digits, combining marks, ligatures, full-width forms and default-ignorables; 300
+    documents, every span of up to 12 view characters.
+    """
+    from themis_shield.normalise import detection_view, is_default_ignorable
 
-@pytest.mark.xfail(reason="M2 ledger deferred", strict=True, raises=NotImplementedError)
-def test_ledger_is_add_only():
-    raise NotImplementedError("M2: immutable mandatory evidence")
+    alphabet = list("Mara Lindahl 0412") + ["́", "̈", "ﬁ", "Ｍ", "​", "‍", "­",
+                                            "️", "󠁁", "⁠", "é", "Å"]
+    rng = random.Random(20261030)
+    for _ in range(300):
+        text = "".join(rng.choice(alphabet) for _ in range(rng.randint(1, 24)))
+        view = detection_view(text)
+        for start in range(len(view.text)):
+            for end in range(start + 1, min(len(view.text), start + 12) + 1):
+                a, b = view.to_source(start, end)
+                assert 0 <= a < b <= len(text)
+                # every source character that produced a view character in the span is covered
+                for index in range(start, end):
+                    low, high = view.offsets[index]
+                    assert a <= low and high <= b
+                # nothing visible outside the span's own sources is swallowed: the envelope starts and ends on them
+                assert a == view.offsets[start][0] and b == view.offsets[end - 1][1]
+                # removed invisible characters strictly inside the envelope are covered by construction
+                assert all(is_default_ignorable(ch) or any(lo <= i < hi for lo, hi in view.offsets[start:end])
+                           for i, ch in enumerate(text[a:b], a))
 
 
 def test_same_value_has_same_token():

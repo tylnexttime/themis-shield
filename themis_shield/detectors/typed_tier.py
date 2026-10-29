@@ -26,7 +26,7 @@ from time import perf_counter
 from types import MappingProxyType
 
 from ..types import Decision, Label, ReasonCode
-from .contracts import FindingEvidence, StageReport, Status, finding
+from .contracts import FindingEvidence, StageReport, Status, failure_code, finding
 from .typed import (
     INDIRECT_NONE, Decider, TypedEvidence, TypedSettings, TypedStageError, make_question, sentences,
     typed_settings,
@@ -124,10 +124,10 @@ def _ask(decider: Decider, text: str, targets, settings: TypedSettings):
             for family, start, end in targets]
 
 
-def _with_answers(evidence, answers, calls, wall_ms, status=Status.OK, added=0):
+def _with_answers(evidence, answers, calls, wall_ms, status=Status.OK, added=0, error_code="stage-failed"):
     reports = dict(evidence.stage_status)
     reports[STAGE] = StageReport(
-        STAGE, status, added, error_code=None if status == Status.OK else "stage-failed",
+        STAGE, status, added, error_code=None if status == Status.OK else error_code,
     )
     return replace(
         evidence, typed=TypedEvidence(tuple(answers), calls, wall_ms),
@@ -217,7 +217,8 @@ def run_typed_tier(texts, results, runtime):
         wall = (perf_counter() - began) * 1000
         failed = []
         for index, result in enumerate(results):
-            evidence = _with_answers(result, (), 0, wall if index == 0 else 0.0, Status.FAILED)
+            evidence = _with_answers(result, (), 0, wall if index == 0 else 0.0, Status.FAILED,
+                                     error_code=failure_code(error))
             failed.append(replace(evidence, policy_result=decide(evidence)))
         return failed
     out = []

@@ -239,8 +239,8 @@ def fake_server(tmp_path):
 @pytest.mark.parametrize("case, passed, error", [
     ("canary", True, None),
     ("empty", False, None),  # a valid, empty answer: the silent failure the canary exists for
-    ("thought-channel", False, "stage-failed"),  # the answer begins in a thought channel
-    ("bare-list", False, "stage-failed"),  # "[]" instead of the schema's object
+    ("thought-channel", False, "stage-failed:runtime"),  # the answer begins in a thought channel
+    ("bare-list", False, "stage-failed:runtime"),  # "[]" instead of the schema's object
 ])
 def test_finder_canary_against_the_fake_llama_server(fake_server, case, passed, error):
     check = check_finder(FinderModel.E4B, fake_server(case))

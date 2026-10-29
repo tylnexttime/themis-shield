@@ -99,6 +99,29 @@ class StageReport:
     error_code: str | None = None
 
 
+# A failed stage's code names the KIND of failure from a fixed list (by exception class, never its message), so a
+# run that failed closed can be diagnosed afterwards without debug logging (docs/DEV-DEBT.md, DD-04).
+_FAILURE_KINDS = (
+    ("NotEnoughMemory", "stage-failed:not-enough-memory"),
+    ("TargetUnavailable", "stage-failed:target-unavailable"),
+    ("TypedStageError", "stage-failed:typed-configuration"),
+    ("RuntimeFailure", "stage-failed:runtime"),
+    ("ConnectionError", "stage-failed:transport"),
+    ("TransportError", "stage-failed:transport"),
+    ("OSError", "stage-failed:os"),
+    ("MemoryError", "stage-failed:out-of-memory"),
+)
+
+
+def failure_code(error: BaseException) -> str:
+    """``stage-failed`` qualified by the first matching kind in the exception's class hierarchy."""
+    names = [cls.__name__ for cls in type(error).__mro__]
+    for name, code in _FAILURE_KINDS:
+        if name in names:
+            return code
+    return "stage-failed"
+
+
 @dataclass(frozen=True, slots=True)
 class StageResult:
     findings: tuple[DetectionFinding, ...]

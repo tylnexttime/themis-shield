@@ -55,7 +55,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. |
 | `detectors/settings.py` | real | `[detection] version`: `v0.2` (default) turns on the tier-1 fixes and the column-aware table pass; `v0.1` restores the evaluated v0.1 detection. |
 | `detectors/typed.py`, `detectors/typed_tier.py` | real, off by default | v0.3 typed-decision tier (T1.5): multiple-choice questions about what the cheaper tiers found, answered in one forward pass; the policy decides what an answer may change (see [below](#v03-typed-decision-tier-t15)). |
-| `normalise.py` | partial | Real: `detection_view`, the shared detection view (Unicode default-ignorable characters removed, NFKC per character, each view character mapped back to its source character) used by the rule packs, the marking gate and the injection signal. Skeleton: the document-level `normalise` and `OffsetMap` contract. |
+| `normalise.py` | real | `detection_view`, the shared detection view (Unicode default-ignorable characters removed, NFKC per character, each view character mapped back to its source character) used by the rule packs, the marking gate and the injection signal. It meets the conservative offset-map contract (property-tested); the older `OffsetMap` skeleton was removed in 0.3.2. |
 
 ### Substitution, vault, restoration
 
@@ -78,7 +78,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | `register/client.py` | partial | Real: the register contracts (`JobRecord`, `JobStatus`, approval validation, offline journal) used everywhere. Skeleton: `JobRegisterClient` protocol methods and `HttpRegisterClient`, a non-networking stub for a remote register. |
 | `handover.py`, `app_services.py` | real | Handover mode: a deterministic, re-scanned package for manual use; safe projections for the web app. |
 | `vetting.py` | real, v0.3.1 | `themis vet`: a data release through the chat path's own steps (markings, detection, policy, catalogue, final sweep), derived documents under position-only names, a codebook vault per release, and the value-free vetting record ([VETTING-RECORD.md](VETTING-RECORD.md)). |
-| `ledger.py` | skeleton | Specification of an append-only evidence ledger per request (its contract test is `xfail`). |
+| `ledger.py` | skeleton | Specification of an append-only evidence ledger per request, for a central register service (roadmap, Later). Today the register's append-only records and decision records carry the evidence (`tests/test_register_immutability.py`). |
 | `audit.py` | skeleton | Specification of value-free audit rows. The register's audit table is the working audit trail. |
 | `adapters/` | skeleton | Specifications for walking Anthropic Messages and OpenAI Responses payloads. The gate accepts Chat Completions only. |
 | `clients.py` | real | Client profiles: Kilo Code as an API provider; Claude Code through managed hooks with its own login. |

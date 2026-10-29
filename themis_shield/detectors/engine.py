@@ -23,7 +23,7 @@ from ..types import Label
 from .allowlist import AllowList, apply_allowlist, compile_profile
 from .contracts import (
     DetectionFinding, DetectionResult, DetectionTargets, StageReport,
-    StageResult, Status, sensitivity, validate_findings,
+    StageResult, Status, failure_code, sensitivity, validate_findings,
 )
 from .escalation import INJECTION, EscalationInput, escalation_reasons
 from .labels import normalise_tracer_dates
@@ -82,8 +82,8 @@ def _run(text: str, stage: str, call: Callable[[], StageResult], timings: dict |
         return StageResult((), StageReport(stage, Status.TIMEOUT, error_code="stage-timeout"))
     except (ValueError, TypeError, KeyError, IndexError):
         return StageResult((), StageReport(stage, Status.MALFORMED, error_code="malformed-output"))
-    except Exception:
-        return StageResult((), StageReport(stage, Status.FAILED, error_code="stage-failed"))
+    except Exception as error:
+        return StageResult((), StageReport(stage, Status.FAILED, error_code=failure_code(error)))
     finally:
         elapsed = (perf_counter() - began) * 1000
         if timings is not None:
