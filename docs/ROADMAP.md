@@ -6,6 +6,17 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
 [awesome-pii-tools](https://github.com/henrikaronsson/awesome-pii-tools) list, and evaluation data), all listed in
 [SOURCES.md](SOURCES.md#roadmap-research-27102026). Dates are day-first.
 
+## Where we are (30/10/2026)
+
+- **v0.3.0 shipped on 27/10/2026 and failed its frozen test** (split D: 28 released spans, sensitive-statement recall
+  0.740, friction 0.248 against a 0.15 rule; [results](../eval/RESULTS-v0.3.md)). Its friction changes worked; detection
+  on new authors' text is what failed. Split D is now development data.
+- **Not yet released:** [vetting records](VETTING-RECORD.md) (`themis vet`), which give the people who sign off a data
+  release one value-free record of what was done, and the evaluation-tooling fixes in the [changelog](../CHANGELOG.md).
+- **Next:** the v0.4 detection fixes below, in order, then v0.4's "keep the work possible" design.
+- **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
+  detection fixes because they change the finder capture.
+
 ## The rule we keep
 
 **Misses teach the gate, never the exam. The exam is written by a stranger, sat once, and the pass mark only goes
@@ -31,6 +42,11 @@ v0.3 research, confirmed by test, fixed in [0.2.1](../CHANGELOG.md). The LLM fin
 text (their prompts are hashed for replay); moving them onto the same view is a v0.3 item.
 
 ## v0.3: less friction, same safety, and a gate that learns
+
+**Status: shipped 27/10/2026 (0.3.0); frozen test FAIL.** Built as planned: items 1 to 5, the restore-safety tests
+from item 6, and split D. The typed tier ships off by default with three question families (two were rejected on
+development data). Still open from item 6: the finders reading the detection view (DD-06) and per-finding
+explanations in the audit tables. The plan below is kept as written.
 
 v0.2 released no leaks on a fresh split but held 19 of 95 clean documents for a human (0.200 against our 0.15 rule).
 v0.3 aims to bring friction under the rule **on a split written by an author outside the Claude and Gemma families**,
@@ -143,8 +159,8 @@ precision is tracked so we know whether it earns its round trip. Never on BLOCK 
 
 ### 6. Smaller items
 
-- Restore safety: tests that a placeholder one character away from another never restores the wrong value (fuzzy
-  restore is how a related project could restore the wrong person's name).
+- Restore safety (done in v0.3): tests that a placeholder one character away from another never restores the wrong
+  value (fuzzy restore is how a related project could restore the wrong person's name).
 - The LLM finders and PII-Tracer read the detection view too (needs a new finder capture).
 - Per-finding explanations in the audit tables: original and final score, checksum result, supporting context,
   cancellation reason.
@@ -165,6 +181,21 @@ precision is tracked so we know whether it earns its round trip. Never on BLOCK 
   [Text Anonymization Benchmark](https://github.com/NorskRegnesentral/text-anonymization-benchmark) (MIT, court
   judgments with direct and quasi-identifiers), a small human-written slice when we have one, and
   jev-pii-checker's English cases as an out-of-distribution smoke test.
+
+## v0.4, first: detection on new authors' text
+
+From split D's leaks and misses. Each is measured on development data (split D included) with the held-by-reason
+split, and the release is tested once on a fresh split.
+
+1. **Column-aware identifier propagation.** When a table column's header names a personal identifier (licence,
+   member, account, ID number), every cell in it is protected. 21 of split D's 28 released spans were bare licence
+   numbers in such a column.
+2. **Finders list each distinct value once** (DD-05), so long tables stop overflowing the answer. This lands *after*
+   item 1, never before it: 274 of split D's unprotected-but-held spans were held only because the finder failed on
+   such a table.
+3. **Finders read the detection view** (DD-06), in the same new finder capture.
+4. **Indirect sensitive statements:** a sentence-level check that also asks about sentences containing only a name
+   (the misses sat in sentences a detector had already touched).
 
 ## v0.4 (design): keep the work possible
 

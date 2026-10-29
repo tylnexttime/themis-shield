@@ -29,7 +29,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 
 | Module | Status | What it does |
 |---|---|---|
-| `cli.py`, `__main__.py` | real | The `themis` command: `serve`, `hooks`, `register`, `runtime`, `profiles`, `--version`. |
+| `cli.py`, `__main__.py` | real | The `themis` command: `serve`, `hooks`, `register`, `runtime`, `profiles`, `kmr`, `fpc`, `tripwire`, `vet`, `--version`. |
 | `startup.py` | real | Value-free startup checks and reason codes for `themis serve`, including the start-up detector canary (`CANARY_FAILED`). |
 | `integration.py` | real | TOML configuration to `Router`: gate flags, markings, rule packs, finder prompt, institution profile, cloud, vault, register, runtime, `[hooks]`. |
 | `paths.py` | real | Per-user default locations (`%LOCALAPPDATA%\themis-shield` or `~/.local/share/themis-shield`). |
@@ -77,6 +77,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | `register/sqlite_store.py`, `models.py`, `two_stage.py`, `reporting.py`, `cli.py`, `pilot.py` | real | The SQLite job register (append-only history tables), intake validation, two-stage approval, reports, the `themis register` CLI and the off-by-default automatic approval fixture. |
 | `register/client.py` | partial | Real: the register contracts (`JobRecord`, `JobStatus`, approval validation, offline journal) used everywhere. Skeleton: `JobRegisterClient` protocol methods and `HttpRegisterClient`, a non-networking stub for a remote register. |
 | `handover.py`, `app_services.py` | real | Handover mode: a deterministic, re-scanned package for manual use; safe projections for the web app. |
+| `vetting.py` | real, unreleased | `themis vet`: a data release through the chat path's own steps (markings, detection, policy, catalogue, final sweep), derived documents under position-only names, a codebook vault per release, and the value-free vetting record ([VETTING-RECORD.md](VETTING-RECORD.md)). |
 | `ledger.py` | skeleton | Specification of an append-only evidence ledger per request (its contract test is `xfail`). |
 | `audit.py` | skeleton | Specification of value-free audit rows. The register's audit table is the working audit trail. |
 | `adapters/` | skeleton | Specifications for walking Anthropic Messages and OpenAI Responses payloads. The gate accepts Chat Completions only. |

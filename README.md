@@ -148,8 +148,9 @@ Read this section before you rely on anything above.
 
 - **It is not cleared for real personal data.** themis-shield refuses to start unless `[gate] synthetic_only = true`.
   That is a switch you set deliberately, not a detector. Everything published here was measured on synthetic text
-  written by three generators that share one model family (all Claude models). Before anyone points it at real data, run the evaluation on a sample
-  of your own documents, labelled by people, with the same frozen-kit discipline.
+  written by language models: Claude models wrote every split, a Qwen model wrote half of split D, and a DeepSeek
+  model re-labelled split D. Before anyone points it at real data, run the evaluation on a sample of your own
+  documents, labelled by people, with the same frozen-kit discipline.
 - **De-identified is not anonymous.** Pseudonymised text is still personal data under the GDPR (Recital 26), and
   the context around a placeholder can still single someone out. ASK exists because of this; it doesn't make the
   risk zero ([OAIC](https://www.oaic.gov.au/privacy/privacy-guidance-for-organisations-and-government-agencies/handling-personal-information/de-identification-and-the-privacy-act);
@@ -324,7 +325,10 @@ protector, the token, the port. `--skip-model-check` starts without local models
 is then blocked.
 
 Other entry points: `themis profiles` (shipped and external profiles), `themis runtime status` (models, back ends,
-memory), `themis register --help` (job register), `themis hooks` (lists the hook events). Off Windows, set
+memory), `themis register --help` (job register), `themis hooks` (lists the hook events), and `themis vet`, which
+de-identifies a whole folder (a data release) and writes a value-free **vetting record** for the people who sign it
+off: what was found, by type and count, what was held and why, the method's measured baseline, and the parts a
+person completes ([docs/VETTING-RECORD.md](docs/VETTING-RECORD.md)). Off Windows, set
 `[vault] protector = "passphrase"` and `THEMIS_VAULT_PASSPHRASE` (at least 12 characters).
 
 To adopt it in an organisation, put your own `markings/`, `institution/`, `catalogue/` and `cloud/` JSON files in a
@@ -562,6 +566,9 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
    Messages leg; a central register service.
 
 Each needs a fresh test split nobody has seen: split D is now development data.
+
+Not yet released: `themis vet` and vetting records ([docs/VETTING-RECORD.md](docs/VETTING-RECORD.md)). Known
+debt is listed, and kept short, in [docs/DEV-DEBT.md](docs/DEV-DEBT.md).
 
 Done in v0.3: deterministic and real-document friction fixes, the typed-decision tier (off by default), a known-miss
 register with a final sweep, a reviewed false-positive catalogue, an optional cloud trip-wire, a detector canary, and

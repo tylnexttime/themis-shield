@@ -8,6 +8,7 @@
     themis kmr        known-miss register (v0.3): add, list, verify, reject, promote, export, import
     themis fpc        reviewed false-positive catalogue (v0.3): propose, accept, list, expire
     themis tripwire   cloud trip-wire results (v0.3): review, list, stats
+    themis vet        vet a data release: de-identify a folder and write a value-free vetting record
     themis --version  print the version
 
 Run `themis <command> --help` for a command's options.
@@ -35,7 +36,7 @@ def _profiles(argv: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    commands = ("serve", "hooks", "register", "runtime", "profiles", "kmr", "fpc", "tripwire")
+    commands = ("serve", "hooks", "register", "runtime", "profiles", "kmr", "fpc", "tripwire", "vet")
     if arguments and arguments[0] in ("--version", "-V"):
         from . import __version__
         print(f"themis-shield {__version__}")
@@ -57,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
     if command == "runtime":
         from .runtime.__main__ import main as runtime
         return int(runtime(rest))
+    if command == "vet":
+        from .vetting import main as vet
+        return int(vet(rest))
     if command in ("kmr", "fpc", "tripwire"):
         from .catalogues import cli as catalogues
         return int(getattr(catalogues, command + "_main")(rest))

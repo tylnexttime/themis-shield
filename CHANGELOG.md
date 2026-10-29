@@ -2,6 +2,42 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## Unreleased
+
+### Vetting records
+
+- `themis vet <folder>`: de-identifies a data release (a folder of text files) with the chat path's own steps
+  (markings first, tiered detection, policy, the false-positive catalogue and known-miss sweep when enabled), writes
+  the derived documents under position-only names, keeps the codebook in a vault file of its own, and writes a
+  **vetting record** (`vetting-record.json` and `.md`) in seven parts: identity, classification, the run, the method
+  baseline and this release's effectiveness, codebook custody, the inspection checklist and two empty sign-off rows.
+  The record holds counts, never values or file names; it is checked against every protected value before it is
+  saved. A value found in one document and left in another holds that document. Unresolved ASKs keep the record
+  `incomplete`; a person's resolution names the document by position and content hash. Exit codes 0 / 3 / 2. See
+  `docs/VETTING-RECORD.md`.
+- `themis_shield.vetting`: `vet_release`, `build_record`, `render_markdown`, `method_baseline`, for use from other
+  tools. The method baseline quotes the published frozen result (0.3.0: split D, FAIL, 28 released spans).
+
+### Evaluation tooling
+
+- `score.py --labelset themis` maps the gate's labels and its `|`-joined union labels through `label_map.py`
+  (`run_eval.py` already did). Split D's pooled scores had been computed with the native label set: the verdict and
+  every label-blind measure stand, but typed recall was 0.899, not 0.690, and case-level any-sensitive recall 0.974,
+  not 0.935 (docs/DEV-DEBT.md, DD-01).
+- The score report separates *leak* (a span touched by no prediction) from *touched-untyped* (touched, but no
+  prediction's label maps to it), prints a fingerprint of the label table it used, warns when union labels go
+  unmapped, counts discarded prediction spans, and splits held-but-unprotected spans by the hold's first reason.
+
+### Fixes
+
+- A trip-wire test began failing on 29/10/2026 by date alone (a fixed approval date in the harness, a wall-clock
+  review). Every register method that takes `now` now defaults to the harness clock.
+
+### Documentation
+
+- `docs/DEV-DEBT.md`: the debt list, kept short. The roadmap's v0.3 section now says what shipped and what moved on;
+  the README no longer says every test author was a Claude model.
+
 ## 0.3.0 (27/10/2026)
 
 **Evaluation: FAIL.** On split D (404 cases written blind by a Qwen and a Claude author, re-labelled by a DeepSeek
