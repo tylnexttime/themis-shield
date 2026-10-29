@@ -50,11 +50,11 @@ v0.4 detection fixes (from split D, now development data):
   format's own key words stand within 40 characters before it ("Work order 12345678"); otherwise it would cancel any
   number of that shape, a licence or account number included. A bare format whose name is only generic words
   ("number", "id") allow-lists nothing. See ``detectors/profile_adapter.py``.
-- ``finder-windows`` (off until measured live): a document longer than 6,000 characters is read by the LLM finders
+- ``finder-windows`` (on since 0.3.2, measured live 30/10/2026; DD-05): a document longer than 6,000 characters is read by the LLM finders
   in line-bounded windows (table headers repeated), so a dense document no longer overflows the finder's answer and
   fails closed; see ``finder_windows`` in ``detectors/llm_finder.py``. It changes the finder prompts, so captured
   answers cannot replay it: it is measured live before it is adopted.
-- ``detectors-detection-view`` (off until measured live; DD-06): PII-Tracer and the LLM finders read the detection
+- ``detectors-detection-view`` (on since 0.3.2, measured live 30/10/2026; DD-06): PII-Tracer and the LLM finders read the detection
   view (invisible characters removed, NFKC per character) like every other detector, and their spans map back to the
   source; see ``on_detection_view`` in ``detectors/contracts.py``. Text the view leaves unchanged is read as it is,
   so only documents with invisible or compatibility characters change.
@@ -87,9 +87,12 @@ SECRET_CONTEXT_FIXES = (
 # development sets and on the private real slice. finder-whitespace-trust is off: on the real slice it released
 # documents whose only hold was the unmatched-values rule and that also had genuine finder misses (+2 leaks).
 DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(
-    name for name in DETECTION_FIXES
-    if name not in ("finder-whitespace-trust", "finder-windows", "detectors-detection-view")
+    name for name in DETECTION_FIXES if name != "finder-whitespace-trust"
 )
+# v0.4 (0.3.2): column-identifiers and bare-number-formats held the ratchet on all four development sets by replay
+# (split D half C: released leaks 26 -> 3). finder-windows and detectors-detection-view changed the finder prompts, so
+# they were measured live on the 54 development documents they can change: no set got worse, and the four documents
+# that overflowed one answer now complete (half C subset: R_any 0.918 -> 0.996, sensitive R_any 0.556 -> 0.991).
 _lock = Lock()
 _version = DEFAULT_DETECTION_VERSION
 _fixes: frozenset[str] = frozenset(DEFAULT_DETECTION_FIXES)

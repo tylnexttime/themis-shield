@@ -287,34 +287,45 @@ class FinderCapture:
 
 
 class FinderReplay:
-    """Serves captured finder responses; refuses any call whose prompt hash or model identity differs."""
+    """Serves captured finder responses; refuses any call whose prompt hash or model identity differs.
 
-    def __init__(self, directory: Path, identities: dict):
-        manifest_path = directory / CAPTURE_MANIFEST
-        if not manifest_path.exists():
-            raise SystemExit(f"no capture manifest in {directory}")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("identities") != identities:
-            raise ReplayRefused(
-                f"model identities differ from the capture: captured {manifest.get('identities')}, now {identities}")
-        self.manifest = manifest
+    Keyed by (case, model, prompt hash): a document read in windows (v0.4 "finder-windows") makes several calls per
+    model, and each window replays its own answer. Several capture folders may be given; for the same key a later
+    folder wins (so a fresh live capture can be layered over an older one). Within a folder, a resumed capture may
+    hold a chunk twice (the crashed attempt and the rerun): the last one counts.
+    """
+
+    def __init__(self, directories, identities: dict):
+        directories = [directories] if isinstance(directories, (str, Path)) else list(directories)
+        self.manifests = []
+        self.records: dict[tuple[str, str, str], dict] = {}
+        self.cases: set[tuple[str, str]] = set()
+        for directory in map(Path, directories):
+            manifest_path = directory / CAPTURE_MANIFEST
+            if not manifest_path.exists():
+                raise SystemExit(f"no capture manifest in {directory}")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if manifest.get("identities") != identities:
+                raise ReplayRefused(f"model identities differ from the capture in {directory}: captured "
+                                    f"{manifest.get('identities')}, now {identities}")
+            self.manifests.append(manifest)
+            for line in (directory / CAPTURE_FILE).read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    record = json.loads(line)
+                    self.records[(record["case_id"], record["model"], record["prompt_sha256"])] = record
+                    self.cases.add((record["case_id"], record["model"]))
+        self.manifest = self.manifests[0]
         self.identities = identities
-        self.records: dict[tuple[str, str], dict] = {}
-        for line in (directory / CAPTURE_FILE).read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                record = json.loads(line)
-                # A resumed capture may hold a chunk twice (the crashed attempt and the rerun): the last one counts.
-                self.records[(record["case_id"], record["model"])] = record
         self.served = 0
 
     def serve(self, case_id, model_role, prompt_sha):
-        record = self.records.get((case_id, model_role))
+        record = self.records.get((case_id, model_role, prompt_sha))
         if record is None:
+            if (case_id, model_role) in self.cases:
+                raise ReplayRefused(f"prompt hash differs for {model_role} on case {case_id}")
             raise ReplayRefused(f"no captured {model_role} response for case {case_id}")
         if record["model_identity"] != self.identities.get(model_role):
             raise ReplayRefused(f"model identity differs for {model_role} on case {case_id}")
-        if record["prompt_sha256"] != prompt_sha:
-            raise ReplayRefused(f"prompt hash differs for {model_role} on case {case_id}")
         self.served += 1
         if record["outcome"] == "ok":
             return json.loads(json.dumps(record["payload"]))  # a fresh copy each time
@@ -619,7 +630,7 @@ def run_detection(args, run_dir: Path, cases: list[dict], log, case_hashes: dict
     replay = capture = runtime = typed_runtime = None
     typed_on = configured["typed"]["enabled"]
     if args.replay_finders:
-        replay = FinderReplay(Path(args.replay_finders), identities)
+        replay = FinderReplay([part for part in args.replay_finders.split(",") if part], identities)
         log(f"replaying finder responses from {args.replay_finders} ({len(replay.records)} captured calls)")
     else:
         if args.capture_finders:
@@ -827,8 +838,9 @@ def main(argv=None) -> int:
     ap.add_argument("--capture-finders", default=None,
                     help="write every finder response (with prompt hash and model identity) to this folder")
     ap.add_argument("--replay-finders", default=None,
-                    help="serve finder responses from a capture folder instead of calling llama-server; refuses "
-                         "any call whose prompt hash or model identity differs")
+                    help="serve finder responses from capture folder(s), comma-separated (a later folder wins), "
+                         "instead of calling llama-server; refuses any call whose prompt hash or model identity "
+                         "differs")
     ap.add_argument("--gate-version", choices=["v0.1", "v0.2"], default=None,
                     help="detection and policy behaviour together (v0.1 = the negative control)")
     ap.add_argument("--detection-version", choices=["v0.1", "v0.2"], default=None)
@@ -859,7 +871,9 @@ def main(argv=None) -> int:
         ap.error("--capture-typed and --replay-typed are exclusive")
     if (args.capture_typed or args.replay_typed or args.typed_ask_all) and args.typed != "on":
         ap.error("typed capture, replay and ask-all need --typed on")
-    for folder in (args.capture_finders, args.replay_finders, args.capture_typed, args.replay_typed):
+    folders = [args.capture_finders, args.capture_typed, args.replay_typed]
+    folders += (args.replay_finders or "").split(",")
+    for folder in folders:
         if folder and Path(folder).resolve().is_relative_to(ROOT.resolve()):
             ap.error("finder captures must live outside the repository")
     run_dir = runs_dir / args.run_name

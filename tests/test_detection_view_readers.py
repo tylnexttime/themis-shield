@@ -29,8 +29,16 @@ def tracer(text):
 
 
 def test_off_the_raw_text_hides_the_name():
+    try:
+        configure_detection_fixes("none")
+        assert on_detection_view(HIDDEN, tracer).findings == ()
+    finally:
+        configure_detection_fixes(None)
+
+
+def test_on_by_default():
     configure_detection_fixes(None)
-    assert on_detection_view(HIDDEN, tracer).findings == ()
+    assert len(on_detection_view(HIDDEN, tracer).findings) == 1
 
 
 def test_on_the_view_finds_it_and_maps_back_over_the_invisible_characters():

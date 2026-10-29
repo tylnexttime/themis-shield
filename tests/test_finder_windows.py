@@ -79,8 +79,15 @@ def test_one_failed_window_fails_the_stage_closed(windows_on):
     assert result.report.status == Status.TIMEOUT and result.findings == ()
 
 
-def test_off_by_default_until_measured_live():
+def test_on_by_default_and_off_with_the_switch():
     configure_detection_fixes(None)
     client = Recorder()
     LLMFinder(FinderModel.GEMMA_26B_A4B, client).detect(table(400))
-    assert len(client.windows) == 1
+    assert len(client.windows) > 1
+    try:
+        configure_detection_fixes("none")
+        client = Recorder()
+        LLMFinder(FinderModel.GEMMA_26B_A4B, client).detect(table(400))
+        assert len(client.windows) == 1
+    finally:
+        configure_detection_fixes(None)

@@ -253,6 +253,22 @@ def test_replayed_errors_keep_their_stage_meaning(tmp_path):
             replay.serve(case_id, "gemma4-e4b", digest)
 
 
+def test_each_window_replays_its_own_answer_and_later_folders_win(tmp_path):
+    # v0.4 finder-windows: several calls per case and model, told apart by prompt hash (DD-13).
+    old = run_eval.FinderCapture(tmp_path / "old", IDENTITIES, {})
+    old.write("c1", "gemma4-26b-a4b", "w1", payload={"entities": [{"label": "PERSON", "value": "old answer"}]})
+    old.close()
+    new = run_eval.FinderCapture(tmp_path / "new", IDENTITIES, {})
+    new.write("c1", "gemma4-26b-a4b", "w1", payload={"entities": [{"label": "PERSON", "value": "window one"}]})
+    new.write("c1", "gemma4-26b-a4b", "w2", payload={"entities": [{"label": "PERSON", "value": "window two"}]})
+    new.close()
+    replay = run_eval.FinderReplay([tmp_path / "old", tmp_path / "new"], IDENTITIES)
+    assert replay.serve("c1", "gemma4-26b-a4b", "w1")["entities"][0]["value"] == "window one"
+    assert replay.serve("c1", "gemma4-26b-a4b", "w2")["entities"][0]["value"] == "window two"
+    with pytest.raises(run_eval.ReplayRefused, match="prompt hash differs"):
+        replay.serve("c1", "gemma4-26b-a4b", "w3")
+
+
 def test_case_files_and_the_held_out_guard(tmp_path):
     cases, hashes = run_eval.load_cases("dev", [str(EVAL / "cases" / "dev.jsonl"), str(EVAL / "cases" / "test.jsonl")])
     assert len(cases) == 521 and len(hashes) == 2  # the v0.1 test file is retired to dev

@@ -346,7 +346,7 @@ def test_default_has_every_fix_but_the_ones_still_off():
     from themis_shield.detectors.settings import DETECTION_FIXES
 
     selected = configure_detection_fixes(None)
-    # Off on purpose: tolerant trust released genuine misses on the real slice; the two v0.4 reader changes alter the
-    # finder prompts and are adopted only after a live measurement. Adding to this set is a deliberate decision.
-    off = {"finder-whitespace-trust", "finder-windows", "detectors-detection-view"}
+    # Off on purpose: tolerant trust released genuine misses on the real slice. Adding to this set is a deliberate
+    # decision; so is removing from it (the v0.4 readers left it on 30/10/2026 after a live measurement).
+    off = {"finder-whitespace-trust"}
     assert set(selected) == set(DETECTION_FIXES) - off
