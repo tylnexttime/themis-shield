@@ -342,9 +342,11 @@ def test_address_line_numbers_end_to_end_switch():
     assert any(STATEMENT[f.start:f.end] == "48" and Label.ADDRESS in f.labels for f in result.findings)
 
 
-def test_default_has_every_fix_but_tolerant_trust():
+def test_default_has_every_fix_but_the_ones_still_off():
     from themis_shield.detectors.settings import DETECTION_FIXES
 
     selected = configure_detection_fixes(None)
-    assert "finder-whitespace-trust" not in selected
-    assert set(selected) == set(DETECTION_FIXES) - {"finder-whitespace-trust"}
+    # Off on purpose: tolerant trust released genuine misses on the real slice; the two v0.4 reader changes alter the
+    # finder prompts and are adopted only after a live measurement. Adding to this set is a deliberate decision.
+    off = {"finder-whitespace-trust", "finder-windows", "detectors-detection-view"}
+    assert set(selected) == set(DETECTION_FIXES) - off

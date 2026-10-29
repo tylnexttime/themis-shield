@@ -23,7 +23,7 @@ from ..types import Label
 from .allowlist import AllowList, apply_allowlist, compile_profile
 from .contracts import (
     DetectionFinding, DetectionResult, DetectionTargets, StageReport,
-    StageResult, Status, failure_code, sensitivity, validate_findings,
+    StageResult, Status, failure_code, on_detection_view, sensitivity, validate_findings,
 )
 from .escalation import INJECTION, EscalationInput, escalation_reasons
 from .labels import normalise_tracer_dates
@@ -140,7 +140,7 @@ def _tier1(document, profile, targets):
     began = perf_counter()
     stages = document.stage_timings
     rules = _run(text, "rules", lambda: RulesDetector().detect(text), stages)
-    tracer = _run(text, "pii-tracer", lambda: targets.tracer.detect(text), stages)
+    tracer = _run(text, "pii-tracer", lambda: on_detection_view(text, targets.tracer.detect), stages)
     if v02() and tracer.report.status == Status.OK:
         tracer = StageResult(
             normalise_tracer_dates(text, tracer.findings, _public_dates(profile)), tracer.report,

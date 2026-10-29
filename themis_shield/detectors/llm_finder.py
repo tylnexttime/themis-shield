@@ -26,7 +26,7 @@ import unicodedata
 
 from ..normalise import detection_view
 from ..types import Label
-from .contracts import ChatJSONClient, StageReport, StageResult, Status, finding
+from .contracts import ChatJSONClient, StageReport, StageResult, Status, finding, on_detection_view
 from .settings import fix_on
 
 WHITESPACE_RUN = r"\s+"  # str patterns: \s covers CR, LF, tab, NBSP U+00A0, U+202F, U+2009 and the other spaces
@@ -449,6 +449,57 @@ def whitespace_tolerant_spans(text: str, value: str, view) -> list[tuple[int, in
     return []
 
 
+# v0.4 fix "finder-windows" (DD-05): a long, dense document can have more distinct values than one answer can hold
+# (split D: four documents of 10,000-21,000 characters with 394-504 personal spans overflowed 8,192 output tokens,
+# and the stage failed closed). Past FINDER_WINDOW_THRESHOLD characters the finder reads the document in windows of
+# about FINDER_WINDOW_CHARS, split on line boundaries, each window starting with the line before it (context across
+# the cut) and, inside a table, with the table's header line (so a cell keeps its column name). Every window's
+# values are then matched against the WHOLE document, so offsets stay exact and a value found once is protected
+# everywhere. A failed window fails the whole stage (fail closed).
+FINDER_WINDOW_THRESHOLD = 6000
+FINDER_WINDOW_CHARS = 4000
+_WINDOW_SEPS = (",", "\t", ";", "|")
+
+
+def _table_headers(lines: list[str]) -> list[int | None]:
+    """For each line, the index of the header line of the table block it sits in (None outside tables)."""
+    headers: list[int | None] = []
+    block_start, block_sep = None, None
+    for index, line in enumerate(lines):
+        body = line.rstrip("\r\n")
+        separator = max(_WINDOW_SEPS, key=body.count)
+        tabular = body.count(separator) >= (2 if separator == "|" else 1)
+        if tabular and block_start is not None and separator == block_sep:
+            headers.append(block_start)
+            continue
+        block_start, block_sep = (index, separator) if tabular else (None, None)
+        headers.append(None)
+    return headers
+
+
+def finder_windows(text: str) -> list[str]:
+    """The texts the finder reads: the document itself, or line-bounded windows of a long document."""
+    if len(text) <= FINDER_WINDOW_THRESHOLD:
+        return [text]
+    lines = text.splitlines(keepends=True)
+    headers = _table_headers(lines)
+    windows, first = [], 0
+    while first < len(lines):
+        last, size = first, 0
+        while last < len(lines) and (last == first or size + len(lines[last]) <= FINDER_WINDOW_CHARS):
+            size += len(lines[last])
+            last += 1
+        prefix = []
+        header = headers[first]
+        if header is not None and header < first - 1:
+            prefix.append(lines[header])
+        if first > 0:
+            prefix.append(lines[first - 1])
+        windows.append("".join(prefix + lines[first:last]))
+        first = last
+    return windows
+
+
 @dataclass(frozen=True, slots=True)
 class LLMFinder:
     model: FinderModel
@@ -460,15 +511,23 @@ class LLMFinder:
         return self.model.value
 
     def detect(self, text: str) -> StageResult:
+        return on_detection_view(text, self._detect)
+
+    def _detect(self, text: str) -> StageResult:
         if type(self.max_tokens) is not int or self.max_tokens < 1:
             raise ValueError("invalid-max-tokens")
         tier = 2 if self.model == FinderModel.E4B else 3
         version = _prompt_version
-        messages = render_messages(text, version)
-        payload = self.client.chat_json(
-            self.model.value, messages, deepcopy(schema_for(version)), self.max_tokens
-        )
-        entities = validate_payload(payload, labels_for(version))
+        entities, seen = [], set()
+        for window in (finder_windows(text) if fix_on("finder-windows") else [text]):
+            payload = self.client.chat_json(
+                self.model.value, render_messages(window, version), deepcopy(schema_for(version)), self.max_tokens
+            )
+            for entity in validate_payload(payload, labels_for(version)):
+                key = (entity["label"], entity["value"])
+                if key not in seen:
+                    seen.add(key)
+                    entities.append(entity)
         spans, missing = spans_for(text, entities)
         findings = tuple(
             finding(

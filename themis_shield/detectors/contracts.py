@@ -122,6 +122,35 @@ def failure_code(error: BaseException) -> str:
     return "stage-failed"
 
 
+def on_detection_view(text: str, detect) -> "StageResult":
+    """v0.4 fix "detectors-detection-view" (DD-06): run a detector on the detection view, map its spans back.
+
+    The rule packs, the marking gate and the injection signal read the detection view since v0.2.1 (invisible
+    characters removed, NFKC per character); the LLM finders and PII-Tracer still read the raw text, so a zero-width
+    character inside a name could hide it from them. With the fix on, they read the view too, and every span maps
+    back to the source characters that produced it (``DetectionView.to_source``, conservative). A text the view
+    leaves unchanged is read as it is.
+    """
+    from dataclasses import replace
+
+    from ..normalise import detection_view
+    from .settings import fix_on
+
+    if not fix_on("detectors-detection-view"):
+        return detect(text)
+    view = detection_view(text)
+    if view.text == text:
+        return detect(text)
+    result = detect(view.text)
+    mapped = []
+    for item in result.findings:
+        statement = item.statement_span
+        if statement is not None:
+            statement = Span(*view.to_source(statement.start, statement.end))
+        mapped.append(replace(item, span=Span(*view.to_source(item.start, item.end)), statement_span=statement))
+    return StageResult(tuple(mapped), result.report)
+
+
 @dataclass(frozen=True, slots=True)
 class StageResult:
     findings: tuple[DetectionFinding, ...]

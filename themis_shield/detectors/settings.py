@@ -40,6 +40,20 @@ default; ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte.
 - ``address-line-numbers``: an address found from the start of a line takes in a street or unit number that stands
   alone on the line just before it ("48" / "EXAMPLE PDE ..." in scanned statements), so the number is not left in
   clear.
+
+v0.4 detection fixes (from split D, now development data):
+
+- ``column-identifiers``: a table column whose header names a personal identifier (licence, passport, Medicare, tax
+  file, national ID, bank account, card, or a staff, employee, student, member, customer, client or patient number)
+  is protected cell by cell; see ``table_identifier_spans`` in ``detectors/propagate.py``.
+- ``finder-windows`` (off until measured live): a document longer than 6,000 characters is read by the LLM finders
+  in line-bounded windows (table headers repeated), so a dense document no longer overflows the finder's answer and
+  fails closed; see ``finder_windows`` in ``detectors/llm_finder.py``. It changes the finder prompts, so captured
+  answers cannot replay it: it is measured live before it is adopted.
+- ``detectors-detection-view`` (off until measured live; DD-06): PII-Tracer and the LLM finders read the detection
+  view (invisible characters removed, NFKC per character) like every other detector, and their spans map back to the
+  source; see ``on_detection_view`` in ``detectors/contracts.py``. Text the view leaves unchanged is read as it is,
+  so only documents with invisible or compatibility characters change.
 """
 
 from __future__ import annotations
@@ -55,6 +69,8 @@ DETECTION_FIXES = (
     # From the first run on real documents (v0.3 pre-freeze); see detectors/secret_context.py and llm_finder.py.
     "secret-url-components", "secret-prose-values", "secret-auth-codes", "secret-document-ids", "secret-org-codes",
     "secret-mrz", "finder-whitespace", "finder-whitespace-trust", "address-line-numbers",
+    # v0.4, from split D (development data since its v0.3 run).
+    "column-identifiers", "finder-windows", "detectors-detection-view",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
@@ -66,7 +82,10 @@ SECRET_CONTEXT_FIXES = (
 # The real-document fixes (secret context classes, finder-whitespace, address-line-numbers) held the ratchet on the
 # development sets and on the private real slice. finder-whitespace-trust is off: on the real slice it released
 # documents whose only hold was the unmatched-values rule and that also had genuine finder misses (+2 leaks).
-DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(name for name in DETECTION_FIXES if name != "finder-whitespace-trust")
+DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(
+    name for name in DETECTION_FIXES
+    if name not in ("finder-whitespace-trust", "finder-windows", "detectors-detection-view")
+)
 _lock = Lock()
 _version = DEFAULT_DETECTION_VERSION
 _fixes: frozenset[str] = frozenset(DEFAULT_DETECTION_FIXES)
