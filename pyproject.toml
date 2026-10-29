@@ -37,6 +37,7 @@ tracer = [
 ]
 dev = [
     "pytest>=8",
+    "time-machine>=2.14",
 ]
 # Optional launch planner for llama.cpp entries ("planner": "marian").
 # Marian is not on PyPI (an unrelated package uses that name), so it is a

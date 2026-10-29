@@ -3,6 +3,10 @@
 Tests marked ``slow`` need real local models (PII-Tracer weights, llama-server)
 and are skipped unless ``--run-slow`` is given.
 
+``--shift-clock-days N`` runs the whole session with the wall clock moved N days ahead (needs ``time-machine``,
+in the ``dev`` extra). A test that passes today and fails under it depends on today's date: pin its clock. Run it
+once per release (docs/DEV-DEBT.md, DD-08).
+
 Business-hours tests need a fixed non-UTC zone with daylight saving; the
 fixture below pins Europe/Lisbon for every test so results do not depend on
 the host or the shipped UTC default.
@@ -24,6 +28,30 @@ def pytest_addoption(parser):
         "--run-slow", action="store_true", default=False,
         help="run tests that need real local models",
     )
+    parser.addoption(
+        "--shift-clock-days", type=int, default=0,
+        help="move the wall clock this many days ahead for the whole session (finds date-dependent tests)",
+    )
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _shifted_wall_clock(request):
+    days = request.config.getoption("--shift-clock-days")
+    if not days:
+        yield
+        return
+    from datetime import datetime, timedelta, timezone
+
+    import time_machine
+
+    real = datetime.now(timezone.utc)
+    with time_machine.travel(real + timedelta(days=days), tick=True):
+        import time
+
+        # A run under a clock that did not move would prove nothing.
+        assert datetime.now(timezone.utc) - real >= timedelta(days=days - 1)
+        assert time.time() - real.timestamp() >= (days - 1) * 86400
+        yield
 
 
 def pytest_collection_modifyitems(config, items):
