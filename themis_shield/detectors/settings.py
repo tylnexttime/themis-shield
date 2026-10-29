@@ -46,6 +46,10 @@ v0.4 detection fixes (from split D, now development data):
 - ``column-identifiers``: a table column whose header names a personal identifier (licence, passport, Medicare, tax
   file, national ID, bank account, card, or a staff, employee, student, member, customer, client or patient number)
   is protected cell by cell; see ``table_identifier_spans`` in ``detectors/propagate.py``.
+- ``bare-number-formats``: a profile format with no letters in it (eight bare digits, say) allow-lists a number only when the
+  format's own key words stand within 40 characters before it ("Work order 12345678"); otherwise it would cancel any
+  number of that shape, a licence or account number included. A bare format whose name is only generic words
+  ("number", "id") allow-lists nothing. See ``detectors/profile_adapter.py``.
 - ``finder-windows`` (off until measured live): a document longer than 6,000 characters is read by the LLM finders
   in line-bounded windows (table headers repeated), so a dense document no longer overflows the finder's answer and
   fails closed; see ``finder_windows`` in ``detectors/llm_finder.py``. It changes the finder prompts, so captured
@@ -70,7 +74,7 @@ DETECTION_FIXES = (
     "secret-url-components", "secret-prose-values", "secret-auth-codes", "secret-document-ids", "secret-org-codes",
     "secret-mrz", "finder-whitespace", "finder-whitespace-trust", "address-line-numbers",
     # v0.4, from split D (development data since its v0.3 run).
-    "column-identifiers", "finder-windows", "detectors-detection-view",
+    "column-identifiers", "finder-windows", "detectors-detection-view", "bare-number-formats",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",

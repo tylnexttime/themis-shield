@@ -345,6 +345,113 @@ def table_quasi_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
     return tuple(out)
 
 
+# v0.4 fix "column-identifiers": a table column whose header names a personal identifier (a licence, passport,
+# Medicare, tax file, national ID, bank account or card number, or a staff, employee, student, member, customer,
+# client or patient number) is protected cell by cell. On split D, 21 of the 28 released spans were bare licence
+# numbers in such a column: no rule matches an 8-digit licence number, and the finders skipped the column while
+# covering every other one. A cell is taken when it carries a digit and is not a date. Headers that name an
+# organisation's own identifiers (incident, order, invoice, asset, ticket, case, reference, transaction, product),
+# a row counter ("#", "row", "line") or a property of the identifier (type, class, state, status, expiry, issue
+# date, balance, limit) are never identifier columns. A bare "ID", "No" or "Number" counts only in a table that also
+# has a name column or another personal-identifier column. Header vocabulary only; nothing learned from any data.
+TABLE_IDENTIFIER_STAGE = "table-identifiers"
+TABLE_IDENTIFIER_MAX_CELL = 40
+_ID_SUFFIX = r"(?:\s?(?:id|ids|no|nos|num|number|numbers|code|#))?"
+_ID_COLUMNS = (
+    (Label.DRIVER_LICENCE, re.compile(r"(?:drivers?\s?)?licen[cs]e" + _ID_SUFFIX + r"|dl" + _ID_SUFFIX
+                                      + r"|driver\s?licen[cs]e" + _ID_SUFFIX)),
+    (Label.PASSPORT, re.compile(r"passport" + _ID_SUFFIX)),
+    (Label.MEDICARE, re.compile(r"medicare" + _ID_SUFFIX)),
+    (Label.TFN, re.compile(r"tfn|tax\s?file" + _ID_SUFFIX)),
+    (Label.NATIONAL_ID, re.compile(r"national\s?(?:id|identifier|insurance)" + _ID_SUFFIX + r"|ssn|nino")),
+    (Label.BANK_ACCOUNT, re.compile(r"(?:bank\s?)?(?:account|acct|acc)" + _ID_SUFFIX + r"|bsb(?:\s?account)?"
+                                    + _ID_SUFFIX + r"|iban")),
+    (Label.PAYMENT_CARD, re.compile(r"(?:credit\s?|debit\s?|payment\s?)?card" + _ID_SUFFIX)),
+    (Label.INTERNAL_ID, re.compile(r"(?:staff|employee|emp|student|member|membership|customer|client|patient|worker"
+                                   r"|person|user|union\s?member)\s?(?:id|ids|no|nos|num|number|numbers|code|#)"
+                                   r"|empid|staffid|memberid|custid|clientid")),
+)
+_BARE_ID = re.compile(r"id|ids|no|nos|num|number|identifier")
+_NOT_ID_COLUMN = re.compile(
+    r"\b(?:incident|order|po|purchase|invoice|inv|asset|ticket|case|ref|reference|transaction|txn|product|item|"
+    r"sku|serial|batch|room|row|line|page|version|phone|mobile|tel|fax|date|dates|expiry|expires|expiration|issued|"
+    r"issue|class|type|state|status|count|total|amount|balance|limit|name|names|holder)\b"
+)
+_DATE_CELL = re.compile(r"\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}")
+
+
+def _identifier_label(name: str) -> Label | None:
+    key = " ".join(name.casefold().replace("_", " ").replace("-", " ").replace(".", " ").split())
+    if not key or _NOT_ID_COLUMN.search(key):
+        return None
+    for label, pattern in _ID_COLUMNS:
+        if pattern.fullmatch(key):
+            return label
+    return None
+
+
+def table_identifier_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
+    lines = text.splitlines(keepends=True)
+    offsets, position = [], 0
+    for line in lines:
+        offsets.append(position)
+        position += len(line)
+    out, index = [], 0
+    while index < len(lines):
+        header = lines[index].rstrip("\r\n").lstrip("﻿")
+        separator = max(SEPS, key=header.count)
+        if header.count(separator) < (2 if separator == "|" else 1) or any(ch.isdigit() for ch in header):
+            index += 1
+            continue
+        try:
+            cells = _cells(header, separator)
+        except (csv.Error, ValueError, StopIteration):
+            index += 1
+            continue
+        names = [header[a:b].strip() for a, b in cells]
+        columns = {j: label for j, name in enumerate(names) if (label := _identifier_label(name)) is not None}
+        has_name = any(NAME_HDR.fullmatch(name) for name in names if name)
+        if columns or has_name:
+            for j, name in enumerate(names):
+                key = " ".join(name.casefold().replace("_", " ").split())
+                if j not in columns and _BARE_ID.fullmatch(key):
+                    columns[j] = Label.INTERNAL_ID
+        if not columns:
+            index += 1
+            continue
+        row_index = index + 1
+        while row_index < len(lines):
+            row = lines[row_index].rstrip("\r\n")
+            if separator == "|" and _ALIGN_ROW.fullmatch(row):
+                row_index += 1
+                continue
+            if not row.strip() or separator not in row:
+                break
+            try:
+                row_cells = _cells(row, separator)
+            except (csv.Error, ValueError, StopIteration):
+                break
+            extra = len(row_cells) - len(cells)
+            if extra < 0:
+                break
+            for column, label in columns.items():
+                # An unquoted comma in a free-text cell ("ROE, Jane") shifts every later cell. Which cell moved is
+                # unknown, so both candidates are protected: a little over-redaction, never a skipped identifier.
+                for position in sorted({column, column + extra}):
+                    a, b = row_cells[position]
+                    value = row[a:b]
+                    if (
+                        not value or len(value) > TABLE_IDENTIFIER_MAX_CELL
+                        or not any(ch.isdigit() for ch in value) or _DATE_CELL.fullmatch(value)
+                    ):
+                        continue
+                    out.append(finding(offsets[row_index] + a, offsets[row_index] + b, label,
+                                       TABLE_IDENTIFIER_STAGE, tier))
+            row_index += 1
+        index = row_index if row_index > index + 1 else index + 1
+    return tuple(out)
+
+
 # v0.3 fix "address-line-numbers": scanned letters and statements often break an address after the street number,
 # leaving the number alone on its own line ("48" then "EXAMPLE PDE" then "QUARRYBEND NSW 2999"). When an ADDRESS
 # finding starts a line (only whitespace before it) and the previous non-empty line is only a street, unit or lot
@@ -384,4 +491,6 @@ def propagate(
     base = union_findings(spans, table_spans(text, stage, tier))
     if v02():
         base = union_findings(base, table_quasi_spans(text, tier))
+    if fix_on("column-identifiers"):
+        base = union_findings(base, table_identifier_spans(text, tier))
     return union_findings(base, extra_spans(text, base, stage, tier))

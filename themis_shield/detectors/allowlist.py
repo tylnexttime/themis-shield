@@ -11,7 +11,7 @@ from ..types import Label, Span
 from .contracts import DetectionFinding
 from .labels import is_bare_time_or_weekday
 from .profile_adapter import adapt
-from .propagate import TABLE_QUASI_STAGE
+from .propagate import TABLE_IDENTIFIER_STAGE, TABLE_QUASI_STAGE
 from .rules import CHECKSUM_LABELS, PHONE, canonical_phone, validate_identifier
 from .settings import fix_on, v02
 from .union import union_findings
@@ -23,6 +23,7 @@ NEVER_TRIM = frozenset({
     Label.FAMILY_VIOLENCE, Label.DATE_OF_BIRTH, Label.ETHNICITY, Label.UNION,
 })
 CHECKSUMMED = CHECKSUM_LABELS
+CONTEXT_CHARS = 40
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,8 @@ class AllowList:
     # v0.2: the organisation's own checksummed identifiers (its ABN), digits only. These are allow-listed even when
     # checksum-valid; every other checksum-valid identifier is still never trimmed.
     own_identifiers: frozenset[str] = frozenset()
+    # v0.4 "bare-number-formats": (number pattern, key-word pattern) pairs; a number counts only after its key words.
+    context_patterns: tuple[tuple[re.Pattern, re.Pattern], ...] = ()
 
 
 def compile_profile(profile: object) -> AllowList:
@@ -80,6 +83,7 @@ def compile_profile(profile: object) -> AllowList:
         ),
         public_phones,
         own_identifiers,
+        tuple((re.compile(number), re.compile(words)) for number, words in adapted.get("context_patterns", [])),
     )
 
 
@@ -87,6 +91,10 @@ def terms(text: str, profile: AllowList) -> tuple[tuple[int, int, str], ...]:
     out = []
     for pattern in profile.literal_patterns + profile.patterns:
         out.extend((m.start(), m.end(), "term") for m in pattern.finditer(text))
+    for number, words in profile.context_patterns:
+        for m in number.finditer(text):
+            if words.search(text[max(0, m.start() - CONTEXT_CHARS):m.start()]):
+                out.append((m.start(), m.end(), "term"))
     for pattern in profile.dates:
         out.extend((m.start(), m.end(), "date") for m in pattern.finditer(text))
     for match in PHONE.finditer(text):
@@ -114,6 +122,11 @@ def trim(
     own_identifiers: frozenset[str] = frozenset(),
 ) -> tuple[DetectionFinding, ...]:
     fixes = v02()
+    if fix_on("column-identifiers") and any(item.stage == TABLE_IDENTIFIER_STAGE for item in span.evidence):
+        # v0.4: a cell of a column headed as a personal identifier is never cancelled by the organisation's terms or
+        # formats. The header is explicit context; a format is only a shape (split D: "\d{8}" work orders
+        # cancelled every licence number in a "licence" column).
+        return (span,)
     if span.labels.intersection(NEVER_TRIM):
         if (
             fixes and span.labels == frozenset({Label.QUASI_ID})

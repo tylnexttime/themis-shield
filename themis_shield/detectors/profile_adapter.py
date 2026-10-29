@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import re
 
 from ..config import DeploymentProfile
 
@@ -12,6 +13,26 @@ from ..config import DeploymentProfile
 FORBIDDEN_ANNOTATION_KEYS = {
     "text", "spans", "hard_negatives", "case_level", "gold", "cases",
 }
+
+
+# A format with no letter in it (only digits, separators and quantifiers, such as "\d{8}") matches any number of
+# that shape, a licence or account number included. v0.4 fix "bare-number-formats": such a format allow-lists a
+# number only when its own key words (from the format's name: "work_order" -> "work order") stand just before it.
+_GENERIC_KEY_WORDS = {"number", "numbers", "no", "num", "id", "code", "ref", "format"}
+
+
+def bare_number_format(pattern: str) -> bool:
+    return not re.search(r"[A-Za-z]", re.sub(r"\\[dDsSwWb]", "", pattern))
+
+
+def key_words(key: str) -> str | None:
+    """A case-insensitive pattern for a format's name, or None when the name is only generic words."""
+    words = [word for word in re.split(r"[\s_\-]+", key.strip()) if word]
+    while words and words[-1].casefold() in _GENERIC_KEY_WORDS:
+        words.pop()
+    if not words:
+        return None
+    return r"(?i)\b" + r"[\s_\-]*".join(re.escape(word) for word in words) + r"s?\b"
 
 
 def bounded(pattern: str) -> str:
@@ -81,15 +102,22 @@ def adapt(profile: DeploymentProfile | Mapping) -> dict:
     literals.extend(profile.get("abn_forms", []))
     if profile.get("institution"):
         literals.append(profile["institution"])
-    patterns = [
-        bounded(pattern)
-        for key in ("code_formats", "reference_number_formats")
-        for pattern in (profile.get(key) or {}).values()
-    ]
+    from .settings import fix_on
+
+    patterns, context_patterns = [], []
+    for group in ("code_formats", "reference_number_formats"):
+        for key, pattern in (profile.get(group) or {}).items():
+            if fix_on("bare-number-formats") and bare_number_format(pattern):
+                words = key_words(str(key))
+                if words is not None:
+                    context_patterns.append((bounded(pattern), words))
+                continue  # a bare number with a nameless format is never allow-listed
+            patterns.append(bounded(pattern))
     mailboxes = profile.get("role_mailboxes", [])
     return {
         "literals": sorted(set(value for value in literals if value)),
         "patterns": patterns,
+        "context_patterns": context_patterns,
         "role_mailbox_local_parts": sorted({
             mailbox.split("@", 1)[0] for mailbox in mailboxes
         }),
