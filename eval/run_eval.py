@@ -768,6 +768,11 @@ def score_run(run_dir: Path, split: str, cases: list[dict], extra: dict | None =
         if line.strip():
             row = json.loads(line)
             preds[row["id"]] = row
+    decisions = [json.loads(l) for l in (run_dir / "decisions.jsonl").read_text(encoding="utf-8").splitlines() if l]
+    for row in decisions:
+        # The scorer splits held-but-unprotected spans by the hold's reason (predictions.jsonl stays unchanged).
+        if row["id"] in preds:
+            preds[row["id"]]["reasons"] = row.get("reasons", [])
     keys = {span["label"] for row in preds.values() for span in row["spans"]}
     scorer.LABELSETS["themis"] = label_map.labelset_for(keys)
     rep = scorer.score(cases, preds, "themis", "RELEASE")
@@ -776,7 +781,6 @@ def score_run(run_dir: Path, split: str, cases: list[dict], extra: dict | None =
     with redirect_stdout(buffer):
         scorer.print_report(rep, show=40)
     (run_dir / "score.txt").write_text(buffer.getvalue(), encoding="utf-8")
-    decisions = [json.loads(l) for l in (run_dir / "decisions.jsonl").read_text(encoding="utf-8").splitlines() if l]
     calls_path = run_dir / "llm_calls.jsonl"
     calls = [json.loads(l) for l in calls_path.read_text(encoding="utf-8").splitlines() if l] if calls_path.exists() else []
     timings_path = run_dir / "timings.jsonl"

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import inspect
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -56,6 +57,33 @@ class MemoryRegister(SqliteRegister):
             identifier, "operator", "ROUTINE_APPROVED", NOW,
             approver_identity="synthetic-operator",
         )
+
+
+
+def _pin_register_clock(cls):
+    """Every register method that takes ``now`` defaults to NOW in the harness, never to the wall clock.
+
+    The harness approves at NOW for seven days. One method left on the wall clock (review_tripwire, called through
+    the CLI) found that approval expired from 29/10/2026 on, and a passing test began failing by date alone. Pinning
+    them all, by signature, means a method added later cannot reopen the gap.
+    """
+    for name, function in inspect.getmembers(SqliteRegister, inspect.isfunction):
+        signature = inspect.signature(function)
+        if name.startswith("_") or name in cls.__dict__ or "now" not in signature.parameters:
+            continue
+
+        def pinned(self, *args, _function=function, _signature=signature, **kwargs):
+            bound = _signature.bind(self, *args, **kwargs)
+            if bound.arguments.get("now") is None:
+                bound.arguments["now"] = NOW
+            return _function(*bound.args, **bound.kwargs)
+
+        pinned.__name__ = name
+        setattr(cls, name, pinned)
+    return cls
+
+
+_pin_register_clock(MemoryRegister)
 
 
 class Tracer:

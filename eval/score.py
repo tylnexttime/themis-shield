@@ -10,7 +10,8 @@ PREDICTION FORMAT (one JSON object per line, one line per case; a missing line i
      "spans": [{"start": 26, "end": 43, "label": "PERSON"}, ...],      # character offsets into the case text,
                                                                         # Python code points, end exclusive
      "case_level": {"contains_pi": true, "sensitive": ["health"]},      # optional
-     "decision": "RELEASE"}                                             # optional: RELEASE | ASK | BLOCK
+     "decision": "RELEASE",                                             # optional: RELEASE | ASK | BLOCK
+     "reasons": ["ASK:..."]}                                            # optional: the decision's reason codes
 
 Labels are mapped to gold labels through LABELSETS (native, openai_pf, pii_tracer, presidio). One candidate label may
 stand for several gold labels; a prediction is "typed-correct" when the gold label is in its mapped set.
@@ -30,6 +31,7 @@ information). Python 3.12 standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections import Counter, defaultdict
@@ -70,6 +72,19 @@ LABELSETS: dict[str, dict[str, list[str]]] = {
     },
 }
 LABELSETS["pii_tracer"] = {**LABELSETS["openai_pf"], "other_pii": ["QUASI_ID"] + SENS + IDS}
+
+
+def themis_labelset(records):
+    """The gate's labels plus every '|'-joined union in these prediction records (see label_map.py)."""
+    sys.path.insert(0, str(HERE))
+    import label_map
+    return label_map.labelset_for({str(s.get("label", "")) for r in records for s in r.get("spans", [])})
+
+
+def labelset_fingerprint(labelset):
+    """Short sha256 of the label table a report was scored with, so two reports can be told apart."""
+    table = json.dumps(LABELSETS[labelset], sort_keys=True)
+    return hashlib.sha256(table.encode("utf-8")).hexdigest()[:12]
 
 
 def map_label(labelset, label):
@@ -114,7 +129,7 @@ def score(gold, preds_by_id, labelset="native", default_decision="RELEASE", sens
     lab = defaultdict(Counter)
     leaks, partials, released, warn = defaultdict(list), defaultdict(list), [], []
     case, hn_tot, hn_hit, unmapped = Counter(), Counter(), Counter(), Counter()
-    decisions, by_gen = Counter(), defaultdict(Counter)
+    decisions, by_gen, held = Counter(), defaultdict(Counter), Counter()
     for c in gold:
         text, G = c["text"], c["spans"]
         rec = preds_by_id.get(c["id"], {})
@@ -122,6 +137,7 @@ def score(gold, preds_by_id, labelset="native", default_decision="RELEASE", sens
         for p in rec.get("spans", []):
             if not (isinstance(p.get("start"), int) and isinstance(p.get("end"), int) and 0 <= p["start"] < p["end"] <= len(text)):
                 warn.append(f"{c['id']}: invalid span skipped {p}")
+                case["discarded"] += 1
                 continue
             m = map_label(labelset, str(p.get("label", "")))
             if not m:
@@ -156,6 +172,10 @@ def score(gold, preds_by_id, labelset="native", default_decision="RELEASE", sens
                                                                    for i in range(g["start"], g["end"]))})
             if not full and dec == "RELEASE":
                 released.append({**item, "label": L, "genre": c["genre"]})
+            elif not full:
+                # Held, not protected: by the hold's first reason, so a span held because the gate saw THIS
+                # document's risk is not read as the same thing as one held for an unrelated reason.
+                held[(rec.get("reasons") or ["unrecorded"])[0]] += 1
         # precision side
         for p in P:
             cands = [g for g in G if overlaps(p, g) and g["label"] in p["map"]]
@@ -196,10 +216,15 @@ def score(gold, preds_by_id, labelset="native", default_decision="RELEASE", sens
         if c.get("injection"):
             case["inj"] += 1
             case["inj_released_leaks"] += sum(1 for r in released if r["id"] == c["id"])
-    return report(gold, lab, leaks, partials, released, case, hn_tot, hn_hit, unmapped, decisions, by_gen, warn, labelset)
+    return report(gold, lab, leaks, partials, released, case, hn_tot, hn_hit, unmapped, decisions, by_gen, warn, labelset,
+                  held)
 
 
-def report(gold, lab, leaks, partials, released, case, hn_tot, hn_hit, unmapped, decisions, by_gen, warn, labelset):
+# Two different failures, never to be read as one: a LEAK is a gold span no prediction touches (the finders missed
+# it; label-blind), while TOUCHED-UNTYPED is a gold span some prediction touches but none labels correctly (the
+# finder worked and the label mapping could not credit it). The second is the price of the taxonomy.
+def report(gold, lab, leaks, partials, released, case, hn_tot, hn_hit, unmapped, decisions, by_gen, warn, labelset,
+           held=None):
     rows, tot = {}, Counter()
     for L in list(GOLD_LABELS) + ["UNMAPPED"]:
         d = lab.get(L)
@@ -209,20 +234,22 @@ def report(gold, lab, leaks, partials, released, case, hn_tot, hn_hit, unmapped,
         rows[L] = {"gold": d["gold"], "recall_full": ratio(d["full"], d["gold"]), "recall_any": ratio(d["any"], d["gold"]),
                    "recall_typed": ratio(d["typed"], d["gold"]), "recall_exact": ratio(d["exact"], d["gold"]),
                    "char_recall": ratio(d["chars_cov"], d["chars"]), "partial": len(partials.get(L, [])),
-                   "leak": len(leaks.get(L, [])), "pred": d["pred"], "precision_typed": ratio(d["pred_typed"], d["pred"]),
+                   "leak": len(leaks.get(L, [])), "touched_untyped": d["any"] - d["typed"], "pred": d["pred"], "precision_typed": ratio(d["pred_typed"], d["pred"]),
                    "precision_exact": ratio(d["pred_exact"], d["pred"])}
     overall = {"gold": tot["gold"], "recall_full": ratio(tot["full"], tot["gold"]), "recall_any": ratio(tot["any"], tot["gold"]),
                "recall_typed": ratio(tot["typed"], tot["gold"]), "recall_exact": ratio(tot["exact"], tot["gold"]),
                "char_recall": ratio(tot["chars_cov"], tot["chars"]), "partial": sum(map(len, partials.values())),
-               "leak": sum(map(len, leaks.values())), "pred": tot["pred"],
+               "leak": sum(map(len, leaks.values())), "touched_untyped": tot["any"] - tot["typed"], "pred": tot["pred"],
                "precision_typed": ratio(tot["pred_typed"], tot["pred"]), "precision_exact": ratio(tot["pred_exact"], tot["pred"]),
                "precision_any_label": ratio(case["pred_any"], case["pred"])}
     return {
-        "labelset": labelset, "cases": len(gold), "per_label": rows, "overall": overall,
+        "labelset": labelset, "labelset_sha": labelset_fingerprint(labelset), "cases": len(gold),
+        "discarded_spans": case["discarded"], "per_label": rows, "overall": overall,
         "by_generator": {g: {"gold": v["gold"], "recall_full": ratio(v["full"], v["gold"])} for g, v in sorted(by_gen.items())},
         "gate": {"decisions": dict(decisions), "released_leaks": len(released),
                  "released_leaks_by_label": dict(Counter(r["label"] for r in released)),
                  "held_back_unprotected_spans": overall["gold"] - (tot["full"]) - len(released),
+                 "held_back_unprotected_by_reason": dict((held or Counter()).most_common()),
                  "friction_on_cases_without_pi": ratio(case["neg_friction"], case["neg"]),
                  "injection_cases": case["inj"], "injection_released_leaks": case["inj_released_leaks"],
                  "released_leak_list": released},
@@ -248,16 +275,21 @@ def f(x):
 
 def print_report(rep, show=8):
     o = rep["overall"]
-    print(f"labelset={rep['labelset']}  cases={rep['cases']}  gold spans={o['gold']}")
-    hdr = f"{'label':16}{'gold':>5}{'R_full':>8}{'R_any':>7}{'R_typ':>7}{'R_ex':>7}{'charR':>7}{'part':>6}{'leak':>6}{'pred':>6}{'P_typ':>7}{'P_ex':>7}"
+    print(f"labelset={rep['labelset']} ({rep['labelset_sha']})  cases={rep['cases']}  gold spans={o['gold']}  "
+          f"discarded prediction spans={rep['discarded_spans']}")
+    hdr = (f"{'label':16}{'gold':>5}{'R_full':>8}{'R_any':>7}{'R_typ':>7}{'R_ex':>7}{'charR':>7}{'part':>6}{'leak':>6}"
+           f"{'untyp':>6}{'pred':>6}{'P_typ':>7}{'P_ex':>7}")
     print(hdr + "\n" + "-" * len(hdr))
     for L, r in list(rep["per_label"].items()) + [("OVERALL", o)]:
         print(f"{L:16}{r['gold']:5d}{f(r['recall_full']):>8}{f(r['recall_any']):>7}{f(r['recall_typed']):>7}{f(r['recall_exact']):>7}"
-              f"{f(r['char_recall']):>7}{r['partial']:6d}{r['leak']:6d}{r['pred']:6d}{f(r['precision_typed']):>7}{f(r['precision_exact']):>7}")
+              f"{f(r['char_recall']):>7}{r['partial']:6d}{r['leak']:6d}{r['touched_untyped']:6d}{r['pred']:6d}{f(r['precision_typed']):>7}{f(r['precision_exact']):>7}")
     print(f"\nprecision, any label: {f(o['precision_any_label'])}   by generator R_full: "
           + ", ".join(f"{g} {f(v['recall_full'])}" for g, v in rep["by_generator"].items()))
     g = rep["gate"]
     print(f"\nGATE  decisions {g['decisions']}  RELEASED LEAKS {g['released_leaks']} {g['released_leaks_by_label']}")
+    if g["held_back_unprotected_by_reason"]:
+        print("      held back but unprotected, by the hold's first reason: "
+              + ", ".join(f"{k} {v}" for k, v in g["held_back_unprotected_by_reason"].items()))
     print(f"      friction on cases without PI {f(g['friction_on_cases_without_pi'])}; injection cases {g['injection_cases']}, "
           f"released leaks in them {g['injection_released_leaks']}")
     cl = rep["case_level"]
@@ -274,8 +306,13 @@ def print_report(rep, show=8):
             print(f"  {L} ({len(items)})")
             for it in items[:show]:
                 print(f"    {it['id']} [{it['start']}:{it['end']}] {it['value'][:60]!r}")
+    print("\nleak = touched by nothing (the finders missed it); untyp = touched, but no prediction carries a label "
+          "that maps to it (the label mapping could not credit it)")
     if rep["unmapped_labels"]:
         print(f"\nunmapped labels (count only in any-label metrics): {rep['unmapped_labels']}")
+        if rep["labelset"] != "themis" and any("|" in k for k in rep["unmapped_labels"]):
+            print("WARNING: '|'-joined labels are the gate's own union findings; score them with --labelset themis, "
+                  "or every typed and per-label figure above is understated")
     if rep["warnings"]:
         print(f"\n{len(rep['warnings'])} warnings; first: {rep['warnings'][0]}")
 
@@ -338,6 +375,21 @@ def self_test():
     print("8. overlap edge cases")
     check("touching spans do not overlap", not overlaps({"start": 0, "end": 5}, {"start": 5, "end": 9}))
     check("one shared character overlaps", overlaps({"start": 0, "end": 6}, {"start": 5, "end": 9}))
+    print("9. gate union labels ('GOLD|STUDENT_ID', as the gate writes a finding with two labels)")
+    union = {c["id"]: {"spans": [dict(s, label=f"{s['label']}|STUDENT_ID") for s in c["spans"]]} for c in gold}
+    LABELSETS["themis"] = themis_labelset(union.values())
+    rep = score(gold, union, "themis")
+    check("themis labelset credits every union: typed recall 1.0, nothing touched-untyped, nothing unmapped",
+          rep["overall"]["recall_typed"] == 1.0 and rep["overall"]["touched_untyped"] == 0 and not rep["unmapped_labels"])
+    rep = score(gold, union, "native")
+    check("native labelset cannot: typed recall 0.0, every span touched-untyped, R_full still 1.0",
+          rep["overall"]["recall_typed"] == 0.0 and rep["overall"]["touched_untyped"] == n_spans
+          and rep["overall"]["recall_full"] == 1.0)
+    check("the two label tables fingerprint differently", labelset_fingerprint("themis") != labelset_fingerprint("native"))
+    print("10. held spans by the hold's reason")
+    rep = score(gold, {c["id"]: {"spans": [], "decision": "ASK", "reasons": ["ASK:sensitive-statement"]} for c in gold})
+    check("every unprotected span is held and attributed to its hold's reason",
+          rep["gate"]["held_back_unprotected_by_reason"] == {"ASK:sensitive-statement": n_spans})
     print("PASS" if not fails else f"FAILED ({len(fails)})")
     return 0 if not fails else 1
 
@@ -347,7 +399,8 @@ def main():
     ap.add_argument("predictions", nargs="?", type=Path)
     ap.add_argument("--split", choices=["dev", "test", "all"], default="dev")
     ap.add_argument("--gold", type=Path, default=None, help="score against one JSONL file instead of cases/<split>.jsonl")
-    ap.add_argument("--labelset", choices=sorted(LABELSETS), default="native")
+    ap.add_argument("--labelset", choices=sorted(LABELSETS) + ["themis"], default="native",
+                    help="'themis' maps the gate's own labels, and every '|'-joined union seen, through label_map.py")
     ap.add_argument("--default-decision", choices=["RELEASE", "ASK", "BLOCK"], default="RELEASE",
                     help="decision for cases whose prediction has none (default RELEASE: the strictest reading)")
     ap.add_argument("--sens-threshold", type=float, default=None, help="treat case_level.sensitivity >= this as 'sensitive'")
@@ -361,6 +414,8 @@ def main():
         ap.error("predictions file required (or --self-test)")
     gold = load_gold(a.split, a.gold)
     preds = {r["id"]: r for r in load_jsonl(a.predictions)}
+    if a.labelset == "themis":
+        LABELSETS["themis"] = themis_labelset(preds.values())
     missing = len({c["id"] for c in gold} - set(preds))
     if missing:
         print(f"note: {missing} cases have no prediction line; scored as empty with decision {a.default_decision}")
