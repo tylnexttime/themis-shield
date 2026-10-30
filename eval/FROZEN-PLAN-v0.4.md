@@ -19,8 +19,9 @@ friction fixes (secret references, implausible PII-Tracer evidence).
 | Item | Value |
 |---|---|
 | Files | Half K and half M, kept outside the repository and private until the result is published; then committed with the results as `eval/cases/test-e-k.jsonl` and `eval/cases/test-e-m.jsonl`, with generators, profiles and provenance under `eval/generator_e/`. |
-| sha256, half K | *added at sealing* |
-| sha256, half M | *added at sealing* |
+| sha256, half K | `25f93e2d272bf8fc8dd5a5228579d775a88da64d3a2e008e87f0e31c083e4c7d` |
+| sha256, half M | none: **half M did not converge** (see below) |
+| Size, half K | 210 cases, 2,731 gold spans, 60 clean cases, 1,501 hard negatives, 22 injection cases (before 8, inside 7, after 7; 8 with no personal information), 6 long documents; every quota met; shared validator 0 rule failures (mutation test 26/26) |
 | Authors | **Half K:** `deepseek/deepseek-v4.1-flash-1017` (DeepSeek family). **Half M:** `xiaomi/mimo-v2.6-flash` (Xiaomi family). Both through OpenRouter with zero data retention enforced on every call. Each saw only `taxonomy.md`, the case format and build rules, a profile schema without values, and split D's one-page brief (ids, half letters and split name changed, nothing else); neither saw the gate, its prompts, the earlier splits, their generators, the roadmap or the other half. Each writes its own fictional organisation. Both work with tools (read, edit, build, validate their own files) from the first message. |
 | Labeller | `z-ai/glm-5.3-flash` (Z.ai family) re-labels every case of both halves blind from the taxonomy and the text; disagreements go back to each half's author once; the author has the final word on gold. Agreement before and after review is published with the hashes. |
 | Orchestrator | A Claude model relays messages, runs builds and the shared validator (its own checksum implementation), and computes agreement; it writes no case content, and reports only counts, hashes and costs to the gate's designer. |
@@ -28,6 +29,23 @@ friction fixes (secret references, implausible PII-Tracer evidence).
 
 If a half does not converge (build, self-check and validator clean with every quota met) within its budget, it is
 not hand-edited: split E runs on the half that did, and the plan says so in the sealing commit.
+
+**At sealing (30/10/2026, 05:4x UTC).** Half K converged (278 tool calls; author USD 0.46, labeller USD 0.18).
+Half M did not: its author used its 250 tool calls without one passing build (23 builds, 72 failed edits) and was
+stopped; nothing of it was labelled, sealed or edited. **Split E is half K alone**, so the family effect cannot be
+measured this time; a second author would be a new split under its own plan, never added to this one.
+
+**Labeller agreement, half K** (span recall / precision of gold against the labeller): 0.809 / 0.992 blind (643
+disagreement items); the author fixed 551 and kept 92; 0.967 / 0.834 after review. 519 of the 525 labeller-only
+spans after review are `OTHER_DATE` in two cases, dates the author took out of gold in review and the labeller
+marks. The taxonomy makes a personal chat message's date stamp `OTHER_DATE` and a meeting or log date a public one;
+under this protocol the author decides, and no one on the gate side has read those cases. So the verdict uses the
+sealed gold, and a **sensitivity score** (reported, not gating) uses `half-k.alt-otherdate.jsonl` (sha256
+`819acf71a6821bd568505e55f79e4da67cce889313840bbe6ac1f4e22c8142ab`): the sealed half with those 519 labeller spans
+added as gold, built by script.
+
+**Contamination (counts only):** 14 distinct 8-grams in 15 of 210 cases shared with the published evaluation cases
+(stock phrasing, as for split D; not inspected); 0 with the finder prompts.
 
 ## Kit
 
@@ -48,7 +66,7 @@ not hand-edited: split E runs on the half that did, and the plan says so in the 
    (the eight v0.4 switches off). Two of the eight change the finder prompts, so the control runs **live** with its
    own capture, not by replay.
 
-The halves are pooled for the verdict (concatenated predictions and gold, standard scorer, `--labelset themis`).
+The halves would have been pooled for the verdict; with half K alone, it is scored directly (standard scorer, `--labelset themis`).
 The shared lock file is held for each run, and no other evaluation runs beside it.
 
 ## Crash policy
@@ -61,10 +79,10 @@ a failing detector canary on a live arm stops the run as an infrastructure fault
 
 The thresholds are split D's. They do not loosen.
 
-**Instrument check (control):** the control must show **clean friction ≥ 0.10 or ≥ 2 released leaks** on E pooled.
+**Instrument check (control):** the control must show **clean friction ≥ 0.10 or ≥ 2 released leaks** on split E (half K).
 Otherwise the result is **INCONCLUSIVE**.
 
-**The candidate PASSES** if, on E pooled, all of these hold:
+**The candidate PASSES** if, on split E (half K), all of these hold:
 
 | Condition | Limit |
 |---|---|
@@ -79,6 +97,5 @@ Otherwise the result is **INCONCLUSIVE**.
 There is no fallback configuration: the candidate passes or fails. If it fails, the result says which conditions,
 and 0.3.4 stays a preview with that verdict, as every release before it has.
 
-**Reported, not gating:** every metric per half; the control's half K minus half M difference (the family effect);
-held-back unprotected spans by reason; indirect UNION, CRIMINAL and ETHNICITY R_any; released leaks inside injection
+**Reported, not gating:** the sensitivity score above; held-back unprotected spans by reason; indirect UNION, CRIMINAL and ETHNICITY R_any; released leaks inside injection
 cases; documents blocked by finder failures; seconds per document.
