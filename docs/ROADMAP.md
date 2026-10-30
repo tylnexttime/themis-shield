@@ -15,7 +15,8 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   release one value-free record of what was done, and the evaluation-tooling fixes in the [changelog](../CHANGELOG.md).
 - **0.3.2 (30/10/2026):** v0.4 detection fixes 1-3 below, measured on development data only (split D half C: released
   leaks 26 -> 3, R_any 0.925 -> 0.993, sensitive R_any 0.666 -> 0.986; friction unchanged).
-- **Next:** item 4 below, then v0.4's "keep the work possible" design, then a fresh split E for v0.4.
+- **0.3.3 (30/10/2026):** item 4 below, the same way (split C sensitive R_any 0.955 -> 0.982).
+- **Next:** v0.4's "keep the work possible" design (the placeholder legend first), then a fresh split E for v0.4.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
 
@@ -197,8 +198,10 @@ split, and the release is tested once on a fresh split.
    item 1, never before it: 274 of split D's unprotected-but-held spans were held only because the finder failed on
    such a table.
 3. **Finders read the detection view** (done, 0.3.2; DD-06), measured in the same live capture.
-4. **Indirect sensitive statements:** a sentence-level check that also asks about sentences containing only a name
-   (the misses sat in sentences a detector had already touched).
+4. **Indirect sensitive statements** (done, 0.3.3). Measured first: after 0.3.2 every remaining miss sat in a held
+   document, and most were cells under a sensitive heading or a person's union role. Two fixed-vocabulary passes
+   (`sensitive-columns`, `union-roles`) took split C's sensitive recall from 0.955 to 0.982 with friction unchanged.
+   A sentence-level model check stays on the list for what vocabulary cannot reach, if split E shows the need.
 
 ## v0.4 (design): keep the work possible
 

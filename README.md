@@ -18,7 +18,7 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.3.2, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status: v0.3.3, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
 - **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
   is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
@@ -177,10 +177,12 @@ Read this section before you rely on anything above.
   identifier is protected cell by cell, and an organisation's format that is only digits no longer cancels such
   numbers: on split D (now development data) released spans fell from 28 to 5. That is a development measurement;
   the fresh split that will test it has not been written yet.
-- **Sensitive statements depend on the LLM finders, and they miss indirect ones.** On split D they caught 74% of
-  sensitive statements overall, 98% in one half and 67% in the half whose author wrote mostly indirect phrasing
-  (union membership 45%, criminal history 51%). Statements found are substituted and held; statements missed in a
-  released document are leaks. A dedicated sentence-level classifier is on the roadmap.
+- **Sensitive statements mostly depend on the LLM finders.** Since 0.3.3 two fixed-vocabulary passes add table
+  cells under a sensitive heading and a person's union role (development data: split C sensitive recall 0.955 ->
+  0.982), but anything else indirect is still the finders' job. The last frozen result is still 0.3.0's: on split D
+  the gate caught 74% of sensitive statements overall, 98% in one half and 67% in the half whose author wrote mostly
+  indirect phrasing (union membership 45%, criminal history 51%). Statements found are substituted and held;
+  statements missed in a released document are leaks. Split E will test 0.3.3 on text nobody here has seen.
 - **A small classifier is a helper, never a judge.** We fine-tuned a small decision encoder (Laya, 421M) on synthetic
   data of our own: it answered 92.3% of questions correctly on sentence templates it had never seen, but its wrong
   answers came with a median confidence of 1.000. **It must never be used as a standalone privacy check.** In
@@ -554,8 +556,8 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
 [docs/ROADMAP.md](docs/ROADMAP.md). In short, each item a known gap from our own runs:
 
 1. **Detection on new authors' text** (from split D): column-aware identifier propagation, finder windows for long
-   documents and detection-view readers are in 0.3.2 (development data only); still to come is a sentence-level check
-   for indirect sensitive statements that also looks at sentences containing only a name, then a fresh split E.
+   documents and detection-view readers are in 0.3.2, and two sensitive-statement passes in 0.3.3 (development data
+   only); next is a fresh split E that tests them.
 2. **Keep the work possible** (v0.4): typed placeholders with a codebook by default, optional partially synthetic
    values with per-job date shifting, per-task profiles, and a utility measurement next to the leak measurement
    ([story](docs/CODEBOOK-AND-SYNTHETIC-DATA.md)).

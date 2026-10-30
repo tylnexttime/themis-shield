@@ -2,6 +2,36 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## 0.3.3 (30/10/2026)
+
+**Development measurement only**, like 0.3.2: no fresh split has tested it, and a vetting record still quotes 0.3.0's
+frozen FAIL as its method baseline.
+
+### Sensitive statements (v0.4 item 4)
+
+After 0.3.2, every sensitive statement the gate still missed on the development sets sat in a held document; most
+were table cells under a sensitive heading and a person's trade-union role in prose. Two deterministic passes, fixed
+vocabulary only (`detectors/statements.py`), each a named switch, on by default:
+
+- `sensitive-columns`: a table column headed police check, criminal history, convictions, union, medical condition,
+  disability, religion, sexuality, ethnicity or Indigenous status marks every non-empty cell as a statement of that
+  category. A "Clear" or "non-member" still describes the person.
+- `union-roles`: a clause that gives a person a trade-union role or act (shop steward, union delegate or member, a
+  delegate for the crew, paying or collecting dues, joining the union, the picket line) is a UNION statement. Policy
+  text ("Union delegates may attend ..."), credit and student unions, a data steward and a conference delegate are
+  not. The statement is the clause, so a log line keeps its time, ticket number and site.
+
+| Set (development data) | Sensitive R_any | R_any | Hard negatives touched | Friction |
+|---|---|---|---|---|
+| split C | 0.955 -> **0.982** | 0.9905 -> 0.9957 | 562 -> 562 | unchanged |
+| split D half C | 0.986 -> **0.995** | 0.9928 -> 0.9941 | 475 -> 476 | unchanged |
+| v0.1 set, split D half Q | unchanged | 0.9989 -> 0.9991, unchanged | unchanged | unchanged |
+
+### Fixes
+
+- `themis vet` held a document with a sensitive statement as BLOCK `substitution-failed` instead of ASK: a finder's
+  sensitive finding has no statement span. Vet now uses the finding's own span (DEV-DEBT DD-15).
+
 ## 0.3.2 (30/10/2026)
 
 **Development measurement only.** These are the first v0.4 detection fixes, measured on the development sets (the
