@@ -147,6 +147,7 @@ _UNION_ROLES = re.compile(
 _NOT_TRADE_UNION = re.compile(r"(?i)\b(?:credit|student|students'|european|customs|rugby|union\s+(?:street|st|road|rd|"
                               r"square|station|hotel|bank|pacific|jack))\b")
 _SENTENCE_END = re.compile(r"[.!?](?=\s)|\n")
+_CLAUSE_BREAK = re.compile(r"[:;,]")
 
 
 def union_role_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
@@ -161,6 +162,19 @@ def union_role_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
         sentence = text[start:end]
         if _NOT_TRADE_UNION.search(sentence) and "union" in match.group().casefold():
             continue
+        # The statement is the clause, not the whole sentence: in a log line the "sentence" also holds the time, a
+        # ticket number and a site ("06:05 MNT-26-96173 welfare flag: Sunita ... is the shop steward on B shift").
+        # Bounded by the last ":", ";" or "," before the match and the first ";" or "," after it.
+        clause = [m.end() for m in _CLAUSE_BREAK.finditer(text, start, match.start())]
+        if clause:
+            start = clause[-1]
+        later = _CLAUSE_BREAK.search(text, match.end(), end)
+        if later is not None and later.group() != ":":
+            end = later.start()
+        while start < end and text[start].isspace():
+            start += 1
+        while end > start and text[end - 1] in " \t.!?":
+            end -= 1
         if start < end:
             out.append(_statement(start, end, Label.UNION, UNION_ROLE_STAGE, tier))
     return tuple(out)

@@ -50,7 +50,9 @@ def test_headers_must_name_the_category_itself(header):
 def test_a_persons_union_role_is_a_statement(sentence):
     (item,) = union_role_spans(sentence)
     assert item.primary_label == Label.UNION and item.statement_span is not None
-    assert sentence[item.start:item.end].rstrip(".") == sentence.strip().rstrip(".")
+    # The statement is the clause that carries the role, inside the sentence.
+    span = sentence[item.start:item.end]
+    assert span and span in sentence and len(span) >= 15
 
 
 @pytest.mark.parametrize("sentence", [
@@ -71,7 +73,16 @@ def test_policy_and_look_alikes_are_not(sentence):
 def test_only_the_sentence_with_the_role_is_marked():
     text = "Kim works nights. She is the shop steward on B shift. The roster changes in May."
     (item,) = union_role_spans(text)
-    assert text[item.start:item.end] == "She is the shop steward on B shift."
+    assert text[item.start:item.end] == "She is the shop steward on B shift"
+
+
+def test_a_log_line_keeps_its_time_ticket_and_site_out_of_the_statement():
+    line = "06:05 MNT-26-96173 welfare flag: Sunita Mehrotra is the shop steward on B shift"
+    (item,) = union_role_spans(line)
+    assert line[item.start:item.end] == "Sunita Mehrotra is the shop steward on B shift"
+    clause = "As you said, you collect the dues envelope from the crew every payday, so I have copied you."
+    (item,) = union_role_spans(clause)
+    assert clause[item.start:item.end] == "you collect the dues envelope from the crew every payday"
 
 
 def test_statements_substitute_whole():
