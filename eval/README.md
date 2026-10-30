@@ -43,6 +43,16 @@ agreement reports: [`generator_d/`](generator_d). sha256: half Q
 `3fb5dc5ec227056cbe3f458356d36bf2089490f9b344cad6c4516bafe8d3a07a`, half C
 `59e127c1414c369cc075833dbd0bdbdc0872a233b671fc6da961888d914063f0`. Results: [`RESULTS-v0.3.md`](RESULTS-v0.3.md).
 
+## Split E: the 0.3.x held-out test
+
+`cases/test-e-k.jsonl`: 210 cases, 2,731 gold spans, 60 clean, 22 injection cases, 6 long documents. Written blind by
+a DeepSeek model with tools (half K), from split D's brief with the ids changed; a second half by a Xiaomi MiMo model
+did not converge and is not part of the split. Re-labelled blind by a Z.ai GLM model, with one review round; checked
+by the shared validator. Generator, profile, provenance, agreement and the half M log: [`generator_e/`](generator_e).
+Sealed sha256 `25f93e2d272bf8fc8dd5a5228579d775a88da64d3a2e008e87f0e31c083e4c7d`; published copy sha256
+`e0bcd2769968781d8ecb07943d61a433a148f02d2436131ea4c74bffbdc6cb18`. The published copy differs from the sealed file in one invented place name, used in five table cases and the generator, replaced by another of the same length (every offset unchanged; the published generator rebuilds the published file exactly). Plan:
+[`FROZEN-PLAN-v0.4.md`](FROZEN-PLAN-v0.4.md); results: [`RESULTS-v0.4.md`](RESULTS-v0.4.md).
+
 ## How it was built
 
 **Two independent generators.** A and B share no templates, no name pools (the build fails if a name token appears

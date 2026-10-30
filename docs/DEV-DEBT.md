@@ -9,8 +9,7 @@ reason. Dates are day-first.
 
 | ID | Found | What | Why it matters | Plan |
 |---|---|---|---|---|
-
-None open (30/10/2026).
+| DD-17 | 30/10/2026 | (Found by split E.) The institutional allow-list trims an organisation's own term off the front of a personal identifier joined to it: in `KWA-EMP-92315` the gate substituted `EMP-92315` and left `KWA-`. | All 12 of 0.3.4's released leaks on split E; the frozen rule counts any uncovered letter of a personal value. No personal digits were released. | An institutional term joined to the rest of a finding's value by a hyphen, slash, underscore or nothing is part of the value and is never trimmed. Regression test from the split E format; measured by replay on every development set, split E included. Next session, first. |
 
 ## Fixed
 

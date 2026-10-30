@@ -18,10 +18,13 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
 - **0.3.3 (30/10/2026):** item 4 below, the same way (split C sensitive R_any 0.955 -> 0.982).
 - **0.3.4 (30/10/2026):** item 5 below, friction on clean documents (split D half Q 0.286 -> 0.064, half C 0.323 ->
   0.161; every safety measure unchanged on all four development sets).
-- **Now (30/10/2026):** split E is being written blind (half K by DeepSeek, half M by Xiaomi MiMo, labelled by
-  Z.ai GLM), and its pass rule was committed first: [`FROZEN-PLAN-v0.4.md`](../eval/FROZEN-PLAN-v0.4.md). It tests
-  0.3.4 against 0.3.0 on text none of the 0.3.x fixes has seen. The placeholder legend is built (unreleased, off by
-  default); whether it should be on by default waits for the utility measurement.
+- **Split E (30/10/2026): 0.3.4 FAILS its frozen rule, narrowly** ([results](../eval/RESULTS-v0.4.md)). Released
+  leaks 12 (limit 3), all the same defect: the allow-list trimmed the organisation's acronym off staff numbers
+  (`KWA-` left, the personal digits substituted; DD-17). Over-redaction one look-alike above the control. Everything
+  else passed: sensitive recall 1.000, R_any 0.993, and friction 0.083, the first fresh-split pass of the friction
+  rule. Against 0.3.0 every safety measure improved. Split E is now development data.
+- **Next:** DD-17; then the placeholder legend's utility measurement (built, unreleased, off by default); then split
+  F, with a second author family, under its own plan and the same thresholds.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
 

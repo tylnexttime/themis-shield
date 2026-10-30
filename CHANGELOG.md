@@ -4,6 +4,13 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Split E result (development: 0.3.4 now has a fresh-split verdict)
+
+0.3.4 **fails** its frozen rule on split E ([results](eval/RESULTS-v0.4.md)): 12 released leaks, all the
+organisation prefix `KWA-` left beside a substituted staff number (DEV-DEBT DD-17), and one more look-alike touched
+than 0.3.0. Every other condition passed, including sensitive recall 1.000 and clean friction 0.083. Split E
+(`eval/cases/test-e-k.jsonl`, generator under `eval/generator_e/`) is published and is now development data.
+
 ### Placeholder legend (v0.4, optional, off by default)
 
 - `[legend] enabled = true` adds one system message to the request sent to the cloud, listing every placeholder it

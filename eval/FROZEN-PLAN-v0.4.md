@@ -1,5 +1,7 @@
 # Frozen evaluation plan: eval-kit-v0.4-frozen (split E)
 
+> **Result (30/10/2026): FAIL** on released leaks and over-redaction; see [`RESULTS-v0.4.md`](RESULTS-v0.4.md). This plan is unchanged below this note.
+
 **Pass rule written 30/10/2026, before split E was written.** The two halves are being authored now by models outside
 the gate's families; nobody who works on the gate has seen or will see a case before the arms run. The rule below
 was committed first; the halves' sha256 are added at sealing, in a commit that changes nothing else, and the kit tag

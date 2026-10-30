@@ -24,8 +24,12 @@ then does one of three things:
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
   driver licence numbers in table columns), and caught only **74% of sensitive statements** written indirectly by
   new authors. Its own changes did what they were for: friction on clean documents fell from 0.320 to 0.248 with no
-  safety measure worse. v0.2 had released 0 leaks on its fresh split and failed on friction. See
-  [Evaluation](#evaluation).
+  safety measure worse. v0.2 had released 0 leaks on its fresh split and failed on friction. **0.3.4 failed its
+  rule on split E, narrowly** (210 documents by a DeepSeek author): 12 released spans, all one organisation's
+  acronym left beside a staff number whose personal digits were substituted (a trimming defect, now being fixed),
+  and one look-alike more than 0.3.0 touched. It caught **every sensitive statement (267 of 267)** and met the
+  friction rule for the first time (0.083). See [Evaluation](#evaluation) and
+  [eval/RESULTS-v0.4.md](eval/RESULTS-v0.4.md).
 - **The round trip** (de-identify, send, restore) is covered by automated tests against a stand-in cloud endpoint.
 - **Not cleared for real personal data.** By design, themis-shield refuses to start unless it is configured for
   synthetic data.
@@ -174,7 +178,7 @@ Read this section before you rely on anything above.
   limits what a cloud model can do with the output (v0.4's typed placeholders and task profiles address this).
   Since 0.3.4, configuration lines that only name where a secret lives, and tracer values that cannot be what their
   label says, no longer hold a clean document (development data: split D friction 0.286 -> 0.064 and 0.323 -> 0.161,
-  every safety measure unchanged). Split E will tell whether that holds on new text.
+  every safety measure unchanged). On split E's fresh text, 5 of 60 clean documents were held (0.083).
 - **Identifier columns in tables, fixed in development only.** On split D, bare licence numbers in a table's licence
   column were missed in three tables while every other column was covered. Since 0.3.2 a column headed as a personal
   identifier is protected cell by cell, and an organisation's format that is only digits no longer cancels such
@@ -185,7 +189,7 @@ Read this section before you rely on anything above.
   0.982), but anything else indirect is still the finders' job. The last frozen result is still 0.3.0's: on split D
   the gate caught 74% of sensitive statements overall, 98% in one half and 67% in the half whose author wrote mostly
   indirect phrasing (union membership 45%, criminal history 51%). Statements found are substituted and held;
-  statements missed in a released document are leaks. Split E will test the 0.3.x fixes on text nobody here has seen.
+  statements missed in a released document are leaks. On split E (a new author's text) 0.3.4 caught all 267.
 - **A small classifier is a helper, never a judge.** We fine-tuned a small decision encoder (Laya, 421M) on synthetic
   data of our own: it answered 92.3% of questions correctly on sentence templates it had never seen, but its wrong
   answers came with a median confidence of 1.000. **It must never be used as a standalone privacy check.** In

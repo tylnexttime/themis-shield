@@ -1,0 +1,108 @@
+{
+  "_about": "Deployment profile of one invented regional water utility: institutional terms only, for allow-listing.",
+  "organisation": "Karratong Water Authority",
+  "organisation_forms": [
+    "Karratong Water",
+    "KWA",
+    "the Authority"
+  ],
+  "description": "Karratong Water Authority is an invented, state-owned regional water and wastewater utility serving the Burrandong and Yarrindi valleys: it runs drinking-water treatment plants, a headworks and weir system, reservoirs, recycled-water schemes and a rural pipeline network, and employs about nine hundred staff across five sites.",
+  "business_identifier": {
+    "scheme": "ABN",
+    "value": "51 846 293 816",
+    "forms": [
+      "51 846 293 816",
+      "51846293816",
+      "ABN 51 846 293 816"
+    ]
+  },
+  "email_domain": "karratongwater.example",
+  "sites": [
+    "Burrandong Treatment Plant",
+    "Karratong Headworks",
+    "Yarrindi Reservoir",
+    "Marlowe Road Depot",
+    "Tidbinbillah Wetlands"
+  ],
+  "site_note": "Site names are institutional. Staff may live in nearby towns; a town inside a staff member's address is personal and is not allow-listed.",
+  "buildings": [
+    "Kestrel House",
+    "Weir Building",
+    "Pump Shed 4",
+    "Naylor Annex"
+  ],
+  "role_mailboxes": [
+    "enquiries@karratongwater.example",
+    "servicedesk@karratongwater.example",
+    "privacy@karratongwater.example",
+    "billing@karratongwater.example",
+    "media@karratongwater.example",
+    "catchment@karratongwater.example"
+  ],
+  "main_lines": [
+    "1800 975 707",
+    "1300 975 708"
+  ],
+  "reception_numbers": [
+    "(02) 5550 4180",
+    "(02) 7010 2266"
+  ],
+  "role_titles": [
+    "the Duty Operations Coordinator",
+    "the Privacy Officer",
+    "Senior Catchment Scientist",
+    "the Drinking Water Quality Lead",
+    "the People and Culture Adviser",
+    "the Asset Reliability Engineer",
+    "the Field Crew Supervisor"
+  ],
+  "programmes": [
+    "Source Water Assurance Program",
+    "Leak First Response",
+    "RiverWatch Monitoring",
+    "Safe Drinking Water Program"
+  ],
+  "research_projects": [
+    "Burrandong Blue-Green Algae Trial",
+    "Karratong Pipe Renewal Stage 3",
+    "Yarrindi Meter Rollout"
+  ],
+  "committees": [
+    "Catchment Liaison Committee",
+    "Diversity and Inclusion Committee",
+    "Staff Pride Network",
+    "WHS Consultative Committee"
+  ],
+  "initiatives": [
+    "Safe Drinking Water Week",
+    "National Water Week",
+    "Mental Health Week",
+    "Reconciliation Action Plan"
+  ],
+  "committee_note": "Committees, networks and their names are institutional and never allow-listed values that are personal.",
+  "code_formats": {
+    "programme_code": "KWA-PRG-####",
+    "module_code": "KWA-MOD-##",
+    "project_code": "KWA-PRJ-#####"
+  },
+  "reference_number_formats": {
+    "ticket_number": "KWA-TKT-######",
+    "order_number": "KWA-ORD-#####",
+    "invoice_number": "KWA-INV-######",
+    "asset_id": "KWA-AS-#####",
+    "cost_centre": "KWA-CC-###",
+    "form_number": "KWA-FRM-###"
+  },
+  "public_dates": [
+    "Australia Day",
+    "Anzac Day",
+    "National Water Week",
+    "Reconciliation Day",
+    "Christmas Day"
+  ],
+  "personal_identifier_formats_issued": {
+    "staff_number": "KWA-EMP-#####",
+    "customer_account": "KWA-CUST-#######",
+    "contractor_pass": "KWA-CON-####"
+  }
+}
