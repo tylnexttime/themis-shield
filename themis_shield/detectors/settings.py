@@ -56,6 +56,11 @@ v0.4 detection fixes (from split D, now development data):
 - ``union-roles``: a sentence that gives a person a trade-union role or act (shop steward, union delegate or member,
   paying or collecting dues, joining the union, the picket line) is a UNION statement; generic policy, credit unions
   and a bare "steward" or "delegate" are not. See ``detectors/statements.py``.
+- ``secret-references``: a SECRET finding (from any detector) is dropped when every line it touches assigns only a
+  reference to where a secret lives (``os.environ['X']``, ``var.x``, ``{{ lookup(...) }}``, ``vault:secret/...``,
+  ``<your-api-key>``, ``REPLACE_ME``, a URL whose password slot is a template), declares one (``variable "x" {``) or
+  plainly holds no value (an import, a lone brace). A literal value, or any other line, keeps the label. See
+  ``references_only`` in ``detectors/secret_context.py``.
 - ``finder-windows`` (on since 0.3.2, measured live 30/10/2026; DD-05): a document longer than 6,000 characters is read by the LLM finders
   in line-bounded windows (table headers repeated), so a dense document no longer overflows the finder's answer and
   fails closed; see ``finder_windows`` in ``detectors/llm_finder.py``. It changes the finder prompts, so captured
@@ -83,9 +88,11 @@ DETECTION_FIXES = (
     "column-identifiers", "finder-windows", "detectors-detection-view", "bare-number-formats",
     # v0.4 item 4 (sensitive statements the finders missed; detectors/statements.py).
     "sensitive-columns", "union-roles",
+    # v0.4 friction (split D's clean configuration files held on references; detectors/secret_context.py).
+    "secret-references",
 )
 SECRET_CONTEXT_FIXES = (
-    "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
+    "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
 )
 # Every fix held the ratchet (released leaks, R_any, sensitive R_any, QUASI_ID R_any) on both development sets
 # (the v0.1 set and split C, replayed from captured finder answers) and is on by default. Three of them
