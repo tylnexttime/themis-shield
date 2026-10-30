@@ -16,6 +16,8 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
 - **0.3.2 (30/10/2026):** v0.4 detection fixes 1-3 below, measured on development data only (split D half C: released
   leaks 26 -> 3, R_any 0.925 -> 0.993, sensitive R_any 0.666 -> 0.986; friction unchanged).
 - **0.3.3 (30/10/2026):** item 4 below, the same way (split C sensitive R_any 0.955 -> 0.982).
+- **0.3.4 (30/10/2026):** item 5 below, friction on clean documents (split D half Q 0.286 -> 0.064, half C 0.323 ->
+  0.161; every safety measure unchanged on all four development sets).
 - **Next:** v0.4's "keep the work possible" design (the placeholder legend first), then a fresh split E for v0.4.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
@@ -202,6 +204,11 @@ split, and the release is tested once on a fresh split.
    document, and most were cells under a sensitive heading or a person's union role. Two fixed-vocabulary passes
    (`sensitive-columns`, `union-roles`) took split C's sensitive recall from 0.955 to 0.982 with friction unchanged.
    A sentence-level model check stays on the list for what vocabulary cannot reach, if split E shows the need.
+5. **Friction on clean documents** (done, 0.3.4). Split D held 38 of its 125 clean documents. Two switches cleared
+   the ones a rule can tell apart: configuration lines that only name where a secret lives (`secret-references`),
+   and PII-Tracer values that cannot be what their label says, with the date and address rules limited to documents
+   where no person was found (`tracer-evidence-sanity`). Fiction the finders read as sensitive, and injection text,
+   are still held; the second by design.
 
 ## v0.4 (design): keep the work possible
 

@@ -18,7 +18,7 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.3.3, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status: v0.3.4, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
 - **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
   is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
@@ -172,6 +172,9 @@ Read this section before you rely on anything above.
   0.15 rule), down from 40 under v0.2.1's behaviour. About a quarter of institutional look-alikes are still redacted,
   and on real documents the gate hides most business phone numbers, reference numbers and transaction dates, which
   limits what a cloud model can do with the output (v0.4's typed placeholders and task profiles address this).
+  Since 0.3.4, configuration lines that only name where a secret lives, and tracer values that cannot be what their
+  label says, no longer hold a clean document (development data: split D friction 0.286 -> 0.064 and 0.323 -> 0.161,
+  every safety measure unchanged). Split E will tell whether that holds on new text.
 - **Identifier columns in tables, fixed in development only.** On split D, bare licence numbers in a table's licence
   column were missed in three tables while every other column was covered. Since 0.3.2 a column headed as a personal
   identifier is protected cell by cell, and an organisation's format that is only digits no longer cancels such
@@ -182,7 +185,7 @@ Read this section before you rely on anything above.
   0.982), but anything else indirect is still the finders' job. The last frozen result is still 0.3.0's: on split D
   the gate caught 74% of sensitive statements overall, 98% in one half and 67% in the half whose author wrote mostly
   indirect phrasing (union membership 45%, criminal history 51%). Statements found are substituted and held;
-  statements missed in a released document are leaks. Split E will test 0.3.3 on text nobody here has seen.
+  statements missed in a released document are leaks. Split E will test the 0.3.x fixes on text nobody here has seen.
 - **A small classifier is a helper, never a judge.** We fine-tuned a small decision encoder (Laya, 421M) on synthetic
   data of our own: it answered 92.3% of questions correctly on sentence templates it had never seen, but its wrong
   answers came with a median confidence of 1.000. **It must never be used as a standalone privacy check.** In
@@ -556,8 +559,8 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
 [docs/ROADMAP.md](docs/ROADMAP.md). In short, each item a known gap from our own runs:
 
 1. **Detection on new authors' text** (from split D): column-aware identifier propagation, finder windows for long
-   documents and detection-view readers are in 0.3.2, and two sensitive-statement passes in 0.3.3 (development data
-   only); next is a fresh split E that tests them.
+   documents and detection-view readers are in 0.3.2, two sensitive-statement passes in 0.3.3 and two friction fixes
+   in 0.3.4 (development data only); next is a fresh split E that tests them.
 2. **Keep the work possible** (v0.4): typed placeholders with a codebook by default, optional partially synthetic
    values with per-job date shifting, per-task profiles, and a utility measurement next to the leak measurement
    ([story](docs/CODEBOOK-AND-SYNTHETIC-DATA.md)).

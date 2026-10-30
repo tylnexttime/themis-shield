@@ -2,6 +2,37 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## 0.3.4 (30/10/2026)
+
+**Development measurement only**, like 0.3.2 and 0.3.3: no fresh split has tested it, and a vetting record still quotes
+0.3.0's frozen FAIL as its method baseline.
+
+### Friction on clean documents
+
+Split D's clean documents were held for two reasons a rule can tell apart: configuration files that name where a secret
+lives, and PII-Tracer values that cannot be what their label says when both LLM finders read the document as clean.
+Two switches, on by default:
+
+- `secret-references`: a SECRET finding (from any detector) is dropped when every line it touches assigns only a
+  reference (`os.environ['X']`, `process.env.X`, `var.x`, `{{ lookup(...) }}`, `vault:secret/...`, `<your-api-key>`,
+  `REPLACE_ME`, a URL whose password slot is a template), declares one (`variable "x" {`), or plainly holds no value
+  (an import, a lone brace). A literal value, a default (`os.getenv('X', 'sk-...')`), or any other line keeps the label.
+- `tracer-evidence-sanity`: an amount labelled an identifier, a word labelled a URL and a lone role word labelled a
+  person are still substituted but no longer hold the document. A date with no birth context labelled a date of birth,
+  and a place without a number labelled an address, are treated the same way only when no detector found a person in
+  the document: a missed person beside a birth date or a street is the double miss the hold is for.
+
+| Set (development data) | Friction | Released leaks, R_any, R_full, sensitive and QI R_any |
+|---|---|---|
+| split D half Q | 0.286 -> **0.064** | unchanged |
+| split D half C | 0.323 -> **0.161** | unchanged |
+| split C | 0.147 -> 0.137 | unchanged |
+| v0.1 set | unchanged | unchanged |
+
+A first version of `secret-references` failed this measurement and never shipped: it also passed prose lines with a
+short value ("Temporary password: Dune!9301z", "temporary PIN 2970") and released 35 values. A test now runs the rule
+over every labelled secret in `eval/cases` and fails if any reads as a reference (DEV-DEBT DD-16).
+
 ## 0.3.3 (30/10/2026)
 
 **Development measurement only**, like 0.3.2: no fresh split has tested it, and a vetting record still quotes 0.3.0's

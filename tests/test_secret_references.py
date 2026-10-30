@@ -71,3 +71,23 @@ def test_a_reference_keeps_its_other_labels():
                    evidence=both.evidence + (FindingEvidence(Label.EMAIL, "gemma4-e4b", 2),))
     out = relabel_secrets(text, (both,), frozenset({"secret-references"}))
     assert len(out) == 1 and out[0].labels == frozenset({Label.EMAIL})
+
+
+def test_no_labelled_secret_in_the_evaluation_sets_reads_as_a_reference():
+    # The first version passed 96 of these (30/10/2026) and the ratchet caught it only where nothing else covered them.
+    # Every labelled SECRET must sit on a line that keeps its label, whatever any detector found.
+    import json
+    from pathlib import Path
+
+    cases = Path(__file__).resolve().parents[1] / "eval" / "cases"
+    passed, checked = [], 0
+    for path in sorted(cases.glob("*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            case = json.loads(line)
+            for span in case["spans"]:
+                if span["label"] == "SECRET":
+                    checked += 1
+                    if references_only(case["text"], span["start"], span["end"]):
+                        passed.append((case["id"], case["text"][span["start"]:span["end"]]))
+    assert checked > 100
+    assert passed == []
