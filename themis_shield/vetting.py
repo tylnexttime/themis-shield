@@ -20,7 +20,7 @@ The rules the record keeps:
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -395,7 +395,7 @@ def vet_release(
     from .detectors.markings import detect_markings, summarise_markings
     from .routing import Route, route_request
     from .detectors.typed import typed_settings
-    from .placeholders import TokenAllocator
+    from .placeholders import SENSITIVE_LABELS, TokenAllocator
     from .substitute import OriginalLeakError, SubstitutionError, substitute, verify_no_originals
 
     out_dir = Path(out_dir)
@@ -444,8 +444,16 @@ def vet_release(
         outcome.reasons = tuple(reason.value for reason in result.reasons)
         if outcome.decision == "BLOCK":
             continue
+        # A sensitive finding must name its statement span to be substituted. The finders copy the statement itself
+        # as the value, so its own span is the statement (the chat path widens to the whole message instead, which
+        # would empty a whole document here). Without this every document with one was BLOCKed (DD-15).
+        findings = tuple(
+            replace(item, statement_span=item.span)
+            if item.statement_span is None and item.labels & SENSITIVE_LABELS else item
+            for item in evidence.findings
+        )
         try:
-            derived = substitute(text, evidence.findings, allocator).tokenised_text
+            derived = substitute(text, findings, allocator).tokenised_text
         except (SubstitutionError, PermissionError):
             outcome.decision, outcome.reasons = "BLOCK", outcome.reasons + ("BLOCK:substitution-failed",)
             continue

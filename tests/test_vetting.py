@@ -246,3 +246,27 @@ def test_cli_runs_end_to_end_and_returns_incomplete_for_open_asks(tmp_path, monk
     assert record["part3_run"]["gate"]["config_sha256"] and record["part3_run"]["gate"]["version"] == __version__
     (tmp_path / "codebook.db").write_text("", encoding="utf-8")
     assert vetting.main(argv[:2] + [str(tmp_path / "out2")] + argv[3:]) == 2   # the codebook file exists
+
+
+class HealthFinders(UnsureFinders):
+    def chat_json(self, model_role, messages, schema, max_tokens):
+        result = super().chat_json(model_role, messages, schema, max_tokens)
+        if "hip replacement" in messages[-1]["content"]:
+            result["entities"].append({"label": "HEALTH", "value": "is waiting for a hip replacement"})
+        return result
+
+
+def test_a_sensitive_statement_is_held_for_ask_and_substituted_when_released(tmp_path):
+    # DD-15: a finder's sensitive finding has no statement span; vet once BLOCKed every such document.
+    text = "Ravi Example is waiting for a hip replacement."
+    h = harness(tmp_path / "a")
+    h.router.targets = replace(h.router.targets, llm_client=HealthFinders())
+    record = vet_release(h.router, [("a.txt", text)], RELEASE, tmp_path / "a" / "out", now=NOW)
+    doc = by_index(record)[1]
+    assert doc["decision"] == "ASK" and "BLOCK:substitution-failed" not in doc["reasons"]
+    resolution = {1: {"sha256": doc["sha256"], "resolution": "release", "by_role": "data custodian", "note": ""}}
+    h = harness(tmp_path / "b")
+    h.router.targets = replace(h.router.targets, llm_client=HealthFinders())
+    vet_release(h.router, [("a.txt", text)], RELEASE, tmp_path / "b" / "out", resolutions=resolution, now=NOW)
+    derived = (tmp_path / "b" / "out" / "release" / "doc-0001.txt").read_text(encoding="utf-8")
+    assert "hip replacement" not in derived and "Ravi" not in derived
