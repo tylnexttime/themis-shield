@@ -78,7 +78,7 @@ def contrary_tracer_findings(evidence: DetectionResult) -> list[tuple]:
     """
     out = []
     for found in evidence.findings:
-        if found.organisation_value:
+        if found.organisation_value or getattr(found, "implausible_tracer_value", False):
             continue
         labels = frozenset(
             item.label for item in found.evidence

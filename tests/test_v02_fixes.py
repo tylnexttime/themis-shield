@@ -289,16 +289,24 @@ def test_a_bracketed_public_number_is_still_a_whole_value():
 
 
 def test_unsure_tracer_finding_is_not_contrary_evidence():
-    text = "Explain why surveys ask for a postcode."
-    start = text.index("a postcode")
-    unsure = finding(start, start + len("a postcode"), Label.ADDRESS, "pii-tracer", 1, 0.78)
-    result = detect(text, {}, thorough(FakeTracer((unsure,))))
-    assert result.findings  # still redacted
-    assert ReasonCode.DISAGREEMENT_EMPTY_LLM not in result.reasons
-    sure = finding(start, start + len("a postcode"), Label.ADDRESS, "pii-tracer", 1, 0.95)
-    assert ReasonCode.DISAGREEMENT_EMPTY_LLM in detect(text, {}, thorough(FakeTracer((sure,)))).reasons
-    configure_policy("v0.1")
-    assert ReasonCode.DISAGREEMENT_EMPTY_LLM in decide(result).reasons
+    # The confidence floor alone. The v0.4 sanity check would also discount this wordless "address" (no number), so
+    # it is switched off here to keep the test about the score.
+    from themis_shield.detectors.settings import configure_detection_fixes
+
+    configure_detection_fixes([name for name in DEFAULT_DETECTION_FIXES if name != "tracer-evidence-sanity"])
+    try:
+        text = "Explain why surveys ask for a postcode."
+        start = text.index("a postcode")
+        unsure = finding(start, start + len("a postcode"), Label.ADDRESS, "pii-tracer", 1, 0.78)
+        result = detect(text, {}, thorough(FakeTracer((unsure,))))
+        assert result.findings  # still redacted
+        assert ReasonCode.DISAGREEMENT_EMPTY_LLM not in result.reasons
+        sure = finding(start, start + len("a postcode"), Label.ADDRESS, "pii-tracer", 1, 0.95)
+        assert ReasonCode.DISAGREEMENT_EMPTY_LLM in detect(text, {}, thorough(FakeTracer((sure,)))).reasons
+        configure_policy("v0.1")
+        assert ReasonCode.DISAGREEMENT_EMPTY_LLM in decide(result).reasons
+    finally:
+        configure_detection_fixes(None)
 
 
 def test_trailing_punctuation_does_not_cancel_a_personal_address():
