@@ -231,8 +231,11 @@ class ChatBoundary:
             else:
                 raise ValueError("INVALID_STOP")
 
-    def final_body(self, maximum_tokens: int, model: str = "") -> dict:
+    def final_body(self, maximum_tokens: int, model: str = "", legend: str = "") -> dict:
         body = deepcopy(self.body)
+        if legend:
+            # The placeholder legend (v0.4) goes first, as the gate's own system message, inside the protected body.
+            body["messages"].insert(0, {"role": "system", "content": legend})
         for path in self.argument_paths:
             parent = body
             for component in path[:-1]:

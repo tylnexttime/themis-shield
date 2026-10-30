@@ -55,6 +55,8 @@ class Replacement:
     label: Label
     category: TokenClass
     original_span: Span
+    # Every evidence label merged into this replacement (the placeholder legend reads them); ``label`` is the strongest.
+    labels: frozenset[Label] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,7 +143,9 @@ def substitute(
         category = token_class_for(label)
         token = allocator.allocate(text[start:end], category)
         output.extend((escape_literals(text[cursor:start]), token))
-        replacements.append(Replacement(token, label, category, Span(start, end)))
+        replacements.append(Replacement(
+            token, label, category, Span(start, end), frozenset(item[2] for item in group),
+        ))
         # A merged replacement contributes once to each distinct evidence label.
         summary.update({item[2].value for item in group})
         cursor = end

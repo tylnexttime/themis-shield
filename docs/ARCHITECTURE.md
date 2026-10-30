@@ -63,6 +63,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 |---|---|---|
 | `placeholders.py` | real | Opaque tokens and conservative entity linking (see below). |
 | `substitute.py` | real | Offset-safe replacement of original text, with value-free metadata. |
+| `legend.py` | real | The placeholder legend (v0.4): one system line per placeholder sent, saying what kind of value it hides. `[legend] enabled` (off by default) and `sensitive_categories` (off: a sensitive statement is described generically). |
 | `vault.py`, `protectors.py`, `dpapi.py` | real | Per-user SQLite token store, AES-256-GCM; the user key wrapped by DPAPI (Windows) or a passphrase (scrypt). |
 | `restore.py` | real | One-pass local restoration of tokens in the answer, tolerant of small syntax damage. Exact only: a damaged identifier is never guessed (see [Restore safety](#restore-safety)). |
 | `summary.py`, `history.py` | real | Summaries from the substituted text only; redacted conversation history. |

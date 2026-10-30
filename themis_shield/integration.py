@@ -160,6 +160,18 @@ def configure_versions(config: Mapping[str, Any]) -> dict:
     }
 
 
+def configure_legend_settings(config: Mapping[str, Any]) -> dict:
+    """Apply ``[legend]``: the placeholder legend (v0.4). Off by default; ``enabled = true`` sends one line per
+    placeholder saying what kind of value it hides, and ``sensitive_categories = true`` (also off by default) names a
+    sensitive statement's category instead of the generic "a sensitive statement about a person"."""
+    from .legend import configure_legend
+
+    table = dict(config.get("legend") or {})
+    if set(table) - {"enabled", "sensitive_categories"}:
+        raise ValueError("unknown [legend] settings")
+    return configure_legend(table.get("enabled"), sensitive_categories=table.get("sensitive_categories"))
+
+
 TYPED_KEYS = {
     "enabled", "families", "temperatures", "margin", "min_label_mass", "mixed_families", "indirect_substitute",
     "max_state_chars", "model_role",
@@ -291,6 +303,7 @@ def build_router(config_path):
     institution = institution_profile(config)
     configure_finder_prompt(config, institution)
     configure_versions(config)
+    configure_legend_settings(config)
     typed = configure_typed_tier(config)
     hooks = hooks_policy(config)
     reference = register_config.get("factory", DEFAULT_REGISTER_FACTORY)

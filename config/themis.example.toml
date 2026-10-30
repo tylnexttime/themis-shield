@@ -133,6 +133,17 @@ version = "v0.2"
 # quasi-identifiers are substituted (chosen on the v0.2 development set).
 quasi_id_ask = false
 
+[legend]
+# The placeholder legend (v0.4), optional and off by default. On: the request
+# sent to the cloud gains one system line per placeholder saying what kind of
+# value it hides ("a bank account number", "a date of birth", "a person"),
+# never the value. A sensitive statement is "a sensitive statement about a
+# person" unless sensitive_categories is also on, which names the category
+# ("a statement about a person's health") and so tells the cloud such a fact
+# exists.
+enabled = false
+sensitive_categories = false
+
 [hooks]
 # Claude Code managed-hooks policy. Closed: prompts with personal data get a
 # de-identified draft to paste, other prompts are refused, file tools denied.

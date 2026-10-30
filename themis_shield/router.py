@@ -24,6 +24,7 @@ from .detectors.contracts import Status
 from .detectors.engine import FINAL_STAGES, LLM_STAGES, TIER1_STAGES
 from .detectors.markings import MarkingClass
 from .history import CanonicalHistory, ClientTurn
+from .legend import legend_settings, legend_text
 from .inference.json_output import validate_output
 from .placeholders import SENSITIVE_LABELS, TokenAllocator, parse_strict_token
 from .policy import decide
@@ -322,6 +323,7 @@ class Router:
         allocator = TokenAllocator(conversation_id, self.vault)
         previous = allocator.mapping()
         sent, counts = set(), Counter()
+        labels_by_token: dict[str, set] = {}  # placeholders first allocated in this request: their evidence labels
         for start, surface in zip(starts, boundary.surfaces):
             end = start + len(surface.text)
             findings = []
@@ -356,10 +358,23 @@ class Router:
             assign(boundary.body, surface.path, protected.tokenised_text)
             sent.update(protected.authorised_tokens)
             counts.update(protected.redaction_summary)
+            for item in protected.replacements:
+                if item.token not in previous:
+                    labels_by_token.setdefault(item.token, set()).update(item.labels or {item.label})
         mapping = allocator.mapping()
         sent = frozenset(sent)
         scoped = {token: mapping[token] for token in sent}
-        raw = canonical(boundary.final_body(self.cloud.settings.max_tokens, self.cloud.settings.model))
+        # v0.4 placeholder legend, optional and off by default; chat requests only (a hook's tool object has no
+        # messages to carry it).
+        settings = legend_settings()
+        legend = legend_text(
+            {token: frozenset(labels_by_token[token]) if token in labels_by_token else None for token in sent},
+            sensitive_categories=settings["sensitive_categories"],
+        ) if settings["enabled"] and isinstance(boundary, ChatBoundary) else ""
+        body = boundary.final_body(self.cloud.settings.max_tokens, self.cloud.settings.model, **(
+            {"legend": legend} if legend else {}
+        ))
+        raw = canonical(body)
         originals = tuple(mapping.values())
         verify_json(raw, originals)
         # v0.3: the known-miss final sweep on the exact outbound JSON (a no-op unless enabled).

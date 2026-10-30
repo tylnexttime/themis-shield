@@ -31,7 +31,8 @@ def test_substitute_original_offsets_and_value_free_metadata():
         metadata = asdict(replacement)
         assert "Mara Lindahl" not in repr(metadata)
         assert "S1234567" not in repr(metadata)
-        assert set(metadata) == {"token", "label", "category", "original_span"}
+        assert set(metadata) == {"token", "label", "category", "original_span", "labels"}
+        assert replacement.labels == {replacement.label}  # label names only (the legend reads them), never values
     assert verify_no_originals(result.tokenised_text, allocator.mapping().values())
 
 

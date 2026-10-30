@@ -325,9 +325,15 @@ def handle(router, request, headers=None, *, source_document_count=1):
         outbound = Outbound(job.job_id, state.marking_class, raw, digest, True, originals)
         with router.register.release_guard(job.job_id, digest, now=router.clock()):
             stream = router.cloud.open(outbound)
+        clean_messages = strict_json(raw)["messages"]
+        # The placeholder legend (v0.4) is the gate's own message, prepended; history pairs the client's messages with
+        # what was sent for each of them, so it is left out.
+        prepended = len(clean_messages) - len(original_messages)
+        if prepended not in (0, 1):
+            raise GateFailure("OUTBOUND_MESSAGES_MISMATCH", 200)
         chunks = router._restore_chunks(
             stream, job, identifier, original_messages,
-            strict_json(raw)["messages"], mapping, sent, boundary.schemas,
+            clean_messages[prepended:], mapping, sent, boundary.schemas,
         )
         if request.get("stream") is True:
             owned_stream, owned_cleanup = stream, cleanup

@@ -2,6 +2,20 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## Unreleased
+
+### Placeholder legend (v0.4, optional, off by default)
+
+- `[legend] enabled = true` adds one system message to the request sent to the cloud, listing every placeholder it
+  carries with the kind of value it hides ("a bank account number", "a date of birth", "a person"), and asks the
+  model to keep each placeholder exactly as written. The legend is part of the protected request: checked for
+  originals and approved with everything else the cloud sees. Chat requests only.
+- A sensitive statement is described generically ("a sensitive statement about a person"). `[legend]
+  sensitive_categories = true`, also off by default, names the category instead ("a statement about a person's
+  health"), which tells the cloud such a fact exists.
+- A placeholder first sent in an earlier turn is described by its class ("an identifier"); history still pairs each
+  client message with what was sent for it, the legend left out.
+
 ## 0.3.4 (30/10/2026)
 
 **Development measurement only**, like 0.3.2 and 0.3.3: no fresh split has tested it, and a vetting record still quotes

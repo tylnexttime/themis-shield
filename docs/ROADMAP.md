@@ -234,9 +234,12 @@ The story behind this part, with its sources: [A codebook, and data that is part
     so the approval stays bound to exactly what the cloud sees.
   - The legend says only what the finding's label says ("a bank account number", "a date of birth"), never where it
     came from, how sure the detector was, or anything about other values.
-  - **One open decision: sensitive statements.** "`⟦S:…⟧` is a statement about someone's criminal history" tells the
-    cloud a special-category fact exists even though the statement is hidden. The default should be the generic "a
-    sensitive statement about a person"; naming the category is a per-task profile choice, off by default.
+  - **Sensitive statements (decided 30/10/2026, Chris):** generic by default ("a sensitive statement about a
+    person"); naming the category ("a statement about a person's health") tells the cloud a special-category fact
+    exists, so it is its own switch, off by default. The legend itself is optional.
+  - **Built (unreleased):** `themis_shield/legend.py`, `[legend] enabled` and `sensitive_categories`, both off by
+    default. A placeholder first sent in an earlier turn is described by its class only ("an identifier"): the
+    vault keeps values, not labels. Whether the legend should be on by default waits for the utility measurement.
   - Measured by the utility measurement below: the same tasks with and without the legend.
 - **A semi-synthetic dictionary, opt-in.** For tasks that read better with real-looking text, values are replaced by
   realistic surrogates, and some classes (transaction dates, for example) pass through unchanged. The cloud model is
