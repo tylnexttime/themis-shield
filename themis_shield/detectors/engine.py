@@ -287,6 +287,10 @@ def _finish(document):
         findings = relabel_secrets(text, findings, secret_fixes)
     if fix_on("address-line-numbers"):
         findings = address_line_numbers(text, findings)
+    if fix_on("tracer-evidence-sanity"):
+        from .tracer_sanity import mark_implausible_tracer_values
+
+        findings = mark_implausible_tracer_values(text, findings)
     document.timings[tier] += (perf_counter() - began) * 1000
     if any(
         not isfinite(value) or value < 0
