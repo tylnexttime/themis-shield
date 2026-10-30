@@ -610,11 +610,12 @@ def test_engine_lifts_a_fiction_hold_without_removing_its_substitution():
 
 def test_engine_q_i_adds_a_hold_and_a_substitution():
     configure_typed(enabled=True, families="all")
-    text = "Shift notes\n\nThe loading bay reopens on Monday. Tavita is the union delegate for night shift."
+    # A phrasing no deterministic pass recognises (union-roles catches "is the union delegate"), so Q-I is asked.
+    text = "Shift notes\n\nThe loading bay reopens on Monday. Tavita speaks for the night crew at the monthly branch meetings."
     result = run(text, ScriptedRuntime({"Q-I": lambda c: "union_membership" if "\"Tavita" in c else "none"}))
     assert result.decision == Decision.ASK and result.reasons == (ReasonCode.TYPED_INDIRECT,)
     added = [f for f in result.findings if f.labels == frozenset({Label.UNION})]
-    assert len(added) == 1 and text[added[0].start:added[0].end].startswith("Tavita is the union delegate")
+    assert len(added) == 1 and text[added[0].start:added[0].end].startswith("Tavita speaks for the night crew")
     configure_typed(enabled=True, families="all", indirect_substitute=False)
     held_only = run(text, ScriptedRuntime({"Q-I": lambda c: "union_membership" if "\"Tavita" in c else "none"}))
     assert held_only.reasons == (ReasonCode.TYPED_INDIRECT,) and not held_only.findings

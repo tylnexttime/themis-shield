@@ -50,6 +50,12 @@ v0.4 detection fixes (from split D, now development data):
   format's own key words stand within 40 characters before it ("Work order 12345678"); otherwise it would cancel any
   number of that shape, a licence or account number included. A bare format whose name is only generic words
   ("number", "id") allow-lists nothing. See ``detectors/profile_adapter.py``.
+- ``sensitive-columns``: a table column whose header names a sensitive category (police check, criminal history,
+  convictions, union membership, medical condition, disability, religion, sexuality, ethnicity or Indigenous status)
+  marks every non-empty cell as a statement of that category; a "No" or "Clear" still describes the person.
+- ``union-roles``: a sentence that gives a person a trade-union role or act (shop steward, union delegate or member,
+  paying or collecting dues, joining the union, the picket line) is a UNION statement; generic policy, credit unions
+  and a bare "steward" or "delegate" are not. See ``detectors/statements.py``.
 - ``finder-windows`` (on since 0.3.2, measured live 30/10/2026; DD-05): a document longer than 6,000 characters is read by the LLM finders
   in line-bounded windows (table headers repeated), so a dense document no longer overflows the finder's answer and
   fails closed; see ``finder_windows`` in ``detectors/llm_finder.py``. It changes the finder prompts, so captured
@@ -75,6 +81,8 @@ DETECTION_FIXES = (
     "secret-mrz", "finder-whitespace", "finder-whitespace-trust", "address-line-numbers",
     # v0.4, from split D (development data since its v0.3 run).
     "column-identifiers", "finder-windows", "detectors-detection-view", "bare-number-formats",
+    # v0.4 item 4 (sensitive statements the finders missed; detectors/statements.py).
+    "sensitive-columns", "union-roles",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",

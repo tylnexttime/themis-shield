@@ -493,4 +493,11 @@ def propagate(
         base = union_findings(base, table_quasi_spans(text, tier))
     if fix_on("column-identifiers"):
         base = union_findings(base, table_identifier_spans(text, tier))
+    if fix_on("sensitive-columns") or fix_on("union-roles"):
+        from .statements import table_statement_spans, union_role_spans
+
+        if fix_on("sensitive-columns"):
+            base = union_findings(base, table_statement_spans(text, tier))
+        if fix_on("union-roles"):
+            base = union_findings(base, union_role_spans(text, tier))
     return union_findings(base, extra_spans(text, base, stage, tier))
