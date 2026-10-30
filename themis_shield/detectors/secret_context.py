@@ -210,75 +210,6 @@ def secret_relabel(text: str, start: int, end: int, fixes) -> frozenset[Label] |
     return None
 
 
-# ----------------------------------------------------------------------------------------------------------------------
-# v0.4 fix "secret-references": every line a SECRET finding touches either assigns only a reference to where a secret
-# lives (an environment lookup, a template, a secret-manager path, a placeholder) or holds no value at all. Split D's
-# clean configuration files were all held this way: the finders label "SECRET_KEY = os.environ['SECRET_KEY']" a
-# secret although the value is never in the text. A line with a literal value is never a reference, so a real
-# secret on such a line keeps its label; so does any line carrying a long mixed token.
-# ----------------------------------------------------------------------------------------------------------------------
-_NAME = r"[A-Za-z_][A-Za-z0-9_.\-]{0,126}"
-_QUOTED_NAME = r"""["'][A-Za-z0-9_./:#@\-]{1,200}["']"""
-ENV_REFERENCE = re.compile(
-    r"""(?x)
-    (?:os\.environ|ENV|env)\s*\[\s*""" + _QUOTED_NAME + r"""\s*\]           # os.environ['X'], ENV["X"]
-    | (?:os\.environ\.get|os\.getenv|System\.getenv|Environment\.GetEnvironmentVariable|getenv)
-      \s*\(\s*""" + _QUOTED_NAME + r"""\s*(?:,\s*(?:None|null|""|''))?\s*\)  # os.getenv('X'), never with a default
-    | process\.env\.""" + _NAME + r"""                                     # process.env.X
-    | (?:var|local)\.""" + _NAME + r"""                                     # Terraform var.x, local.x
-    | \{\{\s*lookup\([^{}()]{1,200}\)\s*\}\}                               # {{ lookup('vault', '...', 'password') }}
-    | \{\{\s*""" + _NAME + r"""\s*\}\}                                     # {{secrets.db_password}}
-    | %\(\s*(?:env:)?""" + _NAME + r"""\s*\)[sdr]                          # %(env:DB_PASSWORD)s
-    | (?:vault|ssm|kv|keyvault|secret|secrets):[A-Za-z0-9_./#@\-]{1,200}  # vault:secret/data/reports#webhook
-    | <\s*(?:your|insert|enter|set|replace|add|put)[A-Za-z0-9 _\-]{0,60}>   # <your-api-key>, <insert token>
-    | (?i:replace[_\-]?me|change[_\-]?me|todo|tbd|x{4,}|dummy|none|null|nil|empty|"")
-    """
-)
-_ASSIGNMENT = re.compile(r"""^\s*(?:export\s+|-\s+)?["']?[A-Za-z0-9_.\-]{1,120}["']?\s*(?::|=|:=)\s*(?P<value>.*)$""")
-_DECLARATION = re.compile(r"""^\s*(?:variable|output|secret|resource|data)\s+"[^"]{1,120}"(?:\s+"[^"]{1,120}")?\s*\{\s*$""")
-_TRAILING = re.compile(r"""\s+(?:#|//).*$""")
-_URL_PASSWORD = re.compile(
-    r"""^[a-z][a-z0-9+.\-]{1,20}://[^:/@\s]{1,80}:(?P<password>\{\{[^{}]{1,240}\}\}|\$\{\{?[^{}]{1,120}\}?\}|[^@\s]{1,240})@"""
-)
-_LONG_MIXED = re.compile(r"(?=[A-Za-z0-9_\-+/=]*[0-9])(?=[A-Za-z0-9_\-+/=]*[A-Za-z])[A-Za-z0-9_\-+/=]{16,}")
-
-
-def _reference(value: str) -> bool:
-    from .rules import PLACEHOLDER
-
-    value = _TRAILING.sub("", value).strip().rstrip(",;").strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-        value = value[1:-1].strip()
-    if not value:
-        return True  # a key with no value carries no secret
-    if ENV_REFERENCE.fullmatch(value) or PLACEHOLDER.fullmatch(value):
-        return True
-    url = _URL_PASSWORD.match(value)
-    return bool(url) and _reference(url.group("password"))
-
-
-def references_only(text: str, start: int, end: int) -> bool:
-    """True when every non-blank line the span touches is a reference-only assignment or holds no value at all."""
-    line_start = max(text.rfind("\n", 0, start), text.rfind("\r", 0, start)) + 1
-    ends = [i for i in (text.find("\n", max(start, end - 1)), text.find("\r", max(start, end - 1))) if i >= 0]
-    line_end = min(ends) if ends else len(text)
-    lines = [line for line in re.split(r"\r\n|\r|\n", text[line_start:line_end]) if line.strip()]
-    if not lines:
-        return False
-    for line in lines:
-        if _DECLARATION.match(line):
-            continue
-        assignment = _ASSIGNMENT.match(line)
-        if assignment:
-            if not _reference(assignment.group("value")):
-                return False
-            continue
-        # Not an assignment ("import os", a block brace): a reference only if it carries no long mixed token.
-        if _LONG_MIXED.search(line) or re.search(r"""["'][^"'\s]{8,}["']""", line):
-            return False
-    return True
-
-
 def relabel_secrets(text: str, findings, fixes) -> tuple:
     """Replace SECRET on findings whose context says they are not secrets; every other label is kept."""
     from dataclasses import replace
@@ -287,13 +218,6 @@ def relabel_secrets(text: str, findings, fixes) -> tuple:
 
     out = []
     for item in findings:
-        if Label.SECRET in item.labels and "secret-references" in fixes and references_only(text, item.start, item.end):
-            # Not a secret, and nothing personal either: keep any other label the finding carries, else drop it.
-            others = item.labels - {Label.SECRET}
-            if not others:
-                continue
-            item = replace(item, labels=frozenset(others), primary_label=min(others, key=lambda label: label.value),
-                           evidence=tuple(e for e in item.evidence if e.label != Label.SECRET))
         if Label.SECRET in item.labels:
             new = secret_relabel(text, item.start, item.end, fixes)
             if new is not None:

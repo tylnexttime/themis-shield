@@ -38,11 +38,6 @@ class DetectionFinding(Finding):
     # v0.3: the whole value is an organisation's contact (role mailbox, inbound number) or company number. Still
     # substituted; only the empty-finder disagreement rule reads it (such a finding is not contrary evidence).
     organisation_value: bool = False
-    # v0.4 ("tracer-evidence-sanity"): a PII-Tracer value that cannot be what its label says (a money amount called an
-    # identifier, a word called a URL, a lone role word called a person, a date with no birth context called a date of
-    # birth, a place without a number called an address). Still substituted; it only stops counting as contrary
-    # evidence for the empty-finder hold, exactly like organisation_value.
-    implausible_tracer_value: bool = False
 
     @property
     def start(self) -> int:
