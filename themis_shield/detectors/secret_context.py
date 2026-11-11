@@ -302,6 +302,11 @@ def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
     A span that reaches into a trailing comment ("... # old: sk_live_...") holds text no reference test has read. A
     span in the key alone is not the reference, and over an empty value it is the key itself: a lone padded base64 key
     ("Zm9v...MQ=") parses as a key with no value. A span over the key and the reference together passes.
+
+    One more span passes: one wholly inside the key of an assignment whose value is a non-empty reference ("DEPLOY_TOKEN"
+    in "DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}"). The name of a variable is not a secret value, and the key is a plain
+    identifier by ``_ASSIGNMENT`` (letters, digits, underscore, hyphen, dot). The caller has already tested the value as
+    a reference, so this never reaches a literal value, and an empty value is answered above.
     """
     if start >= end:
         return True  # the span only touches this line at its line break
@@ -312,13 +317,17 @@ def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
         return False
     if not _bare(value):
         return start >= value_start  # nothing to refer to: a span over the key is the key itself
+    key_start, key_end = assignment.span("key")
+    if key_start <= start and end <= key_end:
+        return True  # the name of a variable that holds a reference
     return end > value_start
 
 
 def references_only(text: str, start: int, end: int, lookalikes: bool = True) -> bool:
     """True when every non-blank line the span touches is a reference-only assignment or holds no value at all.
 
-    On an assignment the span must also sit in the reference: not in the key, not in a trailing comment.
+    On an assignment the span must also sit in the reference: not in a trailing comment, and not in the key unless the
+    value is a non-empty reference (the name of a variable that holds one is not a secret).
     ``lookalikes`` adds the reference forms of ``secret-config-lookalikes`` (a template call to a secret manager, a
     URI under a key that says it is a reference); it is on here so that every caller, the DD-16 guard first, tests them.
     """

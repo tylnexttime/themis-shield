@@ -155,7 +155,9 @@ def test_a_span_must_sit_in_the_reference_not_in_its_comment_or_key():
     assert references_only(line, 0, comment - 2)  # key and reference together
     assert not references_only(line, 0, len(line))  # the span reaches into the comment
     assert not references_only(line, comment, len(line))
-    assert not references_only(line, 0, len("API_TOKEN"))  # the key alone is not the reference
+    # The key alone, over a non-empty reference, is the name of a variable and no longer a secret (the friction fix below);
+    # over a value-less key it still is (test_a_key_with_no_value_is_not_a_reference_for_a_span_over_the_key).
+    assert references_only(line, 0, len("API_TOKEN"))
     slash = "API_KEY = process.env.API_KEY  // old: " + LIVE_KEY
     assert references_only(slash, 0, slash.index("  //"))
     assert not references_only(slash, slash.index(LIVE_KEY), len(slash))
@@ -169,3 +171,121 @@ def test_a_key_with_no_value_is_not_a_reference_for_a_span_over_the_key():
     assert not references_only("password:", 0, len("password:"))
     commented = "API_KEY =  # old: " + LIVE_KEY  # a comment never makes a value-free line a reference
     assert not references_only(commented, 0, len(commented))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# COR-001 friction (development data): the NAME of a variable assigned a reference is not a secret value. After COR-001
+# a finder answer that tagged only the key ("SECRET_KEY" in "SECRET_KEY = os.environ[...]") kept its label.
+# ----------------------------------------------------------------------------------------------------------------------
+RANDOM_KEY = "Xk9pL2mQ7vR4tY8wZ3nB6cD1fG5hJ0aS"  # synthetic: a long random-looking token used as a key name
+PY_SETTINGS = 'import os\n\nDJANGO_SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")\nDEBUG = False\n'
+CI_ENV = (
+    "name: release\n"
+    "on: push\n"
+    "jobs:\n"
+    "  publish:\n"
+    "    runs-on: ubuntu-latest\n"
+    "    steps:\n"
+    "      - run: ./publish.sh\n"
+    "        env:\n"
+    "          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}\n"
+    "          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}\n"
+)
+
+
+class _FindersMany:
+    def __init__(self, values):
+        self.values = values
+
+    def chat_json(self, model_role, messages, schema, max_tokens):
+        return {"entities": [{"label": "SECRET", "value": value} for value in self.values]}
+
+
+def _detect_secret_names(text, names):
+    """The tracer and both finders report each of ``names`` (and only those) as a SECRET."""
+    found = [finding(text.index(n), text.index(n) + len(n), Label.SECRET, "pii-tracer", 1) for n in names]
+    return detect(text, {}, DetectionTargets(tracer=_Tracer(found), llm_client=_FindersMany(names), thorough=True))
+
+
+def _name_span(text, name):
+    start = text.index(name)
+    return start, start + len(name)
+
+
+@pytest.mark.parametrize("text, names", [
+    (PY_SETTINGS, ["DJANGO_SECRET_KEY"]),
+    (CI_ENV, ["PYPI_TOKEN", "DOCKER_PASSWORD"]),
+    ("SMTP_PASSWORD=${SMTP_PASSWORD}\nDEBUG=0\n", ["SMTP_PASSWORD"]),
+])
+def test_a_finder_answer_that_tags_only_the_name_of_a_reference_assignment_is_released(text, names):
+    result = _detect_secret_names(text, names)
+    assert result.decision == Decision.RELEASE and not result.findings
+
+
+@pytest.mark.parametrize("text, name", [
+    (PY_SETTINGS, "DJANGO_SECRET_KEY"),
+    (CI_ENV, "PYPI_TOKEN"),
+    (CI_ENV, "DOCKER_PASSWORD"),
+    ('SECRET_KEY = os.environ["SECRET_KEY"]', "SECRET_KEY"),
+    ("export DB_PASSWORD=${DB_PASSWORD}", "DB_PASSWORD"),
+    ("  - REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}", "REGISTRY_PASSWORD"),
+    ("const token = process.env.API_TOKEN;", "token"),
+    ("  db.password: vault:secret/data/reports#db", "db.password"),
+    ("  admin-password = var.admin_password", "admin-password"),
+    ('API_KEY = os.environ["API_KEY"]  # old: ' + LIVE_KEY, "API_KEY"),  # the name; the comment is judged on its own
+    ("DB_PASSWORD=${DB_PASSWORD}\nAPI_KEY=" + LIVE_KEY + "\n", "DB_PASSWORD"),  # the literal is on another line
+])
+def test_the_name_of_a_reference_assignment_is_not_a_secret(text, name):
+    start, end = _name_span(text, name)
+    assert references_only(text, start, end)
+    assert references_only(text, start + 1, end - 1)  # cut out of the name
+
+
+@pytest.mark.parametrize("line, name", [
+    (RANDOM_KEY + ":", RANDOM_KEY),  # a value-less key: the name is all the line says
+    (RANDOM_KEY + " =", RANDOM_KEY),
+    (RANDOM_KEY + ":  # old", RANDOM_KEY),  # a comment never makes a value
+    ("password:", "password"),
+    ("API_KEY =  # old: " + LIVE_KEY, "API_KEY"),
+    ("API_KEY = '" + LIVE_KEY + "'", "API_KEY"),  # a literal value: the line is not a reference at all
+    ("API_KEY: " + LIVE_KEY, "API_KEY"),
+    ("password = hunter22", "password"),
+    ("API_KEY = os.getenv('API_KEY', 'sk-live-9f8e7d6c5b4a')", "API_KEY"),  # a default is a literal
+    ("DB_PASSWORD=${DB_PASSWORD}\nAPI_KEY=" + LIVE_KEY + "\n", "API_KEY"),
+])
+def test_a_name_with_no_value_or_a_literal_value_stays_a_secret(line, name):
+    start, end = _name_span(line, name)
+    assert not references_only(line, start, end)
+
+
+def test_a_lone_padded_key_and_a_random_key_name_stay_secrets():
+    for line in (PADDED_KEY, RANDOM_KEY + ":", RANDOM_KEY + " ="):
+        assert not references_only(line, 0, len(line))
+    assert not references_only("Rotate it.\n" + PADDED_KEY + "\n", 11, 11 + len(PADDED_KEY))
+
+
+def test_a_span_that_leaves_the_name_is_judged_as_before():
+    line = 'API_TOKEN = os.environ["RECORDS_API_TOKEN"]  # from the vault'
+    assert not references_only(line, 0, len("API_TOKEN ="))  # the name and its separator, short of the reference
+    assert not references_only(line, len("API_TOKEN"), line.index("os.environ"))  # the separator alone
+    assert not references_only(line, 0, len(line))  # the name through the comment
+    assert references_only(line, 0, line.index("  #"))  # name and reference together (COR-001)
+    literal = "API_TOKEN = " + LIVE_KEY
+    assert not references_only(literal, 0, len(literal))  # name and a literal value together
+    assert not references_only(literal, 0, literal.index(LIVE_KEY) + 5)
+    commented = 'API_KEY = os.environ["API_KEY"]  # old: ' + LIVE_KEY
+    assert not references_only(commented, 0, len(commented))  # name through a secret in the comment
+    assert not references_only(commented, commented.index(LIVE_KEY), len(commented))
+
+
+@pytest.mark.parametrize("text, value", [
+    ("Rotated.\n" + RANDOM_KEY + ":\nDone.\n", RANDOM_KEY),
+    ("Rotated.\n" + RANDOM_KEY + " =\nDone.\n", RANDOM_KEY),
+    ("STRIPE_API_KEY = '" + LIVE_KEY + "'\n", LIVE_KEY),
+    ("STRIPE_API_KEY: " + LIVE_KEY + "\n", LIVE_KEY),
+    ('STRIPE_API_KEY = os.environ["STRIPE_API_KEY"]  # old: ' + LIVE_KEY + "\n", LIVE_KEY),
+])
+def test_a_key_with_no_value_or_a_literal_value_is_still_blocked_end_to_end(text, value):
+    result = _detect_secret(text, value)
+    assert result.decision == Decision.BLOCK and ReasonCode.SECRET in result.reasons
+    assert _secret_kept(result, text, value)

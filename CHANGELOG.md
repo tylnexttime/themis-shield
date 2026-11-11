@@ -96,6 +96,14 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   in a single `=` (read as a key with no value). A span that reaches into the stripped comment, a span in the key alone,
   and a span over the key of a value-less line now keep SECRET. A span over the key and the reference together, and a
   span cut out of the reference, still pass. This is a detection change, measured on the development sets afterwards.
+- `secret-references` (COR-001, friction): the span rule above also held two clean documents on the development sets,
+  both finder answers that tagged only a variable name (`SECRET_KEY` in `SECRET_KEY = os.environ["SECRET_KEY"]`; the
+  keys `DEPLOY_TOKEN` and `REGISTRY_PASSWORD` in a CI `env:` block of `${{ secrets.X }}` values), which the old
+  line-level rule had dropped. A SECRET finding whose span lies wholly within the key of an assignment whose value is a
+  non-empty reference is dropped again (the key is a plain identifier: letters, digits, underscore, hyphen, dot). A key
+  with no value, a key beside a literal value, a span that runs on past the key and a secret in a trailing comment
+  keep SECRET as before. This corrects the same switch; there is no new one, and `--detection-fixes` without
+  `secret-references` is unchanged.
 - SEC-01: in hooks mode, PreToolUse now denies the search tools Glob and Grep (only Read is allowed through). Their
   match counts and file lists carry no personal value, so the post-tool re-scan passed them, but under an approved job
   each call was a yes/no oracle over the raw contents and names of every file under `[hooks] roots`: a reviewer
