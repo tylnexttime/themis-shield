@@ -7,6 +7,7 @@ import json
 import httpx
 import pytest
 
+from themis_shield.chat_boundary import ChatBoundary
 from themis_shield.cloud import ApiKeyCredential, CloudClient, CloudFailure, CloudSettings, Outbound
 from themis_shield.cloud.openai_compat import canonical
 from themis_shield.detectors.markings import MarkingClass
@@ -134,6 +135,65 @@ def test_tool_argument_round_trip(tmp_path):
         assert json.loads(call["function"]["arguments"]) == {"name": "Mara Lindahl"}
         assert "Mara Lindahl" not in json.dumps(h.fake.requests)
         assert response.body["choices"][0]["finish_reason"] == "tool_calls"
+    finally:
+        h.cloud.close()
+
+
+NOTE = "Notes: Mara Lindahl, mara.lindahl@example.com, has epilepsy."
+
+
+def schema_tool_request(parameters):
+    # The user text is clean: the personal data is only in the tool schema, where nothing else would catch it.
+    return request(
+        "Synthetic arithmetic question.",
+        tools=[{
+            "type": "function",
+            "function": {
+                "name": "write_local", "description": "Prepare synthetic local output.",
+                "parameters": parameters,
+            },
+        }],
+    )
+
+
+def note_schema():
+    return {"type": "object", "description": NOTE, "properties": {"note": {"type": "string"}}}
+
+
+@pytest.mark.parametrize("wrapper", [
+    {"name": "Mara Lindahl", "strict": True, "schema": note_schema()},
+    {"name": "Mara Lindahl", "schema": note_schema()},
+    {"schema": note_schema()},
+])
+def test_tool_parameters_wrapper_form_is_refused_at_the_boundary(wrapper):
+    with pytest.raises(ValueError, match="UNSUPPORTED_TOOL"):
+        ChatBoundary(schema_tool_request(wrapper), frozenset({"write_local"}))
+
+
+def test_tool_parameters_wrapper_form_is_refused_and_nothing_is_sent(tmp_path):
+    h = harness(tmp_path)
+    try:
+        body = schema_tool_request({"name": "Mara Lindahl", "schema": note_schema()})
+        response = h.router.handle(body)
+        assert response.route == "blocked"
+        assert h.fake.requests == []
+        assert h.runtime.calls == []
+    finally:
+        h.cloud.close()
+
+
+def test_bare_tool_parameters_still_work_and_their_description_is_scanned(tmp_path):
+    boundary = ChatBoundary(schema_tool_request(note_schema()), frozenset({"write_local"}))
+    path = ("tools", 0, "function", "parameters", "description")
+    assert [item.text for item in boundary.surfaces if item.path == path] == [NOTE]
+    h = harness(tmp_path)
+    try:
+        response = approved_response(h, schema_tool_request(note_schema()))
+        assert response.route == "cloud-tokenised"
+        assert len(h.fake.requests) == 1
+        sent = json.dumps(h.fake.requests)
+        for original in ("Mara Lindahl", "mara.lindahl@example.com"):
+            assert original not in sent
     finally:
         h.cloud.close()
 

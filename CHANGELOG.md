@@ -31,6 +31,14 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
 - A placeholder first sent in an earlier turn is described by its class ("an identifier"); history still pairs each
   client message with what was sent for it, the legend left out.
 
+### Fixes from the 11/11/2026 independent review
+
+- **SEC-02, tool parameters in wrapper form.** A tool's `function.parameters` given as `{"name", "strict", "schema"}`
+  (the wrapper that local JSON output accepts) was not scanned: the inner schema's descriptions, titles, enum and
+  const values and the wrapper's `name` reached the cloud verbatim, past detection and substitution. The chat
+  boundary now refuses that form for tools (`UNSUPPORTED_TOOL`, the request is blocked and nothing is sent); a bare
+  schema is accepted and scanned as before.
+
 ## 0.3.4 (30/10/2026)
 
 **Development measurement only**, like 0.3.2 and 0.3.3: no fresh split has tested it, and a vetting record still quotes

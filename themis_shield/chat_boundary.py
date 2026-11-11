@@ -188,6 +188,9 @@ class ChatBoundary:
             if "strict" in function and type(function["strict"]) is not bool:
                 raise ValueError("INVALID_TOOL")
             parameters = function.get("parameters")
+            if isinstance(parameters, dict) and "schema" in parameters:
+                # The {name, strict, schema} wrapper is for local JSON output; schema() would not scan its keys.
+                raise ValueError("UNSUPPORTED_TOOL")
             normalise_schema(parameters)
             self.schemas[name] = deepcopy(parameters)
             self.schema((*base, "function", "parameters"), parameters)
