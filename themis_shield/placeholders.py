@@ -1,8 +1,11 @@
 """Conversation-scoped opaque tokens and conservative, local entity linking.
 
-Literal escaping doubles delimiters, backslashes and colons. Doubling colons
-also shields literal bare tokens from tolerant restoration. Inserted tokens
-are never escaped. Restoration unescapes literal segments, not resolved values.
+Literal escaping stops outbound document text from being read as a placeholder
+when the reply comes back: it doubles the two delimiters and escapes only what
+restoration could read as part of a placeholder (see escape_literals). Every
+other character, colons and backslashes included, goes out as written, so
+restoration can leave text the model writes itself alone. Inserted tokens are
+never escaped. Restoration unescapes literal segments, not resolved values.
 """
 
 from __future__ import annotations
@@ -91,27 +94,52 @@ def parse_strict_token(text: str) -> PlaceholderToken:
     return PlaceholderToken(TokenClass(text[1]), text[3:9])
 
 
+# What restoration could read as part of a placeholder, and so what must be escaped (restore._step is the reader).
+# Both the strict form and the tolerated ones start with a delimiter, a backslash that joins one (or joins u27e6,
+# the spelled-out opener), or a class letter standing alone followed by a colon and a hex digit (the bare form).
+_CLASS_LETTERS = "".join(token_class.value + token_class.value.lower() for token_class in TokenClass)
+_JOINABLE = r"(?=[⟦⟧]|(?i:u27e[67])|\Z)"  # what a backslash joins: a delimiter, u27e6 or u27e7, or a token to come
+_ESCAPABLE = re.compile(
+    "[⟦⟧]"                                                          # a delimiter: doubled
+    rf"|(?<!\\)\\(?:\\\\)*{_JOINABLE}"                              # an odd run of backslashes before one of those
+    rf"|(?<!\w)[{_CLASS_LETTERS}](?::{{3,}}|:(?=[0-9a-fA-F]|\Z))"   # a standalone class letter and its colon
+)
+_ESCAPES = re.compile(rf"⟦⟦|⟧⟧|(?<!\\)\\(?:\\\\)+{_JOINABLE}|(?<!\w)[{_CLASS_LETTERS}]:::")
+
+
 def escape_literals(text: str) -> str:
-    return "".join(character * 2 if character in "⟦⟧:\\" else character
-                   for character in text)
+    """Escape what restoration could read as a placeholder; send everything else as written.
+
+    A delimiter is doubled. A run of an odd number of backslashes followed by a delimiter, by ``u27e6`` or
+    ``u27e7`` (any case) or by the end of the text (a token may follow) gets two more: one backslash would join
+    the delimiter, and three are the escape for one. A class letter that stands alone (not after a letter, digit
+    or underscore), followed by one colon and a hex digit or the end of the text, gets two more colons, and so
+    does a run of three or more colons after such a letter, which could otherwise be read as that escape. An even
+    run of backslashes and a pair of colons are never an escape, so a model's own ``\\\\``, ``::``, ``std::vector``
+    or ``::1`` is not touched on the way back.
+    """
+
+    return _ESCAPABLE.sub(_escape_match, text)
+
+
+def _escape_match(match: re.Match[str]) -> str:
+    text = match.group()
+    if text in (OPEN_DELIMITER, CLOSE_DELIMITER):
+        return text * 2
+    return text + ("\\\\" if text[0] == "\\" else "::")
 
 
 def unescape_literals(text: str) -> str:
-    """Undo pairs once, without interpreting token syntax."""
+    """Undo escape_literals once, without interpreting token syntax."""
 
-    output: list[str] = []
-    index = 0
-    while index < len(text):
-        character = text[index]
-        if (
-            character in "⟦⟧:\\"
-            and index + 1 < len(text)
-            and text[index + 1] == character
-        ):
-            index += 1
-        output.append(character)
-        index += 1
-    return "".join(output)
+    return _ESCAPES.sub(_unescape_match, text)
+
+
+def _unescape_match(match: re.Match[str]) -> str:
+    text = match.group()
+    if text in (OPEN_DELIMITER * 2, CLOSE_DELIMITER * 2):
+        return text[0]
+    return text[:-2]
 
 
 @dataclass(frozen=True, slots=True)

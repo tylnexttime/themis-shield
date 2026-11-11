@@ -77,6 +77,18 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
 
 ### Fixes from the 11/11/2026 independent review
 
+- **DD-18 (COR-011), restoration halved text the cloud model wrote itself.** The gate doubled every `:`, `\`, `⟦` and
+  `⟧` in outbound text and restoration halved them on the way back, so a model-written `std::vector` came back as
+  `std:vector`, `::1` as `:1` and a doubled backslash as one, with a clean report; every colon the cloud read was
+  doubled too (`10::30`). Now only what restoration could read as a placeholder is escaped: the delimiters (doubled), a
+  class letter standing alone followed by a colon and a hex digit (`P:7f3a1c` goes out as `P:::7f3a1c`) and an odd run
+  of backslashes before a delimiter or a placeholder (two more). Every other character goes out as written and
+  restoration undoes only those escapes, so C++, Rust and PHP scope operators, IPv6 addresses and doubled backslashes
+  (four in a row too, as in a string literal) come back as written, and `10:30` is sent as `10:30`. Document text
+  shaped like a placeholder still comes back byte for byte and is never restored into a value. Unchanged: a
+  model-written `⟦⟦` or `⟧⟧`, three colons after a standalone class letter, and an odd run of three or more
+  backslashes before a delimiter or a placeholder are read as the gate's own escape. The strict xfail
+  `test_model_written_double_colon_survives_restoration` now passes (marker removed).
 - **SEC-02, tool parameters in wrapper form.** A tool's `function.parameters` given as `{"name", "strict", "schema"}`
   (the wrapper that local JSON output accepts) was not scanned: the inner schema's descriptions, titles, enum and
   const values and the wrapper's `name` reached the cloud verbatim, past detection and substitution. The chat

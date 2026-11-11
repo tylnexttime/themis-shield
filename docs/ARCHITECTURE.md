@@ -210,9 +210,12 @@ label names, so a token says only the coarse class:
 
 `SECRET` findings are never tokenised: they block the request. Linking is
 conservative: a bare surname or initials reuse a full name's token only when
-the match is unique. Literal text that looks like a token is escaped (doubled
-delimiters, backslashes and colons), so a document cannot forge a token that
-restoration would resolve.
+the match is unique. Literal text that restoration could read as a token is
+escaped (doubled delimiters; two more colons after a class letter that stands
+alone and is followed by a hex digit; two more backslashes in an odd run before
+a delimiter), so a document cannot forge a token that restoration would
+resolve. Every other character goes out as written, and restoration undoes
+only those escapes.
 
 ## Why the hooks path re-scans and the web path does not
 

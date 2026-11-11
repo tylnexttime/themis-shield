@@ -99,3 +99,17 @@ def test_complete_lab_label_mapping(label):
     allocator = TokenAllocator("synthetic")
     result = substitute("synthetic statement", [(0, 19, label)], allocator)
     assert result.replacements[0].category.value in "PCAIDSQ"
+
+
+def test_ordinary_colons_go_out_unchanged_and_text_shaped_like_a_placeholder_stays_inert():
+    # DD-18: only text that restoration could read as a placeholder is escaped; every other colon is sent as written.
+    text = "Mara Lindahl, 10:30, 2001:db8::1, std::vector; her note says P:7f3a1c and ⟦P:7f3a1c⟧ and \\⟦P:7f3a1c\\⟧."
+    allocator = TokenAllocator("synthetic", id_factory=lambda: "7f3a1c")  # the identifier the document spells
+    result = substitute(text, [(0, 12, "PERSON")], allocator)
+    assert result.tokenised_text == (
+        "⟦P:7f3a1c⟧, 10:30, 2001:db8::1, std::vector; her note says P:::7f3a1c and ⟦⟦P:::7f3a1c⟧⟧ and "
+        "\\\\\\⟦⟦P:::7f3a1c\\\\\\⟧⟧."
+    )
+    restored = restore_text(result.tokenised_text, allocator.mapping())
+    assert restored.text == text  # the real token restored once; the document's look-alikes untouched
+    assert restored.report.restored_count == 1 and restored.report.unknown_count == 0

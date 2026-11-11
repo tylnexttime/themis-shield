@@ -1,7 +1,9 @@
 """One-pass local restoration with bounded syntax tolerance.
 
 Resolved values are emitted literally and never rescanned or unescaped.
-Doubled source escape atoms are processed before token recognition. The
+The escapes the gate adds (see placeholders.escape_literals) are processed
+before token recognition, and no other character is changed: text the model
+writes itself, a "::" or a doubled backslash, comes back as written. The
 streaming and complete-text paths share the same lexer.
 """
 
@@ -23,6 +25,7 @@ from .vault import Vault
 MAXIMUM_HOLDBACK_CHARACTERS = 64
 _OPENERS = ("⟦", "\\⟦", "\\u27e6")
 _CLOSERS = ("⟧", "\\⟧", "\\u27e7")
+_UNICODE_FORMS = ("u27e6", "u27e7")  # what follows the backslash in the two spelled-out delimiters
 _BODY = re.compile(
     r"[ \t]{0,4}([PCAIDSQpcaidsq])[ \t]{0,4}:"
     r"[ \t]{0,4}([0-9a-fA-F]{1,16})[ \t]{0,4}"
@@ -127,10 +130,30 @@ def _step(
     """Return a complete lexical atom, or None while a prefix can still grow."""
 
     character = text[0]
-    if character in "⟦⟧:\\":
+    if character in "⟦⟧":
         if len(text) >= 2 and text[1] == character:
             return _Atom(2, character)
         if len(text) == 1 and not final:
+            return None
+    elif character == "\\":
+        # A run of backslashes is read in pairs, which are the text's own and never join a delimiter. The gate
+        # escapes an odd run (one backslash would join one) by adding two, so the last three of an odd run that
+        # is followed by a delimiter, by u27e6 or u27e7 (any case) or by the end are one backslash.
+        run = 1
+        while run < 4 and run < len(text) and text[run] == "\\":
+            run += 1
+        if run == 4:
+            return _Atom(2, "\\\\")
+        if run == 2 and (len(text) > 2 or final):
+            return _Atom(2, "\\\\")
+        if run == 3:
+            rest = text[3:].lower()
+            if not final and len(rest) < 5 and any(form.startswith(rest) for form in _UNICODE_FORMS):
+                return None  # may still become u27e6 or u27e7; an empty rest may be anything
+            if not rest or rest[0] in "⟦⟧" or rest[:5] in _UNICODE_FORMS:
+                return _Atom(3, "\\")
+            return _Atom(3, "\\\\\\")
+        if run == 2:
             return None
 
     lower = text.lower()
@@ -179,6 +202,11 @@ def _step(
                     return _Atom(1, character)
                 raw = text[:end]
                 return _token_atom(raw, raw, mapping)
+            if text[2] == ":":
+                if len(text) == 3 and not final:
+                    return None
+                if len(text) > 3 and text[3] == ":":
+                    return _Atom(4, character + ":")  # three colons: the escape for one; two are the model's own
     return _Atom(1, character)
 
 

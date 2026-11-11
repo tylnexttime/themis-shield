@@ -1127,12 +1127,12 @@ def test_machinery_round_trip_offline(tmp_path, monkeypatch, leg):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# A defect the live round trip makes visible, recorded as an expected failure.
+# DD-18, found by the live round trip: text the model writes itself must come back as written.
 #
-# The gate doubles every ":" (and every backslash and bracket) of the text it sends, so that a document cannot forge a
-# placeholder (placeholders.escape_literals; the live evidence shows "Cc:: ...", "week:: ..."). Restoration undoes the
-# doubling on the way back, which is exact for text the model repeats. But it cannot tell a doubled colon the gate
-# produced from a "::" the model wrote itself, so it halves that one too: "std::vector" comes back as "std:vector".
+# The gate used to double every ":" (and every backslash and bracket) of the text it sends, so that a document cannot
+# forge a placeholder (the live evidence shows "Cc:: ...", "week:: ..."), and restoration halved them on the way back:
+# exact for text the model repeats, but "std::vector" the model wrote itself came back as "std:vector". Now only what
+# restoration could read as a placeholder is escaped (placeholders.escape_literals), and only that escape is undone.
 # ---------------------------------------------------------------------------------------------------------------------
 def _round_trip_with_scripted_reply(tmp_path, monkeypatch, reply_template: str):
     fake_key = "synthetic-key-not-a-real-credential-0000"
@@ -1162,14 +1162,36 @@ def test_model_written_text_without_double_colons_restores_exactly(tmp_path, mon
     assert run.restored == "Imogen Whitlock can use a vector, and the IPv6 loopback address is written 0:0:0:0:0:0:0:1."
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "DEFECT: restoration halves a '::' (also a doubled backslash or bracket) that the model itself wrote, because it "
-    "cannot tell it from an escape the gate added; 'std::vector' is restored as 'std:vector'. Strict: when this is "
-    "fixed the test starts to pass, fails as XPASS, and the marker must be removed."
-))
 def test_model_written_double_colon_survives_restoration(tmp_path, monkeypatch):
     run, _ = _round_trip_with_scripted_reply(
         tmp_path, monkeypatch, "{token} can use std::vector, and the IPv6 loopback address is ::1.",
     )
     assert run.route == "cloud-tokenised", run.steps
     assert run.restored == "Imogen Whitlock can use std::vector, and the IPv6 loopback address is ::1."
+
+
+def test_ordinary_colons_reach_the_cloud_as_written_and_a_model_written_backslash_pair_survives(tmp_path, monkeypatch):
+    fake_key = "synthetic-key-not-a-real-credential-0000"
+    monkeypatch.setenv(KEY_ENV, fake_key)
+    outbound = []
+
+    def reply_for(sent):
+        outbound.append(last_user_text(sent))
+        token = PLACEHOLDER.search(outbound[-1]).group(0)
+        return token + " can run C:\\\\Users\\\\x\\\\go.cmd from \\\\server\\share (Foo::bar, A::B, ::1) at 10:30."
+
+    gate = build_gate(tmp_path / "gate", scripted_transport(reply_for), "claude-synthetic-model", key=fake_key)
+    try:
+        run = run_document(gate, Doc(
+            "cpp", "Ask Imogen Whitlock to explain std::vector at 10:30 about C:\\Users\\Imogen Whitlock\\notes.",
+            _names("Imogen Whitlock"), classes=("P",), visible=("to explain std::vector at 10:30 about",),
+        ))
+    finally:
+        gate.close()
+        reset_process_state()
+    assert run.route == "cloud-tokenised", run.steps
+    assert "std::vector at 10:30 about C:\\Users\\" in outbound[-1]  # sent as written, not doubled
+    assert "Imogen Whitlock" not in outbound[-1]
+    assert run.restored == (
+        "Imogen Whitlock can run C:\\\\Users\\\\x\\\\go.cmd from \\\\server\\share (Foo::bar, A::B, ::1) at 10:30."
+    )

@@ -210,10 +210,13 @@ Read this section before you rely on anything above.
 - **Markings written with look-alike letters are not recognised.** Marking detection reads the text and its NFKC
   form, and NFKC does not fold letters from other scripts: a Cyrillic Е inside RESTRICTED is classified as no marking,
   and the document is routed as unmarked.
-- **Restoration can alter text the cloud model wrote itself.** The gate doubles every `:`, `\`, `⟦` and `⟧` in
-  outbound text and halves them on the way back, which is exact for text that came from you. A `::` or a doubled
-  backslash that the model wrote itself is halved too (`std::vector` comes back as `std:vector`), and the
-  restoration report still says clean ([DD-18](docs/DEV-DEBT.md)).
+- **Restoration can still alter a few shapes the cloud model wrote itself.** The gate escapes only what restoration
+  could read as a placeholder (the `⟦` and `⟧` delimiters, a class letter standing alone followed by a colon and a hex
+  digit, an odd run of backslashes before a delimiter or a placeholder) and sends every other character as written,
+  so `std::vector`, `::1` and a doubled backslash come back as the model wrote them. Text of the model's that has the
+  shape of one of those escapes is undone like one (a doubled `⟦⟦` or `⟧⟧`, three colons after a standalone class
+  letter, three backslashes before a delimiter or a placeholder), and the restoration report still says clean
+  ([DD-18](docs/DEV-DEBT.md)).
 - **A small classifier is a helper, never a judge.** We fine-tuned a small decision encoder (Laya, 421M) on synthetic
   data of our own: it answered 92.3% of questions correctly on sentence templates it had never seen, but its wrong
   answers came with a median confidence of 1.000. **It must never be used as a standalone privacy check.** In
