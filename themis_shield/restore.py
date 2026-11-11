@@ -29,6 +29,15 @@ _BODY = re.compile(
 )
 _BARE_START = frozenset("PCAIDSQpcaidsq")
 _HEX = frozenset("0123456789abcdefABCDEF")
+_SCHEME_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789+.-")
+# Schemes that start a URL without "//": the two named in R-01, javascript, and the
+# WHATWG special schemes, which browsers also parse as absolute in "https:host" form.
+_COLON_SCHEMES = frozenset({
+    "data", "mailto", "javascript", "http", "https", "ftp", "file", "ws", "wss",
+})
+_URL_STOPS = frozenset(")>\"'")
+_URL_ATTRIBUTES = frozenset({"src", "href", "action"})
+_OPAQUE = "\0"  # how a whole token advances the URL context: never a stop or scheme character
 
 
 class StreamingRestorationError(PermissionError):
@@ -45,6 +54,7 @@ class RestoreReport:
     unknown_tokens: tuple[str, ...] = field(repr=False)
     dropped_entities: tuple[str, ...] = field(repr=False)
     tolerant_count: int = 0
+    withheld_in_url: int = 0
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -172,6 +182,87 @@ def _step(
     return _Atom(1, character)
 
 
+class _UrlContext:
+    """Whether the next character of the cloud text sits inside a URL.
+
+    Left context only, advanced with every consumed raw character in order, so
+    the answer never depends on how the text was split into chunks. Inside: a
+    run from a scheme (``x://`` or a colon scheme) to whitespace, ``)``, ``>``,
+    a quote or the end; a markdown ``](...)`` target (balanced parentheses);
+    a ``src=``/``href=``/``action=`` attribute value.
+    """
+
+    __slots__ = ("_url", "_run", "_letter", "_colon", "_target", "_last",
+                 "_name", "_named", "_attribute")
+
+    def __init__(self) -> None:
+        self._url = False       # in a bare scheme run
+        self._run = ""          # trailing scheme-character run (lower case, last 16)
+        self._letter = False    # that run contains a letter
+        self._colon = 0         # 1 after "scheme:", 2 after "scheme:/"
+        self._target = 0        # markdown target parenthesis depth
+        self._last = ""
+        self._name = ""         # trailing attribute-name word (lower case, last 8)
+        self._named = False     # an attribute name, then only whitespace so far
+        self._attribute = ""    # "=" awaiting value, a quote, " " unquoted, "" none
+
+    @property
+    def inside(self) -> bool:
+        return self._url or self._target > 0 or bool(self._attribute)
+
+    def advance(self, raw: str) -> None:
+        for character in raw:
+            self._character(character)
+
+    def _character(self, character: str) -> None:
+        lower = character.lower() if character.isascii() else character
+        space = character.isspace()
+        if self._target:
+            self._target += {"(": 1, ")": -1}.get(character, 0)
+        elif character == "(" and self._last == "]":
+            self._target = 1
+        self._last = character
+
+        state = self._attribute
+        if state == "=":
+            if character in "\"'":
+                self._attribute = character
+            elif not space:
+                self._attribute = "" if character == ">" else " "
+        elif state in ("\"", "'"):
+            if character == state:
+                self._attribute = ""
+        elif state == " ":
+            if space or character == ">":
+                self._attribute = ""
+        elif character == "=" and (self._named or self._name in _URL_ATTRIBUTES):
+            self._attribute = "="
+        if lower.isascii() and (lower.isalnum() or lower == "_"):
+            self._name, self._named = (self._name + lower)[-8:], False
+        else:
+            self._named = space and (self._named or self._name in _URL_ATTRIBUTES)
+            self._name = ""
+
+        if self._url and (space or character in _URL_STOPS):
+            self._url = False
+        if character == "/" and self._colon == 2:
+            self._url, self._colon = True, 0
+        elif character == "/" and self._colon == 1:
+            self._colon = 2
+        elif character == ":" and self._letter:
+            if self._run in _COLON_SCHEMES:
+                self._url, self._colon = True, 0
+            else:
+                self._colon = 1
+        else:
+            self._colon = 0
+        if lower in _SCHEME_CHARACTERS:
+            self._run = (self._run + lower)[-16:]
+            self._letter = self._letter or lower.isalpha()
+        else:
+            self._run, self._letter = "", False
+
+
 class StreamingRestorer:
     """Restore an isolated text stream using an immutable mapping snapshot.
 
@@ -194,6 +285,8 @@ class StreamingRestorer:
         self._previous = ""
         self._counts: Counter[str] = Counter()
         self._unknown: list[str] = []
+        self._withheld: list[str] = []
+        self._url = _UrlContext()
         self._tolerant = 0
         self._closed = False
         self._failed = False
@@ -208,8 +301,27 @@ class StreamingRestorer:
     def report(self) -> RestoreReport:
         return RestoreReport(
             dict(self._counts), tuple(self._unknown),
-            tuple(sorted(self._sent - self._counts.keys())), self._tolerant,
+            tuple(sorted(self._sent - self._counts.keys() - set(self._withheld))),
+            self._tolerant, len(self._withheld),
         )
+
+    def _take(self, raw: str, atom: _Atom) -> str:
+        """Account one atom. A resolved token inside a URL is withheld: left as written."""
+
+        self._previous = raw[-1]
+        output = atom.output
+        if atom.token is not None:
+            self._tolerant += int(atom.tolerant)
+            if self._url.inside:
+                self._withheld.append(atom.token)
+                output = raw
+            else:
+                self._counts[atom.token] += 1
+        if atom.unknown is not None:
+            self._unknown.append(atom.unknown)
+        opaque = atom.token is not None or atom.unknown is not None
+        self._url.advance(_OPAQUE if opaque else raw)
+        return output
 
     def _drain(self, *, final: bool, reject_incomplete: bool) -> str:
         output: list[str] = []
@@ -222,13 +334,7 @@ class StreamingRestorer:
                 break
             raw = self._pending[:atom.consumed]
             self._pending = self._pending[atom.consumed:]
-            self._previous = raw[-1]
-            output.append(atom.output)
-            if atom.token is not None:
-                self._counts[atom.token] += 1
-                self._tolerant += int(atom.tolerant)
-            if atom.unknown is not None:
-                self._unknown.append(atom.unknown)
+            output.append(self._take(raw, atom))
         return "".join(output)
 
     def _characters(self, text: str) -> str:
@@ -296,13 +402,7 @@ def restore_text(
         )
         assert atom is not None
         raw = text[index:index + atom.consumed]
-        stream._previous = raw[-1]
-        output.append(atom.output)
-        if atom.token is not None:
-            stream._counts[atom.token] += 1
-            stream._tolerant += int(atom.tolerant)
-        if atom.unknown is not None:
-            stream._unknown.append(atom.unknown)
+        output.append(stream._take(raw, atom))
         index += atom.consumed
     return RestoreResult("".join(output), stream.report)
 
@@ -324,7 +424,9 @@ def restore_tool_arguments(json_text: str, mapping: Mapping[str, str]) -> str:
     """Restore complete JSON only; unknown tokens or key collisions block.
 
     Syntax recovery is not execution authority. M4 must additionally validate
-    the tool schema, paths, fixed enums, destination and local action.
+    the tool schema, paths, fixed enums, destination and local action. Each
+    string is restored on its own, so a token inside a URL there stays a
+    placeholder, as in text.
     """
 
     snapshot = _snapshot(mapping)

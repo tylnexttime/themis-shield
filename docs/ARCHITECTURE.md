@@ -443,9 +443,25 @@ already issued in the conversation (one hex digit changed, or two adjacent digit
 letter), so a single damaged character can never turn one person's placeholder into another person's: it restores
 the original placeholder's value or nothing (`tests/test_restore_safety.py`).
 
-Restoration is lexical, not contextual. It looks at the token, never at where the token sits: a placeholder that the
-cloud reply writes inside a URL, a markdown image address, a command or a tool-call argument is restored to the real
-value there (`restore_tool_arguments` refuses invalid JSON, colliding keys and unknown tokens; it does not validate
-what the restored string will do). The gate does not check the context a value is restored into, so a client that
-renders or executes the reply (fetches the image, follows the link, runs the command or the tool call) can send the
-real value onwards.
+A placeholder inside a URL is not restored (R-01, review SEC-03). It stays as the placeholder text, and the report
+counts it as `withheld_in_url`. The router returns that count with `unknown_tokens`, `dropped_tokens` and
+`restored_tokens` in the `themis` object (the response body, or the final chunk of a stream). "Inside a URL" means
+any of these:
+
+- a run that starts with a scheme (`[a-z][a-z0-9+.-]*://`, or `data:`, `mailto:`, `javascript:`, `http:`, `https:`,
+  `ftp:`, `file:`, `ws:`, `wss:` without slashes) and ends at whitespace, `)`, `>`, `"`, `'` or the end of the text;
+- a markdown link or image target `](...)`, with balanced parentheses;
+- the value of an HTML/XML attribute named `src`, `href` or `action`, quoted or unquoted. A prefix such as
+  `xlink:href` or `data-src` counts too.
+
+The decision uses only the text before the token, exactly as the cloud wrote it, so it does not depend on how a
+stream is split into chunks. A placeholder next to a URL, but not in it, is restored as before. Each string in
+tool-call arguments (`restore_tool_arguments`, and the hooks' tool input) follows the same rule on its own. That
+function still refuses invalid JSON, colliding keys and unknown tokens, and does not check what the restored string
+will do.
+
+Restoration is otherwise still lexical. A placeholder in a command, in code, in a tool argument that is not a URL,
+or in any other non-URL context (a relative path outside the forms above, `srcset`, `formaction`, CSS `url(...)`, a
+URL the client builds from parts) is restored to the real value. So a client that executes the reply, or builds a
+request from it, can still send the value onwards. The rule also errs on the cautious side: prose shaped like an
+attribute (`action = ⟦P:...⟧`) or an unclosed `](` is withheld.

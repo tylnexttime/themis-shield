@@ -63,10 +63,14 @@ Behaviour that is known and documented, so that nobody relies on the opposite. S
   marking that uses one (a Cyrillic Е inside `RESTRICTED`) is not recognised:
   the document is classified as unmarked and routed as such. Only the
   personal-data decision then stands between it and the cloud.
-- **Restoration is lexical.** The gate puts the original value back wherever
-  the cloud reply writes a placeholder it issued, and does not look at the
-  context. A placeholder the reply puts in a URL, a markdown image address, a
-  command or a tool-call argument is restored to the real value there. A
-  client that renders or executes the reply (fetching the image, following the
-  link, running the command or the tool call) can send that value onwards.
-  See "Restore safety" in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- **Restoration is lexical outside URLs.** A placeholder that the cloud reply
+  writes inside a URL (a scheme run such as `https://...`, a markdown link or
+  image target, or an HTML `src`/`href`/`action` value) is left as the
+  placeholder and counted as `withheld_in_url` in the `themis` report. Every
+  other placeholder it issued is put back wherever the reply writes it,
+  without looking at the context. A placeholder in a command, in code, in a
+  tool-call argument that is not a URL, or in any other non-URL context is
+  restored to the real value there. A client that executes the reply (running
+  the command or the tool call) or builds a request from it can send that
+  value onwards. See "Restore safety" in
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

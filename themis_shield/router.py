@@ -513,6 +513,7 @@ class Router:
                 "unknown_tokens": restorer.report.unknown_count,
                 "dropped_tokens": restorer.report.dropped_count,
                 "restored_tokens": restorer.report.restored_count,
+                "withheld_in_url": restorer.report.withheld_in_url,
             })
         except GateFailure as failure:
             from .router_flow import fail_job

@@ -151,6 +151,7 @@ class FakeCloud:
     def __init__(self, *, tool=False, malformed=False):
         self.requests = []
         self.tool, self.malformed = tool, malformed
+        self.answer = None  # optional text with {token}, sent split inside the token
 
     def __call__(self, request):
         body = strict_json(request.content)
@@ -178,6 +179,12 @@ class FakeCloud:
                 "index": 0, "function": {"arguments": arguments[7:]},
             }]})
             add({}, "tool_calls")
+        elif self.answer is not None:
+            text = self.answer.replace("{token}", token)
+            middle = text.index(token) + 4 if token in text else len(text) // 2
+            add({"content": text[:middle]})
+            add({"content": text[middle:]})
+            add({}, "stop")
         else:
             add({"content": "Hello " + token[:4]})
             add({"content": token[4:] + "."})

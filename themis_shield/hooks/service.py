@@ -422,6 +422,7 @@ class HookService:
                     checked = restore_text(key, mapping)
                     if (
                         checked.text != key
+                        or checked.report.withheld_in_url
                         or checked.report.unknown_count
                         or checked.report.tolerant_count
                     ):

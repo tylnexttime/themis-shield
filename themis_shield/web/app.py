@@ -284,6 +284,7 @@ def create_app(
                                 "restored": latest.get("restored_tokens", 0),
                                 "unknown_tokens": latest.get("unknown_tokens", 0),
                                 "dropped_tokens": latest.get("dropped_tokens", 0),
+                                "withheld_in_url": latest.get("withheld_in_url", 0),
                                 "answer_source": "cloud" if response.route == "cloud-tokenised" else "local",
                             },
                         }).decode() + "\n\n"
