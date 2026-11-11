@@ -237,7 +237,7 @@ ENV_REFERENCE = re.compile(
     | (?i:replace[_\-]?me|change[_\-]?me|todo|tbd|x{4,}|dummy|none|null|nil|empty|"")
     """
 )
-_ASSIGNMENT = re.compile(r"""^\s*(?:export\s+|-\s+)?(?:(?:const|let|var|val)\s+)?["']?[A-Za-z0-9_.\-]{1,120}["']?\s*(?::|=|:=)\s*(?P<value>.*)$""")
+_ASSIGNMENT = re.compile(r"""^\s*(?:export\s+|-\s+)?(?:(?:const|let|var|val)\s+)?["']?(?P<key>[A-Za-z0-9_.\-]{1,120})["']?\s*(?::|=|:=)\s*(?P<value>.*)$""")
 _DECLARATION = re.compile(r"""^\s*(?:variable|output|secret|resource|data)\s+"[^"]{1,120}"(?:\s+"[^"]{1,120}")?\s*\{\s*$""")
 _TRAILING = re.compile(r"""\s+(?:#|//).*$""")
 _URL_PASSWORD = re.compile(
@@ -261,7 +261,28 @@ def _bare(value: str) -> str:
     return value
 
 
-def _reference(value: str) -> bool:
+# v0.5 fix "secret-config-lookalikes" (split F's clean configuration files, now development data), reference forms:
+# - a call to a secret manager from a template ("{{ vault 'kv/app/db#password' }}", "{{ vault('kv/app/db', 'password') }}")
+#   names a path and, at most, a field to read; the first argument is a path (it holds a slash), every other argument a
+#   field name, and nothing else stands in the braces;
+# - a URI of any scheme but a web one, whose key says it is a reference ("credentialRef", "db_password_ref"), made only of
+#   lower-case words ("keyhold://kv-prod/edge/syd#admin"): no user, no password, no query, no host with dots.
+_SM_PATH = r"""(?:"[A-Za-z0-9_.:#@\-]{0,100}/[A-Za-z0-9_./:#@\-]{1,200}"|'[A-Za-z0-9_.:#@\-]{0,100}/[A-Za-z0-9_./:#@\-]{1,200}')"""
+_SM_FIELD = r"""(?:"[A-Za-z0-9_.\-]{1,80}"|'[A-Za-z0-9_.\-]{1,80}')"""
+TEMPLATE_LOOKUP = re.compile(
+    r"\{\{-?\s*(?:vault|hashi_vault|secret|secrets|secretsmanager|ssm|kv|keyvault|op)"
+    r"(?:\(\s*" + _SM_PATH + r"(?:\s*,\s*" + _SM_FIELD + r")*\s*\)"      # {{ vault('kv/app/db', 'password') }}
+    r"|\s+" + _SM_PATH + r"(?:\s+" + _SM_FIELD + r")*)"                  # {{ vault 'kv/app/db#password' }}
+    r"\s*-?\}\}"
+)
+_WORD = r"[a-z]+(?:[_\-][a-z0-9]+)*"  # a lower-case word, then "-01", "_id", "-prod": never letters run into digits
+REF_KEY = re.compile(r"(?:[a-z0-9](?:Ref|Reference)|(?i:(?:^|[_\-.])(?:ref|reference)))$")
+REF_URI = re.compile(
+    r"(?!(?:https?|ftps?|wss?)://)[a-z][a-z0-9+.\-]{1,20}://" + _WORD + r"(?:/" + _WORD + r")+(?:#" + _WORD + r")?"
+)
+
+
+def _reference(value: str, key: str = "", lookalikes: bool = False) -> bool:
     from .rules import PLACEHOLDER
 
     value = _bare(value)
@@ -269,8 +290,10 @@ def _reference(value: str) -> bool:
         return True  # a key with no value carries no secret
     if ENV_REFERENCE.fullmatch(value) or PLACEHOLDER.fullmatch(value):
         return True
+    if lookalikes and (TEMPLATE_LOOKUP.fullmatch(value) or (REF_KEY.search(key) and REF_URI.fullmatch(value))):
+        return True
     url = _URL_PASSWORD.match(value)
-    return bool(url) and _reference(url.group("password"))
+    return bool(url) and _reference(url.group("password"), "", lookalikes)
 
 
 def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
@@ -292,10 +315,12 @@ def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
     return end > value_start
 
 
-def references_only(text: str, start: int, end: int) -> bool:
+def references_only(text: str, start: int, end: int, lookalikes: bool = True) -> bool:
     """True when every non-blank line the span touches is a reference-only assignment or holds no value at all.
 
     On an assignment the span must also sit in the reference: not in the key, not in a trailing comment.
+    ``lookalikes`` adds the reference forms of ``secret-config-lookalikes`` (a template call to a secret manager, a
+    URI under a key that says it is a reference); it is on here so that every caller, the DD-16 guard first, tests them.
     """
     line_start = max(text.rfind("\n", 0, start), text.rfind("\r", 0, start)) + 1
     ends = [i for i in (text.find("\n", max(start, end - 1)), text.find("\r", max(start, end - 1))) if i >= 0]
@@ -309,7 +334,7 @@ def references_only(text: str, start: int, end: int) -> bool:
             continue
         assignment = _ASSIGNMENT.match(line)
         if assignment:
-            if not _reference(assignment.group("value")) or not _in_reference(
+            if not _reference(assignment.group("value"), assignment.group("key"), lookalikes) or not _in_reference(
                 assignment, max(start - offset, 0), min(end - offset, len(line))
             ):
                 return False
@@ -320,15 +345,58 @@ def references_only(text: str, start: int, end: int) -> bool:
     return True
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# v0.5 fix "secret-config-lookalikes", span forms: the rules' base64 pattern (30 or more letters, digits, "+", "/") and
+# the detectors' own guesses take two shapes that are made of words, not of random characters. A random 30-character
+# base64 string is a camel-case name once in about 700,000 (once in 10^8 at 36 characters; measured) and is not a path of
+# lower-case words in 300,000 draws (analytically below 1 in 10^11).
+# - a path of lower-case words that is plainly a directory (it ends in "/") or a configuration file (what follows names
+#   a file extension): "deploy/environments/production" before ".yaml", "kv/team/prod/" in a comment;
+# - the key of an assignment that is a camel-case identifier of at least three words ("targetCPUUtilizationPercentage").
+#   Only in the key: after "password:" the same shape is a passphrase and keeps its label.
+# A span in a key that is not such an identifier, and a span in a path that is neither a directory nor a file, are
+# untouched, so a key alone ("API_TOKEN", a lone padded base64 key) still holds (COR-001).
+# ----------------------------------------------------------------------------------------------------------------------
+_PATH = r"(?:\.{0,2}/)?" + _WORD + r"(?:/" + _WORD + r")+"
+_FILE_PATH = re.compile(
+    _PATH + r"(?:\.[a-z][a-z0-9_\-]{0,20})*\.(?:ya?ml|json|toml|tf|tfvars|ini|cfg|conf|properties|xml)(?![A-Za-z0-9_])"
+)
+_DIRECTORY = re.compile(_PATH + "/")
+CODE_NAME = re.compile(r"[a-z]{2,}(?:[A-Z][a-z]{2,}|[A-Z]{2,}(?=[A-Z][a-z])){2,}")
+
+
+def word_structure(text: str, start: int, end: int) -> bool:
+    """True when the span ``[start, end)`` is a path of words naming a directory or a configuration file, or the key of
+    an assignment that is a camel-case identifier; see the comment above."""
+    if not 0 <= start < end <= len(text):
+        return False
+    if start > 0 and re.match(r"[A-Za-z0-9_.\-/+]", text[start - 1]):
+        return False  # the span starts inside a longer token
+    for pattern in (_FILE_PATH, _DIRECTORY):
+        path = pattern.match(text, start)
+        if path and end <= path.end():
+            return True
+    line_start = max(text.rfind("\n", 0, start), text.rfind("\r", 0, start)) + 1
+    ends = [i for i in (text.find("\n", end), text.find("\r", end)) if i >= 0]
+    assignment = _ASSIGNMENT.match(text[line_start:min(ends) if ends else len(text)])
+    return bool(assignment) and assignment.span("key") == (start - line_start, end - line_start) and bool(
+        CODE_NAME.fullmatch(assignment.group("key"))
+    )
+
+
 def relabel_secrets(text: str, findings, fixes) -> tuple:
     """Replace SECRET on findings whose context says they are not secrets; every other label is kept."""
     from dataclasses import replace
 
     from .contracts import FindingEvidence
 
+    lookalikes = "secret-config-lookalikes" in fixes
     out = []
     for item in findings:
-        if Label.SECRET in item.labels and "secret-references" in fixes and references_only(text, item.start, item.end):
+        if Label.SECRET in item.labels and (
+            ("secret-references" in fixes and references_only(text, item.start, item.end, lookalikes))
+            or (lookalikes and word_structure(text, item.start, item.end))
+        ):
             # Not a secret, and nothing personal either: keep any other label the finding carries, else drop it.
             others = item.labels - {Label.SECRET}
             if not others:

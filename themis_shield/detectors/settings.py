@@ -78,11 +78,25 @@ v0.4 detection fixes (from split D, now development data):
   ``KWA-EMP-92315``), is part of the value and does not cut it, so no prefix of a personal identifier is left in
   clear. A term that is the whole value, or is set apart by a space or punctuation, is trimmed as before; see
   ``_joined`` in ``detectors/allowlist.py``.
+
+v0.5 detection fixes (from split F, now development data):
+
 - ``location-columns`` (from split F): a table column whose header names where a person lives (``residence_postcode``,
   ``home suburb``, ``postcode of residence``, ``home address``, ``residential town``, ``place of residence``,
   ``lives in``) protects every non-empty cell as ADDRESS. A header that names a workplace, site, office, branch,
   depot, campus, ward, delivery, return or business location is not one, and neither is a bare ``postcode`` or
   ``suburb`` (often a site's); see ``table_location_spans`` in ``detectors/propagate.py``.
+- ``secret-config-lookalikes``: four shapes in clean configuration files that a SECRET finding (from any detector) took
+  for a credential and that a rule can tell apart with certainty. Two extend ``secret-references`` and act only with it
+  on: a template call to a secret manager that names a path and at most a field (``"{{ vault 'kv/app/db#password' }}"``,
+  ``"{{ vault('kv/app/db', 'password') }}"``), and a URI of a non-web scheme made only of lower-case words under a key
+  that says it is a reference (``credentialRef: "keyhold://kv-prod/edge/syd#admin"``). Two are about the span itself: a
+  path of lower-case words that is a directory (it ends in ``/``) or a configuration file (a file extension such as
+  ``.yaml``, ``.json`` or ``.tf`` follows it), and the key of an assignment that is a camel-case identifier of three or
+  more words (``targetCPUUtilizationPercentage: 65``). The same shape as a value (``password: correctHorseBatteryStaple``),
+  a key alone that is not such an identifier, a literal in a trailing comment and a lone base64 key keep their label
+  (COR-001).
+  See ``word_structure`` and ``references_only`` in ``detectors/secret_context.py``.
 """
 
 from __future__ import annotations
@@ -106,11 +120,12 @@ DETECTION_FIXES = (
     "secret-references", "tracer-evidence-sanity",
     # v0.4, from split E (DD-17; detectors/allowlist.py).
     "joined-terms",
-    # v0.4, from split F (detectors/propagate.py).
-    "location-columns",
+    # v0.5, from split F (development data since its v0.5 run; detectors/propagate.py, detectors/secret_context.py).
+    "location-columns", "secret-config-lookalikes",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
+    "secret-config-lookalikes",
 )
 # Every fix held the ratchet (released leaks, R_any, sensitive R_any, QUASI_ID R_any) on both development sets
 # (the v0.1 set and split C, replayed from captured finder answers) and is on by default. Three of them

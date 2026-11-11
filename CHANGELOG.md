@@ -16,6 +16,25 @@ protected whole (R_full on them 0.553 -> 1.000), released leaks 13 -> 12, no mea
 The review fix to `secret-references` below (COR-001) came after the kit tag and is not part of that run; on the
 development sets it changed no safety measure and held one more clean document on each split D half (friction
 0.064 -> 0.079 and 0.161 -> 0.177).
+
+### Clean configuration files held as secrets (split F friction)
+
+- `secret-config-lookalikes` (on by default): on split F, six of the 80 clean documents were BLOCKed for `secret`, all
+  configuration or code files. Four shapes a rule can tell from a credential are no longer read as one (from any
+  detector): a template call to a secret manager (`{{ vault 'kv/app/db#password' }}`, `{{ vault('kv/app/db', 'password') }}`),
+  a URI of a non-web scheme made only of lower-case words under a key that says it is a reference
+  (`credentialRef: "keyhold://kv-prod/edge/syd#admin"`), a path of lower-case words that is a directory (`kv/team/prod/`)
+  or a configuration file (`deploy/environments/production.yaml`), and a camel-case key name
+  (`targetCPUUtilizationPercentage: 65`). The same shapes as a value after `password:`, a literal key in a trailing
+  comment, a lone base64 key and a key alone that is not such a name still BLOCK (COR-001), and no gold
+  SECRET span in `eval/cases` passes the new rules. One of the six (`code: DC-SYD`, read as a secret by PII-Tracer
+  alone) cannot be told from a verification code by any rule and is left held. `--detection-fixes` without the switch
+  restores the previous behaviour byte for byte.
+  Measured by replay as development evidence only (written from split F's six clean configuration files): split F
+  friction 0.2125 -> 0.150 (five of the six now released; the sixth, distribution-centre codes under a `code:` key, is
+  left held because a rule cannot tell it from a recovery code), every safety measure unchanged; split E and the four
+  other development sets identical on every measure.
+
 ### Split E result (development: 0.3.4 now has a fresh-split verdict)
 
 0.3.4 **fails** its frozen rule on split E ([results](eval/RESULTS-v0.4.md)): 12 released leaks, all the
