@@ -132,7 +132,10 @@ def create_app(
         if request.headers.get("origin") not in {None, f"http://127.0.0.1:{port}"}:
             return error("ORIGIN_DENIED", 403)
         path = request.url.path
-        public = request.method == "GET" and not path.startswith(("/api", "/v1", "/health"))
+        # "/api/..." is the API; the page's own script "/api.js" is a static file like the others (an Operator-only
+        # browser session, which has no client cookie, could not load it, so the whole UI failed to start).
+        api = path == "/api" or path.startswith("/api/")
+        public = request.method == "GET" and not (api or path.startswith(("/v1", "/health")))
         if not public:
             supplied = request.headers.get("authorization", "")
             bearer = hmac.compare_digest(supplied, "Bearer " + token)

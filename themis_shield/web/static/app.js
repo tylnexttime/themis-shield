@@ -251,6 +251,9 @@ function finishAnswer(answer, text, metadata, snapshot, intent) {
     .map(([tier, ms]) => `tier ${tier} ${numeric(Number.isFinite(ms) ? ms / 1000 : null, " s")}`).join(" · "), "muted"));
   if (metadata.unknown_tokens || metadata.dropped_tokens) answer.extras.append(node("p",
     `Fidelity warning: ${numeric(metadata.unknown_tokens)} unknown tokens; ${numeric(metadata.dropped_tokens)} omitted tokens. Do not guess values.`, "protected"));
+  if (metadata.withheld_in_url) answer.extras.append(node("p",
+    `Withheld in a link: ${numeric(metadata.withheld_in_url)} placeholder${metadata.withheld_in_url === 1 ? "" : "s"} the cloud wrote inside a web address ` +
+    "stayed as placeholders, so no real value goes into a link. Do not guess values.", "protected"));
   if (metadata.route === "cloud-tokenised") addCloudView(answer, metadata.job_id, text);
   if (metadata.route === "held") startHeld(answer, metadata.job_id, snapshot, intent);
   if (state.localOnly && metadata.route === "cloud-tokenised") fail(new GateError("Safety mismatch: cloud processing reported for a local-only conversation. Stop and investigate."));

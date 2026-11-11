@@ -170,6 +170,24 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   the failures above and the exact-value check on `system`; `tests/test_cloud_live.py` now runs its three documents once
   per leg (`-k openai-compatible`, `-k anthropic-messages`).
 
+### Web UI loaded in a browser for the first time
+
+- Headless Chrome, once as the client (chat session) and once as the Operator (own session), found two console
+  errors and one missing display, all fixed. (1) The boundary read every path starting with `/api` as an API path, so
+  the page's own script `/api.js` needed a credential: an Operator-only browser session (SEC-04: no client cookie) got
+  401 for it and the UI never started. Only `/api` and `/api/...` are API paths now. (2) The page declared no icon, so
+  the browser asked for `/favicon.ico` (404, a console error on every load): `favicon.svg` is shipped and linked.
+  (3) `withheld_in_url` (R-01) reached the page but was not shown: a reply that put a placeholder inside a web address
+  now says, beside the unknown and omitted token warning, how many were left as placeholders.
+- `tests/test_web_static.py`: every shipped script is parse-checked without a browser (a tokenizer for brackets,
+  strings, template literals, regular expressions and comments, tested on broken snippets; `node --check` as well when
+  Node is on PATH); every file `index.html` references exists, every shipped script is loaded or imported and every
+  named import is exported; the two fixes above are pinned.
+- `tests/test_web_layout.py` (Playwright, skipped without it) pointed at `server/static`, which has never existed, so it
+  could not have passed. It now serves `themis_shield/web/static`, falls back to an installed Chrome, and its stale
+  fixtures are fixed (the `/api/canary` call, a due time that rendered 01:00 not 11:00, waits for screens that load
+  after the click). It passes in Chrome.
+
 ## 0.3.4 (30/10/2026)
 
 **Development measurement only**, like 0.3.2 and 0.3.3: no fresh split has tested it, and a vetting record still quotes
