@@ -452,6 +452,94 @@ def table_identifier_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, 
     return tuple(out)
 
 
+# v0.4 fix "location-columns": a table column whose header names where a person lives ("residence_postcode", "home
+# suburb", "postcode of residence", "home address", "residential town", "place of residence", "lives in") is
+# protected as ADDRESS, every non-empty cell. On split F an "anonymised" leavers table was released with its nine bare
+# four-digit residence postcodes in clear while the dates and role descriptions beside them were protected: no rule
+# matches a bare postcode and the finders read it as a number. A header that names a workplace, site, office, branch,
+# depot, campus, ward, delivery, return or business location is never a residence column, and a bare "postcode" or
+# "suburb" is not either (it is often a site's): the header must carry a residence word. Header words only (split on
+# underscores, hyphens, spaces and camel case); nothing learned from any data. The vocabulary is the three sets below.
+TABLE_LOCATION_STAGE = "table-locations"
+LOCATION_MAX_HEADER_WORDS = 5
+_HOME_WORDS = frozenset({"home", "residence", "residential"})
+_PLACE_WORDS = frozenset({"address", "postcode", "zip", "zipcode", "suburb", "town", "city", "locality"})
+_NOT_HOME_WORDS = frozenset({
+    "work", "workplace", "employer", "business", "site", "office", "branch", "depot", "campus", "ward", "delivery",
+    "shipping", "return", "email",
+})
+
+
+def _residence_column(name: str) -> bool:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", name).casefold()
+    words = re.sub(r"\b(?:post|postal|zip) code\b", "postcode", " ".join(re.findall(r"[a-z0-9]+", spaced))).split()
+    if not words or len(words) > LOCATION_MAX_HEADER_WORDS or _NOT_HOME_WORDS.intersection(words):
+        return False
+    return (
+        bool({"lives", "resides"}.intersection(words)) or words == ["residence"]
+        or ("place" in words and "residence" in words)
+        or (bool(_HOME_WORDS.intersection(words)) and bool(_PLACE_WORDS.intersection(words)))
+    )
+
+
+def table_location_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
+    lines = text.splitlines(keepends=True)
+    offsets, position = [], 0
+    for line in lines:
+        offsets.append(position)
+        position += len(line)
+    out, index = [], 0
+    while index < len(lines):
+        header = lines[index].rstrip("\r\n").lstrip("﻿")
+        separator = max(SEPS, key=header.count)
+        if header.count(separator) < (2 if separator == "|" else 1) or any(ch.isdigit() for ch in header):
+            index += 1
+            continue
+        try:
+            cells = _cells(header, separator)
+        except (csv.Error, ValueError, StopIteration):
+            index += 1
+            continue
+        columns = [j for j, (a, b) in enumerate(cells) if _residence_column(header[a:b])]
+        if not columns:
+            index += 1
+            continue
+        row_index = index + 1
+        while row_index < len(lines):
+            row = lines[row_index].rstrip("\r\n")
+            if separator == "|" and _ALIGN_ROW.fullmatch(row):
+                row_index += 1
+                continue
+            if not row.strip() or separator not in row:
+                break
+            try:
+                row_cells = _cells(row, separator)
+            except (csv.Error, ValueError, StopIteration):
+                break
+            extra = len(row_cells) - len(cells)
+            if extra < 0:
+                break
+            # An unquoted comma in free text ("12 Wattle St, Redgum VIC 3395", "Yes, both") splits a cell, and every
+            # later cell moves. A piece that follows the comma with a space belongs to the cell before it; when that
+            # accounts for every extra cell the columns are known. Otherwise any cell the column could be in is
+            # protected: a little over-redaction, never a skipped residence.
+            groups = []
+            for position, (a, b) in enumerate(row_cells):
+                if groups and row[row_cells[position - 1][1]:a][-1:].isspace():
+                    groups[-1].append(position)
+                else:
+                    groups.append([position])
+            for column in columns:
+                for position in groups[column] if len(groups) == len(cells) else range(column, column + extra + 1):
+                    a, b = row_cells[position]
+                    if any(ch.isalnum() for ch in row[a:b]):
+                        out.append(finding(offsets[row_index] + a, offsets[row_index] + b, Label.ADDRESS,
+                                           TABLE_LOCATION_STAGE, tier))
+            row_index += 1
+        index = row_index if row_index > index + 1 else index + 1
+    return tuple(out)
+
+
 # v0.3 fix "address-line-numbers": scanned letters and statements often break an address after the street number,
 # leaving the number alone on its own line ("48" then "EXAMPLE PDE" then "QUARRYBEND NSW 2999"). When an ADDRESS
 # finding starts a line (only whitespace before it) and the previous non-empty line is only a street, unit or lot
@@ -493,6 +581,8 @@ def propagate(
         base = union_findings(base, table_quasi_spans(text, tier))
     if fix_on("column-identifiers"):
         base = union_findings(base, table_identifier_spans(text, tier))
+    if fix_on("location-columns"):
+        base = union_findings(base, table_location_spans(text, tier))
     if fix_on("sensitive-columns") or fix_on("union-roles"):
         from .statements import table_statement_spans, union_role_spans
 

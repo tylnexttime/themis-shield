@@ -78,6 +78,11 @@ v0.4 detection fixes (from split D, now development data):
   ``KWA-EMP-92315``), is part of the value and does not cut it, so no prefix of a personal identifier is left in
   clear. A term that is the whole value, or is set apart by a space or punctuation, is trimmed as before; see
   ``_joined`` in ``detectors/allowlist.py``.
+- ``location-columns`` (from split F): a table column whose header names where a person lives (``residence_postcode``,
+  ``home suburb``, ``postcode of residence``, ``home address``, ``residential town``, ``place of residence``,
+  ``lives in``) protects every non-empty cell as ADDRESS. A header that names a workplace, site, office, branch,
+  depot, campus, ward, delivery, return or business location is not one, and neither is a bare ``postcode`` or
+  ``suburb`` (often a site's); see ``table_location_spans`` in ``detectors/propagate.py``.
 """
 
 from __future__ import annotations
@@ -101,6 +106,8 @@ DETECTION_FIXES = (
     "secret-references", "tracer-evidence-sanity",
     # v0.4, from split E (DD-17; detectors/allowlist.py).
     "joined-terms",
+    # v0.4, from split F (detectors/propagate.py).
+    "location-columns",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",

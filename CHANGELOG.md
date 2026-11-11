@@ -31,6 +31,19 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   the whole value, or is set apart by a space or punctuation ("Priya Kimura, KWA"), is trimmed as before.
   `--detection-fixes` without it (or `fixes = "none"`) restores the 0.3.4 behaviour byte for byte.
 
+### Location columns in "anonymised" tables (from split F)
+
+- `location-columns` (on by default): in a table the gate recognises, a column whose header names where a person lives
+  (`residence_postcode`, `home suburb`, `postcode of residence`, `home address`, `residential town`,
+  `place of residence`, `lives in`) is protected as an address, every non-empty cell. On split F an anonymised leavers
+  table was released with its nine bare residence postcodes in clear, while the dates and roles beside them were
+  protected. A header that names a workplace, site, office, branch, depot, campus, ward, delivery, return or business
+  location is not matched, and neither is a bare `postcode` or `suburb`, which is often a site's. Run over every case
+  in `eval/cases`, the pass protects 351 cells, 310 of them gold spans, and touches no hard negative.
+  `--detection-fixes` without it restores the previous behaviour. Measured by replay as development evidence only
+  (it was written from split F's miss): split F released leaks 12 -> 3, R_any 0.989 -> 0.991, friction and
+  over-redaction unchanged; split E and the four other development sets identical on every measure.
+
 ### Placeholder legend (v0.4, optional, off by default)
 
 - `[legend] enabled = true` adds one system message to the request sent to the cloud, listing every placeholder it
