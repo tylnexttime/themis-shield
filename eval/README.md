@@ -53,6 +53,20 @@ Sealed sha256 `25f93e2d272bf8fc8dd5a5228579d775a88da64d3a2e008e87f0e31c083e4c7d`
 `e0bcd2769968781d8ecb07943d61a433a148f02d2436131ea4c74bffbdc6cb18`. The published copy differs from the sealed file in one invented place name, used in five table cases and the generator, replaced by another of the same length (every offset unchanged; the published generator rebuilds the published file exactly). Plan:
 [`FROZEN-PLAN-v0.4.md`](FROZEN-PLAN-v0.4.md); results: [`RESULTS-v0.4.md`](RESULTS-v0.4.md).
 
+## Split F: the v0.5 kit's held-out test
+
+`cases/test-f-o.jsonl`: 240 cases, 4,414 gold spans (458 sensitive statements: 320 indirect, 60 negative), 80
+clean, 4,877 hard negatives, 28 injection cases, 14 long documents. Unlike every earlier split it is not a template
+generator: a deterministic planner wrote one specification per case (with pre-generated safe values for every
+checksummed or range-restricted identifier, phone and email) and `claude-opus-5-5` at effort high wrote each document
+whole through the Message Batches API, gold marked inline and turned into offsets by code. Re-labelled blind by
+`claude-sonnet-5-5` at effort xhigh, with one review round; checked by the shared validator (protocol constants
+only changed), the origin denylist and a per-case pointer check. Author and labeller are one vendor's models (stated
+in the plan as a limitation). Pipeline, inputs, validator, profile, plan, manifest, provenance and agreement:
+[`generator_f/`](generator_f) (the raw batch requests and results are not published). sha256
+`c8ef6854379e5c43b090bb55ae2068cb92bfaec00bf517bf8c68ae38a7506afd`, identical to the sealed file. Plan:
+[`FROZEN-PLAN-v0.5.md`](FROZEN-PLAN-v0.5.md); results: [`RESULTS-v0.5.md`](RESULTS-v0.5.md).
+
 ## How it was built
 
 **Two independent generators.** A and B share no templates, no name pools (the build fails if a name token appears

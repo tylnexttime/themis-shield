@@ -1,0 +1,30 @@
+{
+ "cases_clean_of_issues": 210,
+ "cases_in_round": 240,
+ "cases_with_issues": 30,
+ "cases_with_wrong_closer_accepted": 6,
+ "errored": 0,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {
+  "PROFILE_HN": 1,
+  "P_DENYLIST": 7,
+  "P_INJ": 1,
+  "P_LANG": 3,
+  "P_LEN": 1,
+  "P_PARSE": 2,
+  "P_PI": 3,
+  "P_QUASI": 3,
+  "REPEAT": 17
+ },
+ "requests": 240,
+ "round": "author-1",
+ "status_totals": {
+  "invalid": 30,
+  "valid": 210
+ },
+ "succeeded": 240,
+ "trimmed_spans": 0,
+ "truncated": 0,
+ "unknown_hn_kind_warnings": 0,
+ "wrong_closers_accepted": 13
+}

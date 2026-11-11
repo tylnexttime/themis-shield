@@ -1,0 +1,10 @@
+{
+ "cases_all_keep": 19,
+ "cases_with_a_fix": 51,
+ "fix_applied": 51,
+ "fix_applied_no_net_change": 0,
+ "items_decided": 168,
+ "items_fix": 97,
+ "items_keep": 71,
+ "items_total": 168
+}

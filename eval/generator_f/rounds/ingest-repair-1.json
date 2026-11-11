@@ -1,0 +1,19 @@
+{
+ "cases_clean_of_issues": 31,
+ "cases_in_round": 31,
+ "cases_with_issues": 0,
+ "cases_with_wrong_closer_accepted": 0,
+ "errored": 0,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {},
+ "requests": 31,
+ "round": "repair-1",
+ "status_totals": {
+  "valid": 240
+ },
+ "succeeded": 31,
+ "trimmed_spans": 0,
+ "truncated": 0,
+ "unknown_hn_kind_warnings": 0,
+ "wrong_closers_accepted": 0
+}

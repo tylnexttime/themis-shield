@@ -4,6 +4,18 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Split F result (eval-kit-v0.5-frozen)
+
+The candidate (0.3.4 plus `joined-terms`) **fails** its frozen rule on split F ([results](eval/RESULTS-v0.5.md)), on
+four conditions: 12 released leaks (9 from one table's postcode column), sensitive recall 0.937 (limit 0.95),
+quasi-identifier recall one span behind the control, and clean friction 0.2125 (limit 0.15). The previous-release
+arm, the same finder answers with `joined-terms` off, shows the fix alone: every organisation-issued identifier
+protected whole (R_full on them 0.553 -> 1.000), released leaks 13 -> 12, no measure worse. Split F
+(`eval/cases/test-f-o.jsonl`, pipeline under `eval/generator_f/`) is published and is now development data.
+
+The review fix to `secret-references` below (COR-001) came after the kit tag and is not part of that run; on the
+development sets it changed no safety measure and held one more clean document on each split D half (friction
+0.064 -> 0.079 and 0.161 -> 0.177).
 ### Split E result (development: 0.3.4 now has a fresh-split verdict)
 
 0.3.4 **fails** its frozen rule on split E ([results](eval/RESULTS-v0.4.md)): 12 released leaks, all the

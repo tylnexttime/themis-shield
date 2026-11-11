@@ -409,6 +409,10 @@ themis-shield ships synthetic evaluation data ([`eval/`](eval/README.md)), all a
   cases by a Qwen model through a zero-data-retention route, 205 by a Claude model), each with its own invented
   organisation, re-labelled blind by a DeepSeek model, and committed by hash before the gate ever saw it
   ([`eval/generator_d/`](eval/generator_d)).
+- **Split E:** 210 cases, the 0.3.4 held-out test, written by a DeepSeek model and labelled blind by a Z.ai GLM model
+  ([`eval/RESULTS-v0.4.md`](eval/RESULTS-v0.4.md)).
+- **Split F:** 240 cases, the v0.5 kit's held-out test, each document written whole by a Claude model from a
+  per-case specification and labelled blind by another Claude model ([`eval/generator_f/`](eval/generator_f)).
 
 `eval/run_eval.py` runs the real detection and policy (rules, PII-Tracer, Gemma 4 E4B and 26B-A4B through llama.cpp,
 union, allow-list, policy), and `eval/score.py` scores it. Each release follows the same discipline:
@@ -417,7 +421,28 @@ union, allow-list, policy), and `eval/score.py` scores it. Each release follows 
 3. Open the test split once.
 4. Change nothing afterwards.
 
-### v0.3 (current)
+### v0.5 kit, split F (11/11/2026)
+
+**Verdict: FAIL** (details: [`eval/RESULTS-v0.5.md`](eval/RESULTS-v0.5.md); plan:
+[`eval/FROZEN-PLAN-v0.5.md`](eval/FROZEN-PLAN-v0.5.md)). The candidate is 0.3.4 plus `joined-terms` (DD-17).
+
+| Split F (240 cases, 4,414 gold spans, 80 clean) | 0.3.0 control | 0.3.4 | candidate |
+|---|---|---|---|
+| Released leaks (limit 3) | 17 | 13 | **12** |
+| R_any / R_full | 0.985 / 0.933 | 0.989 / 0.945 | **0.989 / 0.969** |
+| Sensitive statements, R_any (limit 0.95) | 0.906 | 0.937 | **0.937** |
+| Quasi-identifiers, R_any | 0.938 | 0.929 | **0.929** |
+| Clean documents held (of 80; limit 12) | 20 | 17 | **17** |
+| Over-redaction | 0.236 | 0.229 | **0.229** |
+
+- **Where it failed:** released leaks (9 of the 12 are one table's postcode column), sensitive recall (7 statements
+  short; negative statements found least), quasi-identifiers (one span behind the control) and friction.
+- **What worked:** `joined-terms`, the only difference between the last two columns: every organisation-issued
+  identifier protected whole (R_full on them 0.553 to 1.000), and no measure worse. No injection case released a leak.
+- Split E's result (0.3.4 failed narrowly, all 12 leaks from DD-17) is in
+  [`eval/RESULTS-v0.4.md`](eval/RESULTS-v0.4.md).
+
+### v0.3
 
 **Verdict: FAIL** (details: [`eval/RESULTS-v0.3.md`](eval/RESULTS-v0.3.md); plan:
 [`eval/FROZEN-PLAN-v0.3.md`](eval/FROZEN-PLAN-v0.3.md); development: [`eval/V03-DEV-LOG.md`](eval/V03-DEV-LOG.md)).

@@ -1,0 +1,226 @@
+{
+ "split": "test-f",
+ "half": "O",
+ "generator": "O",
+ "id_prefix": "FO-",
+ "counts": {
+  "cases": 240,
+  "clean_documents": 80,
+  "gold_spans": 4414,
+  "hard_negatives": 4877,
+  "by_label": {
+   "ABN": 36,
+   "ADDRESS": 101,
+   "BANK_ACCOUNT": 43,
+   "CRIMINAL": 63,
+   "DATE_OF_BIRTH": 70,
+   "DISABILITY": 49,
+   "DRIVER_LICENCE": 35,
+   "EMAIL": 138,
+   "ETHNICITY": 52,
+   "FAMILY_VIOLENCE": 52,
+   "HEALTH": 95,
+   "INTERNAL_ID": 235,
+   "MEDICARE": 42,
+   "NATIONAL_ID": 39,
+   "OTHER_DATE": 295,
+   "PASSPORT": 34,
+   "PAYMENT_CARD": 38,
+   "PERSON": 2419,
+   "PHONE": 71,
+   "QUASI_ID": 112,
+   "RELIGION": 49,
+   "SECRET": 65,
+   "SEXUALITY": 46,
+   "TFN": 44,
+   "UNION": 52,
+   "URL_PERSONAL": 44,
+   "USERNAME": 95
+  },
+  "by_genre": {
+   "case note": 12,
+   "chat log": 15,
+   "clinical note": 10,
+   "config": 14,
+   "csv": 14,
+   "email": 26,
+   "faq": 12,
+   "fiction": 10,
+   "form": 16,
+   "letter": 14,
+   "log": 10,
+   "markdown table": 16,
+   "minutes": 18,
+   "news": 10,
+   "notice": 6,
+   "report": 15,
+   "ticket": 16,
+   "tsv": 6
+  },
+  "by_organisation_kind": {
+   "profiled": 120,
+   "other_workplace": 120,
+   "other_workplaces_distinct": 12
+  },
+  "by_injection_position": {
+   "inside": 10,
+   "after": 9,
+   "before": 9
+  },
+  "injected_cases": 28,
+  "injected_cases_without_pi": 7,
+  "hard_to_spot_cases": 29,
+  "long_documents": 11,
+  "sensitive_spans": {
+   "total": 458,
+   "indirect": 320,
+   "negative": 60
+  },
+  "characters_total": 968918,
+  "cases_planned": 240
+ },
+ "seeds": {
+  "plan": 20261111,
+  "safe_values": 20261112
+ },
+ "models": {
+  "profile": {
+   "model": "claude-opus-5-5",
+   "effort": "high",
+   "thinking": "adaptive",
+   "max_tokens": 32000
+  },
+  "author": {
+   "model": "claude-opus-5-5",
+   "effort": "high",
+   "thinking": "adaptive",
+   "max_tokens": 64000
+  },
+  "repair": {
+   "model": "claude-opus-5-5",
+   "effort": "high"
+  },
+  "pointer_check": {
+   "model": "claude-sonnet-5-5",
+   "effort": "high"
+  },
+  "blind_labeller": {
+   "model": "claude-sonnet-5-5",
+   "effort": "xhigh",
+   "max_tokens": 64000
+  },
+  "review": {
+   "model": "claude-opus-5-5",
+   "effort": "high"
+  }
+ },
+ "sha256": {
+  "cases": "c8ef6854379e5c43b090bb55ae2068cb92bfaec00bf517bf8c68ae38a7506afd",
+  "plan": "b67e67827bca8cb4d98238a14c1f9e1a4ea4ba584c1de70f53677fdb7489ba21",
+  "profile": "c76d0cb33e01fff65a7fed09cfb2b63d1f0a2ba68b4c26f9722186f8ccf2eed7",
+  "taxonomy": "90611d0a05963e08cceea7dbb22f2a32bceec65a957b3765818b53de931a5159",
+  "brief": "c45c67151c219b3435a1f217abf05d809b0c235d07fe2e103e002e848c21714e",
+  "validator": "cafc5e89b5a8b535a088bfe03379bfd6fa1815ca92c0f35fb5c2108a649571d8",
+  "institution_profile": "0c789637f7b1b9f00181ac3f18301381e8a13d47f7dfe3de28dbc7392aaaa1d0",
+  "context": "93ae1ff7383cffe6f4c68db905541f9c7005e5de84565f82d374a4ffe204b045",
+  "agreement_md": "40fdd8a007c5e4bdbd0c8fe8a2bd0a138afa9faf420b2c6f33d35a49c93f6fde"
+ },
+ "profile_fixes": {
+  "abn": 0,
+  "abn_forms": 0,
+  "email_domain": 0,
+  "mailboxes": 0,
+  "phones": 0
+ },
+ "dropped_total": 0,
+ "status_totals": {
+  "valid": 240
+ },
+ "rounds": {
+  "agreement-before": {
+   "any_r": 4333,
+   "documents compared": 240,
+   "documents where the labeller's echo differed from the text (aligned by diff)": 2,
+   "documents with at least one disagreement item": 70,
+   "documents with no labeller output": 0,
+   "ex_p": 4251,
+   "ex_r": 4251,
+   "gold": 4359,
+   "lab": 4395,
+   "labeller markup errors (lenient parse)": 0,
+   "labeller outputs cut off at max_tokens": 0,
+   "labeller spans dropped in alignment": 21,
+   "ov_p": 4335,
+   "ov_r": 4333
+  },
+  "ingest-author-1": {
+   "cases_clean_of_issues": 210,
+   "cases_in_round": 240,
+   "cases_with_issues": 30,
+   "cases_with_wrong_closer_accepted": 6,
+   "errored": 0,
+   "fence_stripped": 0,
+   "issue_case_counts_by_code": {
+    "PROFILE_HN": 1,
+    "P_DENYLIST": 7,
+    "P_INJ": 1,
+    "P_LANG": 3,
+    "P_LEN": 1,
+    "P_PARSE": 2,
+    "P_PI": 3,
+    "P_QUASI": 3,
+    "REPEAT": 17
+   },
+   "requests": 240,
+   "round": "author-1",
+   "status_totals": {
+    "invalid": 30,
+    "valid": 210
+   },
+   "succeeded": 240,
+   "trimmed_spans": 0,
+   "truncated": 0,
+   "unknown_hn_kind_warnings": 0,
+   "wrong_closers_accepted": 13
+  },
+  "ingest-f-pointer-1": {
+   "checked": 240,
+   "flagged": 1,
+   "name": "f-pointer-1"
+  },
+  "ingest-f-pointer-2": {
+   "checked": 1,
+   "flagged": 0,
+   "name": "f-pointer-2"
+  },
+  "ingest-repair-1": {
+   "cases_clean_of_issues": 31,
+   "cases_in_round": 31,
+   "cases_with_issues": 0,
+   "cases_with_wrong_closer_accepted": 0,
+   "errored": 0,
+   "fence_stripped": 0,
+   "issue_case_counts_by_code": {},
+   "requests": 31,
+   "round": "repair-1",
+   "status_totals": {
+    "valid": 240
+   },
+   "succeeded": 31,
+   "trimmed_spans": 0,
+   "truncated": 0,
+   "unknown_hn_kind_warnings": 0,
+   "wrong_closers_accepted": 0
+  },
+  "review-1": {
+   "cases_all_keep": 19,
+   "cases_with_a_fix": 51,
+   "fix_applied": 51,
+   "fix_applied_no_net_change": 0,
+   "items_decided": 168,
+   "items_fix": 97,
+   "items_keep": 71,
+   "items_total": 168
+  }
+ }
+}

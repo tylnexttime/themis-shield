@@ -6,7 +6,7 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
 [awesome-pii-tools](https://github.com/henrikaronsson/awesome-pii-tools) list, and evaluation data), all listed in
 [SOURCES.md](SOURCES.md#roadmap-research-27102026). Dates are day-first.
 
-## Where we are (30/10/2026)
+## Where we are (11/11/2026)
 
 - **v0.3.0 shipped on 27/10/2026 and failed its frozen test** (split D: 28 released spans, sensitive-statement recall
   0.740, friction 0.248 against a 0.15 rule; [results](../eval/RESULTS-v0.3.md)). Its friction changes worked; detection
@@ -23,8 +23,16 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   (`KWA-` left, the personal digits substituted; DD-17). Over-redaction one look-alike above the control. Everything
   else passed: sensitive recall 1.000, R_any 0.993, and friction 0.083, the first fresh-split pass of the friction
   rule. Against 0.3.0 every safety measure improved. Split E is now development data.
-- **Next:** DD-17; then the placeholder legend's utility measurement (built, unreleased, off by default); then split
-  F, with a second author family, under its own plan and the same thresholds.
+- **11/11/2026: DD-17 fixed (`joined-terms`), split F run: the candidate FAILS its frozen rule**
+  ([results](../eval/RESULTS-v0.5.md)): 12 released leaks (9 from one table's postcode column), sensitive recall
+  0.937, quasi-identifiers one span behind the control, friction 0.2125. The fix itself is confirmed on split F
+  (every organisation-issued identifier protected whole, no measure worse than 0.3.4). An opt-in live cloud-leg test
+  now exists, and an independent review's quick fixes landed (see "From the independent review" below). Split F is
+  now development data.
+- **Next:** from split F: location and quasi-identifier columns in "anonymised" tables, negative sensitive
+  statements, friction on clean documents (sensitive look-alikes, configuration files read as secrets); the review's
+  R-01 and R-02; then the placeholder legend's utility measurement; then a new split with author and labeller from
+  different families, under its own plan and the same thresholds.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
 

@@ -1,0 +1,533 @@
+{
+  "_about": "Institution profile for split F half O, converted from that half's profile by eval/convert_profile.py (do not edit by hand). Every value is institutional and invented.",
+  "institution": "Kestrel Plains Health and Community Care Network",
+  "institution_forms": [
+    "KPCN",
+    "The Kestrel Plains Network",
+    "kestrel plains health and community care network",
+    "Kestrel Plains Health",
+    "The Kestrel Plains Health and Community Care Network"
+  ],
+  "email_domain": "kestrelplainshealth.example",
+  "campuses": [
+    {
+      "town": "Corella Downs",
+      "forms": [
+        "Corella Downs Base Hospital",
+        "Corella Downs Hospital",
+        "Corella Downs campus",
+        "CDBH",
+        "120 Banksia Street, Corella Downs VIC 3398"
+      ],
+      "reception": "(03) 5550 1101"
+    },
+    {
+      "town": "Redgum Point",
+      "forms": [
+        "Redgum Point Hospital",
+        "Redgum Point campus",
+        "RPH",
+        "45 Lakeview Road, Redgum Point VIC 3396"
+      ],
+      "reception": "(03) 5550 1102"
+    },
+    {
+      "town": "Wattlebird Ridge",
+      "forms": [
+        "Wattlebird Ridge District Hospital",
+        "Wattlebird Ridge Hospital",
+        "WRDH",
+        "8 Hospital Lane, Wattlebird Ridge VIC 3394"
+      ],
+      "reception": "(03) 5550 1103"
+    },
+    {
+      "town": "Myall Station",
+      "forms": [
+        "Myall Station Urgent Care Centre",
+        "Myall Station UCC",
+        "Myall Station clinic",
+        "3 Railway Parade, Myall Station VIC 3392"
+      ],
+      "reception": "(03) 5550 1104"
+    },
+    {
+      "town": "Ironbark Crossing",
+      "forms": [
+        "Ironbark Crossing Community Health Centre",
+        "Ironbark Crossing CHC",
+        "Ironbark Crossing Community Health",
+        "22 Ferry Street, Ironbark Crossing VIC 3391"
+      ],
+      "reception": "(03) 5550 1105"
+    },
+    {
+      "town": "Mallee Springs",
+      "forms": [
+        "Mallee Springs Community Health Centre",
+        "Mallee Springs CHC",
+        "Mallee Springs Community Health",
+        "57 Spring Road, Mallee Springs VIC 3389"
+      ],
+      "reception": "(03) 5550 1106"
+    },
+    {
+      "town": "Quandong Vale",
+      "forms": [
+        "Quandong Vale Community Health Centre",
+        "Quandong Vale CHC",
+        "Quandong Vale Community Health",
+        "14 Orchard Avenue, Quandong Vale VIC 3387"
+      ],
+      "reception": "(03) 5550 1107"
+    },
+    {
+      "town": "Yarran Gully",
+      "forms": [
+        "Yarran Gully Community Health Centre",
+        "Yarran Gully CHC",
+        "Yarran Gully Community Health",
+        "91 Gully Road, Yarran Gully VIC 3386"
+      ],
+      "reception": "(03) 5550 1108"
+    },
+    {
+      "town": "Galah Bend",
+      "forms": [
+        "Galah Bend Bush Nursing Centre",
+        "Galah Bend Nursing Centre",
+        "Galah Bend BNC",
+        "6 River Street, Galah Bend VIC 3385"
+      ],
+      "reception": "(03) 5550 1109"
+    },
+    {
+      "town": "Brolga Flat",
+      "forms": [
+        "Brolga Flat Lodge",
+        "Brolga Flat Aged Care Residence",
+        "Brolga Flat aged care",
+        "30 Wetland Drive, Brolga Flat VIC 3384"
+      ],
+      "reception": "(03) 5550 1110"
+    },
+    {
+      "town": "Saltbush Hill",
+      "forms": [
+        "Saltbush Hill House",
+        "Saltbush Hill Aged Care",
+        "Saltbush Hill residence",
+        "17 Ridge Crescent, Saltbush Hill VIC 3383"
+      ],
+      "reception": "(03) 5550 1111"
+    },
+    {
+      "town": "Emu Hollow",
+      "forms": [
+        "Emu Hollow Residential Aged Care",
+        "Emu Hollow Lodge",
+        "Emu Hollow RAC",
+        "4 Hollow Road, Emu Hollow VIC 3382"
+      ],
+      "reception": "(03) 5550 1112"
+    },
+    {
+      "town": "Coolabah Rise",
+      "forms": [
+        "Coolabah Rise Aged Care Residence",
+        "Coolabah Rise Lodge",
+        "Coolabah Rise residence",
+        "62 Coolabah Street, Coolabah Rise VIC 3381"
+      ],
+      "reception": "(03) 5550 1113"
+    },
+    {
+      "town": "Tallowood Creek",
+      "forms": [
+        "Tallowood Creek Mental Health Service",
+        "Tallowood Creek MHS",
+        "Tallowood Creek Adult Mental Health",
+        "11 Creekside Way, Tallowood Creek VIC 3379"
+      ],
+      "reception": "(03) 5550 1114"
+    },
+    {
+      "town": "Bluebush Junction",
+      "forms": [
+        "Bluebush Junction Adult Mental Health Unit",
+        "Bluebush Junction AMHU",
+        "Bluebush Junction unit",
+        "2 Junction Road, Bluebush Junction VIC 3378"
+      ],
+      "reception": "(03) 5550 1115"
+    },
+    {
+      "town": "Lignum Park",
+      "forms": [
+        "Lignum Park Youth Mental Health Hub",
+        "Lignum Park Youth Hub",
+        "Lignum Park YMHH",
+        "39 Parkland Avenue, Lignum Park VIC 3377"
+      ],
+      "reception": "(03) 5550 1116"
+    }
+  ],
+  "buildings": [
+    "Kestrel Wing",
+    "Riverbend Ward",
+    "Ochre Pavilion",
+    "Acacia Day Procedure Unit",
+    "Banksia Ward",
+    "Bottlebrush Rehabilitation Wing",
+    "Callistemon Clinic Room 3",
+    "Sandstone Building",
+    "Waratah Maternity Suite",
+    "Lomandra Wellness Centre",
+    "Grevillea Dementia Wing",
+    "Kurrajong Allied Health Building",
+    "Mulga Education Centre",
+    "Spinifex Outpatients Clinic",
+    "Paperbark Garden Lounge",
+    "Hakea Dialysis Unit",
+    "Boronia Consulting Suite"
+  ],
+  "role_mailboxes": [
+    "enquiries@kestrelplainshealth.example",
+    "privacy@kestrelplainshealth.example",
+    "servicedesk@kestrelplainshealth.example",
+    "feedback@kestrelplainshealth.example",
+    "careers@kestrelplainshealth.example",
+    "media@kestrelplainshealth.example",
+    "accounts.payable@kestrelplainshealth.example",
+    "referrals@kestrelplainshealth.example",
+    "volunteers@kestrelplainshealth.example",
+    "research.ethics@kestrelplainshealth.example",
+    "procurement@kestrelplainshealth.example",
+    "foi@kestrelplainshealth.example",
+    "records@kestrelplainshealth.example"
+  ],
+  "main_lines": [
+    {
+      "purpose": "main",
+      "number": "(03) 7010 2000"
+    },
+    {
+      "purpose": "main",
+      "number": "1300 975 707"
+    },
+    {
+      "purpose": "main",
+      "number": "1800 975 708"
+    }
+  ],
+  "reception_numbers": [
+    "(03) 5550 1101",
+    "(03) 5550 1102",
+    "(03) 5550 1103",
+    "(03) 5550 1104",
+    "(03) 5550 1105",
+    "(03) 5550 1106",
+    "(03) 5550 1107",
+    "(03) 5550 1108",
+    "(03) 5550 1109",
+    "(03) 5550 1110",
+    "(03) 5550 1111",
+    "(03) 5550 1112",
+    "(03) 5550 1113",
+    "(03) 5550 1114",
+    "(03) 5550 1115",
+    "(03) 5550 1116"
+  ],
+  "role_titles": [
+    "Chief Executive Officer",
+    "Executive Director of Nursing and Midwifery",
+    "Executive Director of Medical Services",
+    "Chief Financial Officer",
+    "Director of Clinical Governance",
+    "Nurse Unit Manager",
+    "Associate Nurse Unit Manager",
+    "Registered Nurse",
+    "Enrolled Nurse",
+    "Clinical Nurse Specialist",
+    "Nurse Practitioner",
+    "Midwife",
+    "Maternal and Child Health Nurse",
+    "Director of Emergency Medicine",
+    "Visiting Medical Officer",
+    "Resident Medical Officer",
+    "Hospital Pharmacist",
+    "Physiotherapist",
+    "Occupational Therapist",
+    "Speech Pathologist",
+    "Dietitian",
+    "Podiatrist",
+    "Social Worker",
+    "Diabetes Educator",
+    "Aboriginal Health Liaison Officer",
+    "Personal Care Worker",
+    "Residential Care Manager",
+    "Lifestyle Coordinator",
+    "Consultant Psychiatrist",
+    "Mental Health Clinician",
+    "Peer Support Worker",
+    "Mental Health Triage Clinician",
+    "Pastoral Care Coordinator",
+    "Health Information Manager",
+    "Privacy Officer",
+    "Freedom of Information Officer",
+    "Patient Liaison Officer",
+    "Ward Clerk",
+    "Medical Receptionist",
+    "Payroll Officer",
+    "IT Service Desk Analyst",
+    "Clinical Informatics Lead",
+    "Facilities Manager",
+    "Maintenance Technician",
+    "Environmental Services Supervisor",
+    "Infection Prevention Coordinator",
+    "Quality and Risk Manager",
+    "Volunteer Coordinator",
+    "Research Governance Officer",
+    "Board Chair",
+    "Company Secretary"
+  ],
+  "programmes": [
+    {
+      "code": "PRG-CH01",
+      "title": "Community Nursing Program"
+    },
+    {
+      "code": "PRG-CH02",
+      "title": "Hospital in the Home"
+    },
+    {
+      "code": "PRG-AC01",
+      "title": "Home Support for Older People"
+    },
+    {
+      "code": "PRG-AC02",
+      "title": "Residential Respite Program"
+    },
+    {
+      "code": "PRG-MH01",
+      "title": "Adult Community Mental Health Program"
+    },
+    {
+      "code": "PRG-MH02",
+      "title": "Youth Early Intervention Service"
+    },
+    {
+      "code": "PRG-MH03",
+      "title": "Suicide Prevention Aftercare Program"
+    },
+    {
+      "code": "PRG-AH01",
+      "title": "Falls Prevention and Strength Program"
+    },
+    {
+      "code": "PRG-PH01",
+      "title": "Childhood Immunisation Outreach"
+    },
+    {
+      "code": "PRG-PH02",
+      "title": "Rural Diabetes Education Service"
+    },
+    {
+      "code": "PRG-PC01",
+      "title": "Palliative Care at Home"
+    },
+    {
+      "code": "PRG-MT01",
+      "title": "Maternal and Child Health Outreach"
+    },
+    {
+      "code": "TRN-1042",
+      "title": "Basic Life Support Refresher"
+    },
+    {
+      "code": "TRN-1105",
+      "title": "Infection Prevention and Control Fundamentals"
+    },
+    {
+      "code": "TRN-1210",
+      "title": "Privacy and Confidentiality Essentials"
+    },
+    {
+      "code": "TRN-1318",
+      "title": "Occupational Violence Prevention"
+    }
+  ],
+  "projects": [
+    {
+      "code": "RP-2026-TH",
+      "title": "Telehealth Follow-up for Rural Heart Failure"
+    },
+    {
+      "code": "RP-2026-FP",
+      "title": "Community Falls Prevention Outcomes Study"
+    },
+    {
+      "code": "RP-2025-DS",
+      "title": "Dementia-Friendly Wards Evaluation"
+    },
+    {
+      "code": "RP-2026-MH",
+      "title": "Youth Mental Health Access in Small Towns"
+    },
+    {
+      "code": "RP-2027-WF",
+      "title": "Rural Health Workforce Retention Study"
+    },
+    {
+      "code": "RP-2026-AB",
+      "title": "Aboriginal Health Worker-Led Diabetes Screening Evaluation"
+    },
+    {
+      "code": "RP-2027-PC",
+      "title": "Palliative Care at Home Carer Experience Study"
+    }
+  ],
+  "committees": [
+    "Clinical Governance Committee",
+    "Health Consumer Advisory Group",
+    "Disability Inclusion Advisory Committee",
+    "Pride Staff Network",
+    "Faith and Pastoral Care Committee",
+    "Aboriginal Health Advisory Group",
+    "Union Consultative Committee",
+    "Medication Safety Committee",
+    "Human Research Ethics Committee",
+    "Mental Health Lived Experience Advisory Group",
+    "Occupational Health and Safety Committee",
+    "Women in Health Leadership Network",
+    "Board Audit and Risk Committee",
+    "Aged Care Quality Committee"
+  ],
+  "initiatives": [
+    "Kestrel Plains Health Expo",
+    "Winter Flu Vaccination Drive",
+    "KPCN Community Open Day",
+    "Mental Health Week Community Walk",
+    "Hand Hygiene Awareness Week",
+    "Falls Prevention Awareness Week",
+    "Green Wards Sustainability Challenge",
+    "Graduate Nurse Welcome Week",
+    "Carers Recognition Breakfast",
+    "Healthy Ageing Expo",
+    "Pride in Health Morning Tea",
+    "Disability Access Audit Month",
+    "Volunteer Thank You Luncheon",
+    "Dementia Awareness Fortnight",
+    "Plains Ride for Rural Health",
+    "Spring Step Challenge",
+    "Rural Mental Health Forum"
+  ],
+  "code_formats": {
+    "programme_code": "PRG-@@##",
+    "training_module_code": "TRN-####",
+    "research_project_code": "RP-####-@@",
+    "ward_code": "W-@@#",
+    "service_stream_code": "SS-@@@",
+    "funding_stream_code": "FS-##-@@"
+  },
+  "reference_number_formats": {
+    "ticket_number": "SD-#######",
+    "case_number": "CASE-######",
+    "reference_number": "########",
+    "order_number": "PO-######",
+    "invoice_number": "INV-#####",
+    "asset_id": "AST-@@-#####",
+    "cost_centre": "######",
+    "form_number": "F-####",
+    "provider_number": "#######",
+    "client_account": "CA-######",
+    "software_version": "#.##.#",
+    "build_number": "#####",
+    "payroll_group": "PG##",
+    "work_order_number": "WO-@@-####",
+    "foi_request_number": "FOI-####-###",
+    "incident_report_number": "RISK-#######",
+    "contract_number": "CTR-####-##",
+    "ethics_approval_number": "HREC-####-###",
+    "pharmacy_batch_lot": "LOT######"
+  },
+  "public_dates": [
+    {
+      "event": "Australia Day",
+      "date": "26 January 2026"
+    },
+    {
+      "event": "Labour Day (Victoria)",
+      "date": "9 March 2026"
+    },
+    {
+      "event": "Good Friday",
+      "date": "3 April 2026"
+    },
+    {
+      "event": "Anzac Day",
+      "date": "25 April 2026"
+    },
+    {
+      "event": "World Hand Hygiene Day",
+      "date": "5 May 2026"
+    },
+    {
+      "event": "King's Birthday (Victoria)",
+      "date": "8 June 2026"
+    },
+    {
+      "event": "R U OK? Day",
+      "date": "10 September 2026"
+    },
+    {
+      "event": "World Mental Health Day",
+      "date": "10 October 2026"
+    },
+    {
+      "event": "KPCN Community Open Day",
+      "date": "17 October 2026"
+    },
+    {
+      "event": "Melbourne Cup Day",
+      "date": "3 November 2026"
+    },
+    {
+      "event": "KPCN Annual General Meeting",
+      "date": "25 November 2026"
+    },
+    {
+      "event": "International Day of People with Disability",
+      "date": "3 December 2026"
+    },
+    {
+      "event": "Christmas Day",
+      "date": "25 December 2026"
+    },
+    {
+      "event": "Boxing Day",
+      "date": "26 December 2026"
+    },
+    {
+      "event": "Australia Day",
+      "date": "26 January 2027"
+    }
+  ],
+  "abn": "53 827 416 926",
+  "abn_forms": [
+    "53 827 416 926",
+    "53827416926"
+  ],
+  "finder_do_not_flag": [
+    "the organisation's own name (Kestrel Plains Health and Community Care Network, KPCN, The Kestrel Plains Network)",
+    "site and campus names used as places of work (Corella Downs Base Hospital, Redgum Point Hospital)",
+    "building and room names (Kestrel Wing, Riverbend Ward)",
+    "programme, course and project codes and titles (PRG-CH01, Community Nursing Program)",
+    "committee, staff-network and initiative names, even when they contain words such as health, pride, faith or union (Board Audit and Risk Committee, Aged Care Quality Committee, Kestrel Plains Health Expo)",
+    "role titles without a person's name (Chief Executive Officer, Executive Director of Nursing and Midwifery)",
+    "shared role mailboxes (enquiries@kestrelplainshealth.example, privacy@kestrelplainshealth.example)",
+    "reception, switchboard and enquiry numbers",
+    "the organisation's own business number",
+    "dates of public events (open days, ceremonies, closures)"
+  ]
+}
