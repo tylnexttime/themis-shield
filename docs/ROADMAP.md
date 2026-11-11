@@ -272,6 +272,40 @@ The same task runs twice through a cloud model, once on the original documents a
 judge scores how much worse the de-identified answer is. Reported per task and per profile, next to released leaks:
 privacy and usefulness on one page.
 
+## From the independent review (11/11/2026)
+
+Four reviewers (security, correctness, documentation honesty, packaging; Claude Opus 5.5 at high effort and Claude
+Sonnet 5.5 at xhigh: one vendor, two models) read the branch at the v0.5 kit. Every High finding was checked against the code and reproduced before
+it was believed. Fixed the same night, each with a test: tool parameters in schema-wrapper form were never scanned
+(SEC-02); the Claude Code hook read and wrote the locale code page (PKG-01); `secret-references` dropped a secret in a
+trailing comment or a lone padded base64 key (COR-001; a detection change, measured on the development sets, not part
+of split F's run); Grep and Glob under an approved hooks job were an oracle over local files (SEC-01); and the README,
+SECURITY and ARCHITECTURE now say what is not guaranteed. Defects left are in [DEV-DEBT.md](DEV-DEBT.md) (DD-18 to
+DD-25). Design work, in this order:
+
+1. **R-01, context-aware restoration** (SEC-03). Restoration is lexical: a placeholder the cloud writes inside a URL,
+   a markdown image, a command or a tool argument comes back as the real value there, and a client that renders or
+   runs the reply sends it on. Leave tokens in URL and link targets unrestored and flag the answer; restore into tool
+   arguments only for fields a deployment marks as value-bearing.
+2. **R-02, a separate Operator credential** (SEC-04). Today one local bearer token authenticates `/v1` and the
+   Operator's approve endpoints, so the API client can approve its own job. A second token, or an Operator session
+   opened with its own launcher code, so approval means a second person.
+3. **R-03, ASK on any unmatched personal finder value** (DOC-02). Below the 3-or-10% threshold an unmatched value is
+   neither located nor substituted. Hold on any unmatched PERSON or identifier value; measure friction on the
+   development sets first.
+4. **R-04, look-alike letters in markings** (DOC-03). Fold Unicode confusables (TR39 skeletons) for the marking scan
+   only, never for substitution.
+5. **R-05, sentence-level sensitive statements** (COR-004). A found statement replaces the whole message surface
+   with one placeholder: safe, but the cloud gets nothing to work on.
+6. **R-06, the vault and linking** (SEC-06, SEC-07). Make expiry a hard delete of the key material; give every
+   conversation its own mapping when the client sends no conversation id, so the cloud cannot link people across
+   conversations that open the same way.
+7. **R-07, pinned model artefacts** (PKG-04). Record and check the revisions of PII-Tracer and the GGUF files that an
+   evaluation used; no `trust_remote_code` without a pinned revision.
+8. **R-08, the evaluation narrative** (DOC-04 to DOC-08, DOC-12). Re-state split D's failure cause from its data,
+   split E's improvement with its control and its single-author limit, the v0.3 friction headline's configuration,
+   and the authors' families; mark promised evaluations that were not run as dropped; give the next release its own
+   version number (this branch still says 0.3.4 but behaves differently).
 ## Later
 
 - **A tier-1 bake-off** of small span finders: GLiNER PII checkpoints (Apache-2.0 ones only; the original GLiNER
