@@ -29,9 +29,8 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   (every organisation-issued identifier protected whole, no measure worse than 0.3.4). An opt-in live cloud-leg test
   now exists, and an independent review's quick fixes landed (see "From the independent review" below). Split F is
   now development data.
-- **Next:** from split F: location and quasi-identifier columns in "anonymised" tables, negative sensitive
-  statements, friction on clean documents (sensitive look-alikes, configuration files read as secrets); the review's
-  R-01 and R-02; then the placeholder legend's utility measurement; then a new split with author and labeller from
+- **Next:** split F's remaining misses that need finder-prompt changes (R-09) and the last released date cell
+  (R-10), measured on development sets with fresh captures; then the placeholder legend's utility measurement; then a new split with author and labeller from
   different families, under its own plan and the same thresholds.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
@@ -294,7 +293,8 @@ DD-25). Design work, in this order:
 1. **R-01, context-aware restoration** (SEC-03). Restoration is lexical: a placeholder the cloud writes inside a URL,
    a markdown image, a command or a tool argument comes back as the real value there, and a client that renders or
    runs the reply sends it on. Leave tokens in URL and link targets unrestored and flag the answer; restore into tool
-   arguments only for fields a deployment marks as value-bearing.
+   arguments only for fields a deployment marks as value-bearing. Done for URLs, markdown link and image targets and
+   src/href/action attributes (`withheld_in_url`, shown in the web UI); commands and tool arguments remain.
 2. **R-02, a separate Operator credential** (SEC-04). Today one local bearer token authenticates `/v1` and the
    Operator's approve endpoints, so the API client can approve its own job. A second token, or an Operator session
    opened with its own launcher code, so approval means a second person. Done: a separate `operator-token` and
@@ -316,6 +316,30 @@ DD-25). Design work, in this order:
    split E's improvement with its control and its single-author limit, the v0.3 friction headline's configuration,
    and the authors' families; mark promised evaluations that were not run as dropped; give the next release its own
    version number (this branch still says 0.3.4 but behaves differently).
+## From split F, development (12/11/2026)
+
+Split F is development data since its result was published. Three default switches written from its misses
+(`negative-statements`, `unique-roles`, `quasi-cells`) bring it, by replay of the frozen candidate's finder answers,
+to 1 released span, sensitive recall 0.961 and quasi-identifier recall 0.955, with friction and over-redaction
+unchanged; this is development evidence, not a test result. What a rule cannot fix:
+
+9. **R-09, finder-prompt changes for split F's remaining misses** (18 sensitive statements, 5 quasi-identifiers),
+   which replay cannot measure because a changed prompt needs fresh finder answers: negated clinical findings ("No
+   numbness or tingling") as HEALTH; a same-gender spouse or partner (shown by name, pronoun or grammatical gender) as
+   SEXUALITY; a foreign place of origin and home language as ETHNICITY; role-plus-place descriptions that point to one
+   person without "only" as QUASI_ID; treatment and modified duties, workplace adjustments, and hiding from a former
+   partner as indirect statements, every sentence of them. Measure with live captures on every development set, one
+   kit, before the next fresh split.
+10. **R-10, a date column's last cell.** The one span split F still releases is one cell of a "Next review" date
+   column whose other cells were all protected by the finders and the tracer. Protect the remaining cells of the same
+   date shape in such a column; columns of meeting dates are hard negatives elsewhere, so it needs a guard on every
+   set's predictions first.
+11. **R-11, small detection items:** the AU/NZ term "job delegate" is missing from `union-roles`; a model-written
+   lone opening delimiter before a placeholder still swallows it (DD-18's residue).
+12. **R-12, the web UI's loose ends** from its first browser load: the chat stream is cancelled after the verified
+   `[DONE]` instead of drained (Chrome logs an aborted request); static files' JavaScript content type comes from the
+   Windows registry through `mimetypes` (pin it).
+
 ## Later
 
 - **A tier-1 bake-off** of small span finders: GLiNER PII checkpoints (Apache-2.0 ones only; the original GLiNER
@@ -331,7 +355,7 @@ DD-25). Design work, in this order:
   because a text gate cannot see them.
 - **A real-data evaluation protocol** before `synthetic_only` can ever be switched off.
 - **A human-written test slice**: 20-40 documents written by people, in their own words.
-- Linux and macOS runs, a native Anthropic Messages leg, a central register service, and with it the per-request evidence
+- Linux and macOS runs, a central register service, and with it the per-request evidence
   ledger specified in `themis_shield/ledger.py` (locally, the register's append-only records already carry the
   evidence).
 
