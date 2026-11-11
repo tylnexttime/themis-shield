@@ -103,6 +103,26 @@ v0.5 detection fixes (from split F, now development data):
   invisible ones inside it included. One zero-width space or soft hyphen in a table header or in a later mention no
   longer switches that protection off. Findings coming in are mapped into the view first. Text the view leaves
   unchanged is read as it is; see ``propagate`` in ``detectors/propagate.py``.
+- ``negative-statements`` (from split F): a statement that a person does not have a sensitive attribute is a
+  statement of that category: ``is not on any medication``, ``No regular medications``, ``denies any thoughts of
+  self-harm`` (HEALTH); ``No disclosable court outcomes``, ``has never been charged``, ``the police certificate shows no
+  matters`` (CRIMINAL; "matters" and "outcomes" only near a police, court, conviction or criminal word, and never in a
+  paragraph about a company); ``is not experiencing family violence``; ``am not a member of any union``; and a ``No``
+  (or other whole answer) after a question about Aboriginal or Torres Strait Islander origin, ethnicity, criminal
+  history, union membership or disability. The span is the clause; see ``negative_statement_spans`` in
+  ``detectors/statements.py``.
+- ``unique-roles`` (from split F): a role the text says only one person holds (``the only analyst on the overnight
+  roster``, ``the one contractor seconded from ...``, ``Sole night-shift pharmacist at ...``) is a QUASI_ID: "the
+  only", "only", "sole", "the sole" or "the one", up to three describing words (no function word or number: "only one
+  manager on duty" is not one), a role word (the last words of the common-role list, generic ones such as staff,
+  member or employee left out), then "on", "at", "in", "from", "for", "with", "based", "seconded" or "who"; the span
+  ends at punctuation, a cell separator, an auxiliary verb or 50 characters. See ``unique_role_spans`` in
+  ``detectors/propagate.py``.
+- ``quasi-cells`` (from split F): a QUASI_ID finding inside one table cell that covers only part of it is widened to
+  the whole cell (a piece after an unquoted ", " belongs to the cell before it, as for ``location-columns``), so the
+  rest of a role description is not released beside it. A finding across cells, a cell over 160 characters and a
+  QUASI_ID label given only by PII-Tracer (it calls single sensitive words quasi-identifiers) are left as they are;
+  see ``quasi_cell_spans`` in ``detectors/propagate.py``.
 """
 
 from __future__ import annotations
@@ -130,6 +150,8 @@ DETECTION_FIXES = (
     "location-columns", "secret-config-lookalikes",
     # From the 11/11/2026 review (DD-19, COR-002; detectors/propagate.py).
     "propagate-detection-view",
+    # v0.5, from split F's weakest safety areas (detectors/statements.py, detectors/propagate.py).
+    "negative-statements", "unique-roles", "quasi-cells",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",

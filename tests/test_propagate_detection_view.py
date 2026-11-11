@@ -41,7 +41,7 @@ def test_the_switch_is_a_default_fix_after_location_columns():
     assert SWITCH in DEFAULT_DETECTION_FIXES and fix_on(SWITCH)
     switch_off()
     assert not fix_on(SWITCH)
-    assert configure_detection_fixes("all")[-1] == SWITCH
+    assert SWITCH in configure_detection_fixes("all")
 
 
 # ----------------------------------------------------------------------------------------------------------------

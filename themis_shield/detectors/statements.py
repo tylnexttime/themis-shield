@@ -178,3 +178,102 @@ def union_role_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
         if start < end:
             out.append(_statement(start, end, Label.UNION, UNION_ROLE_STAGE, tier))
     return tuple(out)
+
+
+# v0.5 fix "negative-statements" (from split F): a statement that a person does NOT have a sensitive attribute still
+# says something about them ("is not on any medication", "denies any thoughts of self-harm", "the police certificate
+# shows no matters", "is not experiencing family violence", "am not a member of any union", a "No" after a question
+# about Aboriginal or Torres Strait Islander origin). The finders find the positive statements and miss most negative
+# ones. Fixed vocabulary only: a negation (no, not, never, nil, denies) next to a category's own words; nothing learned
+# from any data. The words "matters" and "outcomes" are criminal only near a police, court, conviction or criminal
+# word, and a form answer counts only when it is the whole answer (never "Yes / No" options on a blank form).
+NEGATIVE_STATEMENT_STAGE = "negative-statements"
+_NEGATIVE_PATTERNS = (
+    (Label.CRIMINAL, re.compile(
+        r"(?ix)\b(?:no|nil|not\s+any)\s+(?:(?:new|further|other|disclosable|recorded|relevant|prior|previous)\s+)*"
+        r"(?:court\s+outcomes?|(?:criminal\s+)?convictions?|criminal\s+(?:history|records?|matters|charges|offences)"
+        r"|police\s+record|offences)\b"
+        r"|\b(?:has|have|had)\s+never\s+been\s+(?:charged|convicted|arrested|jailed|imprisoned|in\s+prison)\b"
+        r"|\b(?:has|have|had)\s+(?:no|never\s+had\s+a(?:ny)?)\s+criminal\s+(?:record|history|convictions?)\b")),
+    (Label.HEALTH, re.compile(
+        r"(?ix)\b(?:is|am|was|are|were)\s+not\s+(?:on|taking)\s+any\s+(?:(?:regular|prescribed|other)\s+)?"
+        r"(?:medications?|medicines?)\b"
+        r"|(?:^|(?<=[.:;]\s)|(?<=\n))[ \t]*(?:no|nil)\s+(?:regular|current|known|prescribed)\s+(?:medications?|medicines?)\b"
+        r"|\bdenies\s+(?:any\s+)?(?:(?:current|recent|thoughts\s+of|history\s+of|suicidal)\s+)*"
+        r"(?:self-harm|self\s+harm|suicidal\s+(?:thoughts|ideation)|suicid(?:e|ality)|thoughts\s+of\s+harm|alcohol\s+use"
+        r"|drug\s+use|substance\s+use|hallucinations)\b")),
+    (Label.FAMILY_VIOLENCE, re.compile(
+        r"(?ix)\b(?:is|am|was|has|have|had)\s+(?:not|never)\s+(?:been\s+)?(?:experiencing|experienced"
+        r"|subjected\s+to|affected\s+by|a\s+victim\s+of)\s+(?:any\s+)?(?:family|domestic|family\s+(?:and|or)\s+domestic)"
+        r"\s+violence\b")),
+    (Label.UNION, re.compile(
+        r"(?ix)\b(?:is|am|was|i'm)\s+(?:not|no\s+longer)\s+(?:a\s+)?member\s+of\s+(?:any|a)\s+(?:trade\s+)?union\b")),
+)
+_MATTERS = re.compile(
+    r"(?ix)\bno\s+(?:(?:new|further|other|disclosable)\s+)*matters\s+(?:declared|disclosed|recorded|listed|on\s+file)\b"
+    r"|\b(?:check|certificate|clearance)\b[\w '-]{0,40}?\b(?:shows?|showed|returned|returns|came\s+back\s+with|lists?"
+    r"|listed|records?|recorded|discloses|disclosed)\s+no\s+(?:(?:new|further|other|disclosable)\s+)*"
+    r"(?:matters|outcomes)\b")
+_CRIMINAL_CONTEXT = re.compile(r"(?i)\b(?:police|criminal|convictions?|court|offences?|corrections)\b")
+CRIMINAL_CONTEXT_CHARS = 400
+# A court report about a company ("the company had no prior convictions", "No conviction was recorded" after a
+# sentence about the company) is not a person's record: no criminal statement when its paragraph (line) names a
+# company.
+_COMPANY = re.compile(r"(?i)\b(?:company|company's|companies|business|firm|corporation|pty|ltd)\b")
+_STATEMENT_END = re.compile(r"[.!?][\"'\u201d\u2019)]*(?=\s)|\n")
+# A question naming a category, then its whole answer on the same line ("... Torres Strait Islander origin? No").
+_QUESTION_CATEGORIES = (
+    (Label.ETHNICITY, re.compile(r"(?i)\b(?:aboriginal|torres\s+strait|indigenous|ethnicity|ethnic\s+(?:background|origin)"
+                                 r"|cultural\s+background)\b")),
+    (Label.CRIMINAL, re.compile(r"(?i)\b(?:criminal|convictions?|convicted|police\s+(?:check|record)|court\s+outcomes?)\b")),
+    (Label.UNION, re.compile(r"(?i)\b(?:union\s+member(?:ship)?|member\s+of\s+(?:a|any|the)\s+(?:trade\s+)?union)\b")),
+    (Label.DISABILITY, re.compile(r"(?i)\bdisabilit(?:y|ies)\b")),
+)
+_ANSWERED_QUESTION = re.compile(
+    r"(?im)^[^\n?]{0,200}\?[ \t]*(yes|no|nil|none|unknown|declined|not\s+stated|prefer\s+not\s+to\s+say)[ \t]*[.;]?[ \t]*$")
+
+
+def _sentence_clause(text: str, start: int, end: int) -> tuple[int, int]:
+    """The clause around a match: its sentence, cut at the last ":", ";" or "," before it and the first ";" or ","
+    after it (as for union roles), without the surrounding spaces and the final stop."""
+    ends = [m.end() for m in _STATEMENT_END.finditer(text, 0, start)]
+    left = ends[-1] if ends else 0
+    after = _STATEMENT_END.search(text, end)
+    right = after.start() if after else len(text)
+    clause = [m.end() for m in _CLAUSE_BREAK.finditer(text, left, start)]
+    if clause:
+        left = clause[-1]
+    later = _CLAUSE_BREAK.search(text, end, right)
+    if later is not None and later.group() != ":":
+        right = later.start()
+    while left < right and (text[left].isspace() or text[left] in "\"'“‘"):
+        left += 1
+    while right > left and text[right - 1] in " \t.!?":
+        right -= 1
+    return left, right
+
+
+def negative_statement_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
+    out = []
+    found = [(label, m.start(), m.end()) for label, pattern in _NEGATIVE_PATTERNS for m in pattern.finditer(text)]
+    found += [
+        (Label.CRIMINAL, m.start(), m.end()) for m in _MATTERS.finditer(text)
+        if _CRIMINAL_CONTEXT.search(text, max(0, m.start() - CRIMINAL_CONTEXT_CHARS), m.end())
+    ]
+    for label, a, b in found:
+        while a < b and text[a].isspace():
+            a += 1
+        if label is Label.CRIMINAL:
+            line_end = text.find("\n", b)
+            if _COMPANY.search(text, text.rfind("\n", 0, a) + 1, len(text) if line_end < 0 else line_end):
+                continue
+        start, end = _sentence_clause(text, a, b)
+        if start < end:
+            out.append(_statement(start, end, label, NEGATIVE_STATEMENT_STAGE, tier))
+    for m in _ANSWERED_QUESTION.finditer(text):
+        question = text[m.start():m.start(1)]
+        for label, pattern in _QUESTION_CATEGORIES:
+            if pattern.search(question):
+                out.append(_statement(m.start(1), m.end(1), label, NEGATIVE_STATEMENT_STAGE, tier))
+                break
+    return tuple(out)

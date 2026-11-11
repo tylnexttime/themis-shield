@@ -542,6 +542,136 @@ def table_location_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ..
     return tuple(out)
 
 
+# v0.5 fix "unique-roles" (from split F): a role the text says only one person holds ("the only analyst on the overnight
+# roster", "the one contractor seconded from the Perth office", "Sole night-shift pharmacist at the district hospital")
+# singles that person out, in prose as in a table cell. Matched: "the only", "only", "sole", "the sole" or "the one",
+# up to three describing words, a role word, then where or who ("on", "at", "in", "from", "for", "with", "based",
+# "seconded", "who"); the span runs to the end of that phrase (punctuation, a cell separator, an auxiliary verb or
+# ``UNIQUE_ROLE_MAX_TAIL`` characters). The role words are the last words of ``COMMON_ROLES`` without the generic ones
+# below; a describing word may not be a function word or a number ("only by the screening officer", "only one manager
+# on duty" are not matched), and "one of the nurses" never is. Fixed vocabulary only, nothing learned from any data.
+UNIQUE_ROLE_STAGE = "unique-roles"
+UNIQUE_ROLE_MAX_TAIL = 50
+_GENERIC_ROLE_HEADS = frozenset({
+    "casual", "full-time", "part-time", "permanent", "temporary", "hand", "staff", "member", "employee", "student",
+    "volunteer",
+})
+_ROLE_HEADS = sorted({value.split()[-1] for value in COMMON_ROLES} - _GENERIC_ROLE_HEADS, key=len, reverse=True)
+_UNIQUE_ROLE = re.compile(
+    r"(?i)\b(?:the\s+(?:only|sole|one)|only|sole)\s+((?:[\w'-]+\s+){0,3}?)(?:"
+    + "|".join(re.escape(head) for head in _ROLE_HEADS)
+    + r")s?\s+(?:on|at|in|from|for|with|based|seconded|who)\b"
+)
+_NOT_DESCRIBING = frozenset({
+    "a", "an", "the", "this", "that", "these", "those", "of", "by", "to", "for", "with", "and", "or", "in", "on", "at",
+    "from", "as", "if", "when", "be", "been", "is", "was", "are", "were", "one", "two", "each", "every", "any", "more",
+    "than", "other", "per", "our", "your", "their", "his", "her", "my",
+})
+_ROLE_TAIL_END = re.compile(
+    r"[.,;:!?|\t\r\n\"()]|\s(?:is|was|are|were|has|had|have|will|would|can|cannot|could|should|may|might|must|does"
+    r"|did|said|says|told)\b"
+)
+
+
+def unique_role_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
+    out = []
+    for match in _UNIQUE_ROLE.finditer(text):
+        if any(word.casefold() in _NOT_DESCRIBING for word in match.group(1).split()):
+            continue
+        limit = min(len(text), match.end() + UNIQUE_ROLE_MAX_TAIL)
+        stop = _ROLE_TAIL_END.search(text, match.end(), limit)
+        if stop is not None:
+            end = stop.start()
+        elif limit < len(text):
+            end = max(text.rfind(" ", match.end(), limit + 1), match.end())
+        else:
+            end = limit
+        while end > match.start() and text[end - 1].isspace():
+            end -= 1
+        out.append(finding(match.start(), end, Label.QUASI_ID, UNIQUE_ROLE_STAGE, tier))
+    return tuple(out)
+
+
+# v0.5 fix "quasi-cells" (from split F): a QUASI_ID finding inside one table cell that covers only part of it is
+# widened to the whole cell. A role description in a table is one value ("First-year electrical apprentice, only
+# apprentice on the night roster", "Longest-serving member, in the same flat since it opened"); on split F the finders
+# marked half of two such cells and the other half was released beside it. Cells are found as in
+# ``table_location_spans``: a header line without digits, then rows; a piece after an unquoted comma followed by a space
+# belongs to the cell before it when that accounts for every extra cell. A finding that crosses a cell boundary, and a
+# cell longer than ``QUASI_CELL_MAX_CHARS``, are left as they are. PII-Tracer's QUASI_ID label is not widened: it
+# marks single sensitive words ("chemo", "EpiPen") as quasi-identifiers, and on split D half C widening those took
+# case numbers and site names in free-text cells. Document structure only; no vocabulary.
+QUASI_CELL_STAGE = "quasi-cells"
+QUASI_CELL_MAX_CHARS = 160
+QUASI_CELL_NOT_FROM = "pii-tracer"
+
+
+def quasi_cell_spans(
+    text: str,
+    findings: tuple[DetectionFinding, ...],
+    tier: int = 1,
+) -> tuple[DetectionFinding, ...]:
+    quasi = [
+        (item.start, item.end) for item in findings
+        if any(e.label is Label.QUASI_ID and e.stage != QUASI_CELL_NOT_FROM for e in item.evidence)
+    ]
+    if not quasi:
+        return ()
+    lines = text.splitlines(keepends=True)
+    offsets, position = [], 0
+    for line in lines:
+        offsets.append(position)
+        position += len(line)
+    out, index = [], 0
+    while index < len(lines):
+        header = lines[index].rstrip("\r\n").lstrip("﻿")
+        separator = max(SEPS, key=header.count)
+        if header.count(separator) < (2 if separator == "|" else 1) or any(ch.isdigit() for ch in header):
+            index += 1
+            continue
+        try:
+            cells = _cells(header, separator)
+        except (csv.Error, ValueError, StopIteration):
+            index += 1
+            continue
+        row_index = index + 1
+        while row_index < len(lines):
+            row = lines[row_index].rstrip("\r\n")
+            if separator == "|" and _ALIGN_ROW.fullmatch(row):
+                row_index += 1
+                continue
+            if not row.strip() or separator not in row:
+                break
+            try:
+                row_cells = _cells(row, separator)
+            except (csv.Error, ValueError, StopIteration):
+                break
+            if len(row_cells) < len(cells):
+                break
+            groups = []
+            for at, (a, b) in enumerate(row_cells):
+                if groups and row[row_cells[at - 1][1]:a][-1:].isspace():
+                    groups[-1].append(at)
+                else:
+                    groups.append([at])
+            if len(groups) != len(cells):
+                groups = [[at] for at in range(len(row_cells))]
+            for group in groups:
+                a, b = row_cells[group[0]][0], row_cells[group[-1]][1]
+                while a < b and (row[a].isspace() or row[a] == '"'):
+                    a += 1
+                while b > a and (row[b - 1].isspace() or row[b - 1] == '"'):
+                    b -= 1
+                if not a < b <= a + QUASI_CELL_MAX_CHARS:
+                    continue
+                start, end = offsets[row_index] + a, offsets[row_index] + b
+                if any(start <= s and e <= end and (s, e) != (start, end) for s, e in quasi):
+                    out.append(finding(start, end, Label.QUASI_ID, QUASI_CELL_STAGE, tier))
+            row_index += 1
+        index = row_index if row_index > index + 1 else index + 1
+    return tuple(out)
+
+
 # v0.3 fix "address-line-numbers": scanned letters and statements often break an address after the street number,
 # leaving the number alone on its own line ("48" then "EXAMPLE PDE" then "QUARRYBEND NSW 2999"). When an ADDRESS
 # finding starts a line (only whitespace before it) and the previous non-empty line is only a street, unit or lot
@@ -585,13 +715,19 @@ def _propagate_text(
         base = union_findings(base, table_identifier_spans(text, tier))
     if fix_on("location-columns"):
         base = union_findings(base, table_location_spans(text, tier))
-    if fix_on("sensitive-columns") or fix_on("union-roles"):
-        from .statements import table_statement_spans, union_role_spans
+    if fix_on("sensitive-columns") or fix_on("union-roles") or fix_on("negative-statements"):
+        from .statements import negative_statement_spans, table_statement_spans, union_role_spans
 
         if fix_on("sensitive-columns"):
             base = union_findings(base, table_statement_spans(text, tier))
         if fix_on("union-roles"):
             base = union_findings(base, union_role_spans(text, tier))
+        if fix_on("negative-statements"):
+            base = union_findings(base, negative_statement_spans(text, tier))
+    if fix_on("unique-roles"):
+        base = union_findings(base, unique_role_spans(text, tier))
+    if fix_on("quasi-cells"):
+        base = union_findings(base, quasi_cell_spans(text, base, tier))
     return union_findings(base, extra_spans(text, base, stage, tier))
 
 

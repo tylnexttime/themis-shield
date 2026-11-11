@@ -63,6 +63,27 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   (it was written from split F's miss): split F released leaks 12 -> 3, R_any 0.989 -> 0.991, friction and
   over-redaction unchanged; split E and the four other development sets identical on every measure.
 
+### Negative statements, unique roles and partial table cells (from split F's weakest safety areas)
+
+Three new detection switches, on by default, each written from split F's misses (development data) with fixed
+vocabulary or document structure only. `--detection-fixes` without a switch restores the previous behaviour.
+
+- `negative-statements`: a statement that a person does not have a sensitive attribute is a statement of that
+  category (the finder prompt already says so; the finders found 47 of split F's 60): `is not on any medication`,
+  `No regular medications`, `denies any thoughts of self-harm` (HEALTH); `No disclosable court outcomes`, `has never
+  been charged`, `the police certificate shows no matters` (CRIMINAL; "matters" and "outcomes" only near a police,
+  court, conviction or criminal word, never in a paragraph about a company); `is not experiencing family violence`;
+  `am not a member of any union`; and a whole `No` answer after a question about Aboriginal or Torres Strait Islander
+  origin, ethnicity, criminal history, union membership or disability (never `Yes / No` options). Over every case in
+  `eval/cases`: 42 statements, each on a gold span of its own category, none on a hard negative or a clean document.
+- `unique-roles`: a role only one person holds (`the only analyst on the overnight roster`, `the one contractor
+  seconded from ...`, `Sole night-shift pharmacist at ...`) is a QUASI_ID, in prose and in table cells. Over
+  `eval/cases`: 124 spans, each on a gold QUASI_ID, none on a hard negative.
+- `quasi-cells`: a QUASI_ID finding that covers only part of one table cell is widened to the whole cell (split F
+  released the rest of two role descriptions beside the half the finders marked). PII-Tracer's QUASI_ID label alone
+  is not widened (it marks single sensitive words). Over `eval/cases`, given the first half of every gold QUASI_ID:
+  329 cells, each completing its gold span, none on a hard negative.
+
 ### Placeholder legend (v0.4, optional, off by default)
 
 - `[legend] enabled = true` adds one system message to the request sent to the cloud, listing every placeholder it
