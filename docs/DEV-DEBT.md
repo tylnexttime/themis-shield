@@ -9,8 +9,7 @@ reason. Dates are day-first.
 
 | ID | Found | What | Why it matters | Plan |
 |---|---|---|---|---|
-
-None open (11/11/2026).
+| DD-18 | 11/11/2026 | (Found by the live cloud-leg test, `tests/test_cloud_live.py`.) Restoration halves a `::` that the cloud model wrote itself: `placeholders.escape_literals` doubles every `:`, `\`, `⟦` and `⟧` in outbound text and restore un-doubles them, which is exact for echoed text but turns a model-authored `std::vector` into `std:vector` and `::1` into `:1`, with a clean restoration report. Every `:` the cloud reads is also doubled (`10::30`). | Silent corruption of code answers (C++, Rust, PHP namespaces, IPv6) for the coding-assistant and hooks uses; degraded text for every cloud task. No personal value is involved. | Escape only what could complete a placeholder (a colon right after a standalone class letter) and un-double only that form; or drop the bare-token tolerance so only the bracket forms need escaping. Strict xfail `test_model_written_double_colon_survives_restoration` flips when fixed; extend the restore and placeholder round-trip tests with model-authored text. |
 
 ## Fixed
 
