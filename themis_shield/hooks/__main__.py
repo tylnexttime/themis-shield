@@ -59,7 +59,14 @@ def main(
     try:
         if len(arguments) != 1 or arguments[0] not in EVENT_FUNCTIONS:
             raise ValueError("UNKNOWN_EVENT")
-        raw = incoming.read(MAXIMUM_INPUT_CHARACTERS + 1)
+        if stdin is None:
+            # Claude Code sends UTF-8; the text stream would use the locale code page
+            # (cp1252 on Windows) and the rules would scan mojibake. Strict decode: a
+            # decode error is refused like any other malformed input. A character is at
+            # most 4 bytes, so this many bytes always holds one character over the limit.
+            raw = incoming.buffer.read(MAXIMUM_INPUT_CHARACTERS * 4 + 4).decode("utf-8")
+        else:
+            raw = incoming.read(MAXIMUM_INPUT_CHARACTERS + 1)
         if len(raw) > MAXIMUM_INPUT_CHARACTERS:
             raise ValueError("HOOK_INPUT_BOUND")
         payload = strict_json(raw)
@@ -78,7 +85,11 @@ def main(
         # Validate serialization before writing any part of a response.
         encoded = canonical(response).decode("utf-8")
         if response:
-            outgoing.write(encoded + "\n")
+            if stdout is None:
+                # UTF-8 bytes, not the locale code page of the text stream.
+                outgoing.buffer.write((encoded + "\n").encode("utf-8"))
+            else:
+                outgoing.write(encoded + "\n")
             outgoing.flush()
         return 0
     except Exception:

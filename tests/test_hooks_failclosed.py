@@ -106,6 +106,70 @@ def test_cli_rejects_oversized_input():
     assert output.getvalue() == ""
 
 
+# PKG-01: Claude Code speaks UTF-8 JSON; on Windows without UTF-8 mode the text streams are cp1252.
+_FULL_WIDTH = {ord(d): ord(d) + 0xFEE0 for d in "0123456789"}
+_ECHO_GATE = """
+import json
+import sys
+from themis_shield.hooks.__main__ import main
+
+
+class Gate:
+    def call(self, event, body):
+        # ASCII-only escapes, so what the gate scanned is visible whatever the stream encoding is.
+        sys.stderr.write(json.dumps(body["prompt"]) + "\\n")
+        return {"decision": "block", "reason": "seen: " + body["prompt"]}
+
+
+raise SystemExit(main(["UserPromptSubmit"], client=Gate()))
+"""
+
+
+def _cli_utf8_bytes(raw, *, script=_ECHO_GATE):
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(ROOT)
+    for name in ("PYTHONUTF8", "PYTHONIOENCODING"):
+        environment.pop(name, None)
+    return subprocess.run(
+        [sys.executable, "-c", script], input=raw,
+        capture_output=True, cwd=ROOT, env=environment, timeout=10,
+    )
+
+
+def test_cli_scans_and_replies_in_exact_utf8_without_utf8_mode():
+    prompt = (
+        "Анастасия Петрова "
+        "田中太郎, TFN " + "123 456 782".translate(_FULL_WIDTH)
+        + ", TFN 123​456​782"
+    )
+    payload = {"session_id": "synthetic-pkg01", "prompt": prompt}
+    result = _cli_utf8_bytes(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+    assert result.returncode == 0, result.stderr
+    # The text the gate scanned is exactly what Claude Code sent.
+    assert json.loads(result.stderr.decode("ascii")) == prompt
+    # The reply is valid UTF-8, one line, and carries the same text back unchanged.
+    reply = result.stdout.decode("utf-8")
+    assert reply.endswith("\n") and reply.count("\n") == 1
+    assert json.loads(reply)["reason"] == "seen: " + prompt
+
+
+def test_cli_refuses_invalid_utf8_input_fail_closed():
+    for raw in (b'{"session_id":"synthetic-pkg01","prompt":"\xff\xfe"}',
+                b'{"session_id":"synthetic-pkg01","prompt":"\xe2\x80"}'):
+        result = _cli_utf8_bytes(raw)
+        assert result.returncode != 0
+        assert result.stdout == b""
+        assert result.stderr.strip() == b"themis: hook failed; no payload diagnostics emitted"
+
+
+@pytest.mark.parametrize("unit", [b" ", "\U0001f600".encode("utf-8")])
+def test_cli_refuses_oversized_input_on_default_streams(unit):
+    # One character over the limit, whether each character is one byte or four.
+    result = _cli_utf8_bytes(unit * (MAXIMUM_INPUT_CHARACTERS + 1))
+    assert result.returncode != 0
+    assert result.stdout == b""
+
+
 def test_managed_settings_fail_closed_on_supported_events():
     settings = json.loads(SETTINGS.read_text(encoding="utf-8"))
     assert settings["allowManagedHooksOnly"] is True
@@ -133,6 +197,11 @@ def test_managed_settings_has_no_proxy_and_telemetry_is_off():
     assert settings["env"]["CLAUDE_CODE_ENABLE_TELEMETRY"] == "0"
     assert settings["env"]["OTEL_SDK_DISABLED"] == "true"
     assert settings["env"]["DISABLE_TELEMETRY"] == "1"
+
+
+def test_managed_settings_ask_python_for_utf8_mode():
+    # Second layer beside the hook reading and writing UTF-8 bytes itself (PKG-01).
+    assert json.loads(SETTINGS.read_text(encoding="utf-8"))["env"]["PYTHONUTF8"] == "1"
 
 
 # Retired: four skeleton-era tests of the stub hook handlers. The handlers are now live clients

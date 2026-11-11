@@ -6,7 +6,8 @@
     "DISABLE_ERROR_REPORTING": "1",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "OTEL_SDK_DISABLED": "true"
+    "OTEL_SDK_DISABLED": "true",
+    "PYTHONUTF8": "1"
   },
   "hooks": {
     "UserPromptSubmit": [

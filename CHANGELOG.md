@@ -38,6 +38,13 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   const values and the wrapper's `name` reached the cloud verbatim, past detection and substitution. The chat
   boundary now refuses that form for tools (`UNSUPPORTED_TOOL`, the request is blocked and nothing is sent); a bare
   schema is accepted and scanned as before.
+- `python -m themis_shield.hooks` read Claude Code's UTF-8 JSON and wrote its reply through the text streams, which on
+  Windows without UTF-8 mode are cp1252 (PKG-01). The rules scanned mojibake, so a TFN in full-width digits or with a
+  zero-width space inside was not found (with `[hooks] cloud_authorised` the original prompt then went out; the default
+  closed policy refused it); a reply with text outside cp1252 was written
+  as invalid UTF-8 or failed. The hook now reads `sys.stdin.buffer` and decodes strict UTF-8 (a decode error is refused
+  like malformed JSON) and writes its reply as UTF-8 bytes. The input limit (1,048,576 characters) is unchanged. The
+  managed settings example also sets `PYTHONUTF8=1`, as a second layer.
 
 ## 0.3.4 (30/10/2026)
 
