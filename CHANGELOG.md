@@ -117,6 +117,15 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   string. The restoration report counts these as `withheld_in_url`, and the router returns that count in its `themis`
   object next to `unknown_tokens`. A placeholder next to a URL is restored as before. Commands, code and other non-URL
   contexts are still restored as written (SECURITY "Known limits").
+- **SEC-04 / R-02, a separate Operator credential.** The `/v1` bearer token (`gate-token`) also drove
+  `/api/operator/*/approve`, so the API client, or any agent that could read the token, approved its own held job. Every
+  `/api/operator/*` endpoint (approve, refuse, escalate, the queue) now needs the Operator credential: the new
+  `operator-token` (created beside `gate-token` on first start, same format and checks; a malformed one, or one equal to
+  the gate token, refuses the start with `OPERATOR_TOKEN_UNAVAILABLE`) or an Operator browser session opened with a
+  one-use code that only that token can mint (`themis serve --open-operator`). The gate token and the chat session from
+  `--open` get 403 `OPERATOR_CREDENTIAL_REQUIRED` and nothing changes; the Operator token is refused on `/v1`, the hooks
+  API and the app's writes. Both files sit under the same OS user's profile: a separation of credentials, not proof of
+  a second human.
 - `propagate-detection-view` (on by default; COR-002, DD-19): name propagation and the table name, identifier,
   quasi-identifier, location and statement passes read the raw text, not the detection view, so one zero-width space or
   soft hyphen (common in text copied from a PDF) in a table header or in a later mention switched that protection off:

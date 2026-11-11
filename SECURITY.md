@@ -38,6 +38,9 @@ In scope, for example:
 - reading the vault without the user's key, or another local user's vault;
 - the loopback server accepting requests from another host, origin or
   without the gate token;
+- an Operator action (approve, refuse, escalate, the Operator queue) accepted
+  with the client's credential (the gate token or the chat session), or the
+  Operator token accepted as a client credential on `/v1` or the hooks API;
 - a secret or credential being read from configuration files instead of the
   named environment variables.
 
@@ -74,3 +77,10 @@ Behaviour that is known and documented, so that nobody relies on the opposite. S
   the command or the tool call) or builds a request from it can send that
   value onwards. See "Restore safety" in
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- **The Operator credential is separate, not a second person.** Approval
+  needs the Operator token (`operator-token`) or a browser session opened with
+  a one-use code minted by it; the gate token that API clients, agents and
+  hooks hold is refused there. Both token files sit under the same OS user's
+  profile, so a process running as that user can read both and approve. The
+  separation stops a client that holds only the gate token; it does not prove
+  that a second human approved.

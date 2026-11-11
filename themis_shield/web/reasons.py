@@ -53,6 +53,10 @@ FIXED = {
     "LOOPBACK_HOST_REQUIRED": "The local gate host header is required.",
     "ORIGIN_DENIED": "The browser origin is not permitted.",
     "LOCAL_BEARER_REQUIRED": "A valid local session or bearer credential is required.",
+    "OPERATOR_CREDENTIAL_REQUIRED": (
+        "Operator actions need the Operator's own credential (operator-token, or a browser session opened with "
+        "`themis serve --open-operator`); the client token and the client session are refused."
+    ),
     "CONTENT_ENCODING_UNSUPPORTED": "Encoded request bodies are not supported.",
     "FRONT_DOOR_FAILED": "The local API front door failed closed.",
     "CALIBRATION_MAINTENANCE": "Calibration or maintenance currently excludes detection.",

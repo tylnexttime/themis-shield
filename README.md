@@ -109,10 +109,12 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
 
 - **Run a privacy-gated chat assistant locally.** `themis serve` starts a web app on `127.0.0.1`, opened with a
   one-use code. It shows what was found and what was sent, holds each cloud job until the Operator approves it, and
-  streams the cloud answer with your original values restored. The Operator is a configured identity name, not an
-  authenticated second person: the approve endpoints accept the same local bearer token as `/v1`, so approval is a
-  recorded step under one credential, and anyone who holds the gate token (the API client included) can approve,
-  until a separate operator credential exists. The app also serves OpenAI-compatible `/v1/chat/completions` and
+  streams the cloud answer with your original values restored. The Operator's endpoints need a separate Operator
+  credential (`operator-token`, created beside `gate-token` on first start, or a browser session opened with
+  `themis serve --open-operator`); the gate token and the chat session opened with `--open` are refused there, so an
+  API client or agent that holds only the gate token cannot approve its own job. Both files sit in the same user's
+  profile, so a process running as that user can read both: this separates credentials, it does not prove that a
+  second human approved. The app also serves OpenAI-compatible `/v1/chat/completions` and
   `/v1/models` endpoints on loopback, so tools like [Kilo Code](examples/kilo.example.json) can use it as their
   provider.
 - **Use any OpenAI-compatible cloud endpoint** (OpenAI, Azure OpenAI, or a compatible gateway). The API key stays
@@ -345,7 +347,7 @@ $env:THEMIS_CLOUD_API_KEY = "<your key>"                        # the variable's
 [`config/rehearsal.example.toml`](config/rehearsal.example.toml) is a complete configuration for synthetic data.
 It turns on the switches the minimal [`config/themis.example.toml`](config/themis.example.toml) keeps off: that one
 starts but refuses every chat. It authorises the cloud and local routes, turns on the Operator console with a
-separate approver identity name (a recorded label under the same local token, not a second login), and uses the
+separate approver identity name (a recorded label; the approval itself needs the Operator credential), and uses the
 evaluated pipeline (rule packs `core,au,intl`, the
 `"a training and research institute"` finder context, and the fictional `harbourline-eval` profile). Every switch is
 explained next to it.
@@ -357,10 +359,14 @@ explained next to it.
 ```
 
 `--open` creates the local gate token and opens the browser with a one-use code. Without `--open`, run
-`themis serve --provision-token` once first.
+`themis serve --provision-token` once first. Either way, the first start also creates the separate Operator token
+(`operator-token` beside `gate-token`, same format). Give the gate token to API clients and hooks; never the Operator
+token.
 
-Send a chat message. If it would go to the cloud, it is held. Open the **Operator** tab, approve the job, then go back
-and re-send: approval never sends anything by itself.
+Send a chat message. If it would go to the cloud, it is held. To decide, open the Operator session: while the gate
+runs, `themis serve --open-operator` reads `operator-token`, asks the gate for a one-use Operator code (two minutes)
+and opens the browser with it. In the **Operator** tab, approve the job, then go back to the chat and re-send:
+approval never sends anything by itself. The chat session alone (from `--open`) is refused on the Operator tab.
 
 If startup is refused, the line `Themis startup refused [CODE]: …` says why: a missing model, the engine, the vault
 protector, the token, the port. `--skip-model-check` starts without local models, but every request that needs them

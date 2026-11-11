@@ -42,6 +42,14 @@ REASONS = {
         "The local gate token is not provisioned. Run `themis serve --provision-token` once, "
         "or start with `themis serve --open`."
     ),
+    "OPERATOR_TOKEN_UNAVAILABLE": (
+        "The Operator token (operator-token beside gate-token) is unreadable, malformed or equal to the gate "
+        "token. Delete that file to have a new one created at the next start."
+    ),
+    "OPERATOR_LAUNCH_FAILED": (
+        "The running gate did not issue an Operator launcher code: start it with `themis serve` first and "
+        "enable the Operator console ([gate] operator_console_enabled)."
+    ),
     "PORT_IN_USE": (
         "The port is already in use on 127.0.0.1. Stop the other process or choose another --port "
         "(--open always uses 8742)."

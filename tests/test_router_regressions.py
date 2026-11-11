@@ -194,7 +194,7 @@ def test_operator_http_uses_router_clock_and_settings_fake_contract(tmp_path):
 
     async def exercise():
         transport = httpx.ASGITransport(
-            app=create_app(h.router, token="synthetic-local-bearer"),
+            app=create_app(h.router, token="synthetic-local-bearer", operator_token="synthetic-operator-bearer"),
             client=("127.0.0.1", 12345),
         )
         async with httpx.AsyncClient(
@@ -217,6 +217,7 @@ def test_operator_http_uses_router_clock_and_settings_fake_contract(tmp_path):
                 approved = await client.post(
                     f"/api/operator/{held.job_id}/approve",
                     json={"stage": stage, "reason": "ROUTINE_APPROVED"},
+                    headers={"Authorization": "Bearer synthetic-operator-bearer"},
                 )
                 assert approved.status_code == 200
                 assert h.fake.requests == []

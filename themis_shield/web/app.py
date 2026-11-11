@@ -34,6 +34,11 @@ def default_token_path():
     return app_data_dir() / "gate-token"
 
 
+def default_operator_token_path():
+    # The Operator's own credential (SEC-04): same format and checks as gate-token, never given to API clients.
+    return app_data_dir() / "operator-token"
+
+
 def read_gate_token(path):
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 4096:
         raise ValueError("LOCAL_TOKEN_UNAVAILABLE")
@@ -52,9 +57,13 @@ def calibration_run(router, model_id, mode):
 
 
 def create_app(
-    router, *, token, port=8742, launcher_code=None, clock=time.monotonic,
+    router, *, token, operator_token=None, port=8742, launcher_code=None, clock=time.monotonic,
     detection_timeout_seconds=None, detection_lock_timeout_seconds=120,
 ):
+    # Client and Operator credentials are separate (SEC-04): the client token, or a session opened with the client
+    # launcher code, never acts as the Operator; without an operator_token nobody can act as the Operator.
+    if operator_token is not None and hmac.compare_digest(operator_token, token):
+        raise ValueError("OPERATOR_TOKEN_MUST_DIFFER")
     timeout = (
         float(os.environ.get("THEMIS_DETECTION_TIMEOUT_SECONDS", "600"))
         if detection_timeout_seconds is None else detection_timeout_seconds
@@ -67,6 +76,7 @@ def create_app(
     router.detector, router.batch_detector = control.wrap(raw_detector), control.wrap(raw_batch)
     previews, handovers = services.PreviewStore(clock), services.HandoverStore()
     sessions, calibration_jobs = {}, {}
+    operator_sessions, operator_codes = {}, {}
     code_digest = __import__("hashlib").sha256(launcher_code.encode()).digest() if launcher_code else None
     code_expiry = clock() + 120
     settings = {
@@ -121,15 +131,25 @@ def create_app(
             return error("LOOPBACK_HOST_REQUIRED", 403)
         if request.headers.get("origin") not in {None, f"http://127.0.0.1:{port}"}:
             return error("ORIGIN_DENIED", 403)
-        public = request.method == "GET" and not request.url.path.startswith(("/api", "/v1", "/health"))
+        path = request.url.path
+        public = request.method == "GET" and not path.startswith(("/api", "/v1", "/health"))
         if not public:
-            bearer = hmac.compare_digest(request.headers.get("authorization", ""), "Bearer " + token)
+            supplied = request.headers.get("authorization", "")
+            bearer = hmac.compare_digest(supplied, "Bearer " + token)
+            operator_bearer = operator_token is not None and hmac.compare_digest(supplied, "Bearer " + operator_token)
             with session_lock:
-                for key, expiry in tuple(sessions.items()):
-                    if clock() >= expiry:
-                        del sessions[key]
+                for table in (sessions, operator_sessions):
+                    for key, expiry in tuple(table.items()):
+                        if clock() >= expiry:
+                            del table[key]
                 authenticated = bearer or request.cookies.get("themis_session", "") in sessions
-            if not authenticated:
+                operator = operator_bearer or request.cookies.get("themis_operator", "") in operator_sessions
+            if path == "/api/operator" or path.startswith("/api/operator/"):
+                # Every Operator endpoint needs the Operator credential; the client's is refused, nothing changes.
+                if not operator:
+                    return error("OPERATOR_CREDENTIAL_REQUIRED", 403 if authenticated else 401)
+            elif not authenticated and not (operator and request.method == "GET" and path.startswith("/api/")):
+                # The Operator credential only reads the app's views; it is never a client credential (/v1, hooks).
                 return error("LOCAL_BEARER_REQUIRED", 401)
         if request.headers.get("content-encoding"):
             return error("CONTENT_ENCODING_UNSUPPORTED", 400)
@@ -187,14 +207,24 @@ def create_app(
         if supplied is not None:
             digest = __import__("hashlib").sha256(supplied.encode()).digest()
             with session_lock:
-                if code_digest is None or clock() >= code_expiry or not hmac.compare_digest(code_digest, digest):
+                for key, expiry in tuple(operator_codes.items()):
+                    if clock() >= expiry:
+                        del operator_codes[key]
+                operator_code = next((key for key in operator_codes if hmac.compare_digest(key, digest)), None)
+                if operator_code is not None:
+                    # A one-use Operator launcher code opens an Operator session (its own cookie).
+                    del operator_codes[operator_code]
+                    name, table = "themis_operator", operator_sessions
+                elif code_digest is None or clock() >= code_expiry or not hmac.compare_digest(code_digest, digest):
                     return error("LAUNCHER_CODE_INVALID", 401)
-                code_digest = None
+                else:
+                    code_digest = None
+                    name, table = "themis_session", sessions
                 cookie = secrets.token_urlsafe(32)
-                sessions[cookie] = clock() + 8 * 3600
+                table[cookie] = clock() + 8 * 3600
             response = RedirectResponse("/", status_code=303)
             response.set_cookie(
-                "themis_session", cookie, httponly=True, samesite="strict",
+                name, cookie, httponly=True, samesite="strict",
                 secure=False, max_age=8 * 3600, path="/",
             )
             return response
@@ -405,6 +435,21 @@ def create_app(
 
     def operator_enabled():
         return bool(getattr(router, "operator_console_enabled", False))
+
+    @app.post("/api/operator/launcher")
+    async def operator_launcher():
+        # Only the Operator credential reaches here (boundary check): mint a one-use, two-minute browser code.
+        if not operator_enabled():
+            return error("OPERATOR_CONSOLE_DISABLED", 404)
+        code = secrets.token_urlsafe(32)
+        with session_lock:
+            for key, expiry in tuple(operator_codes.items()):
+                if clock() >= expiry:
+                    del operator_codes[key]
+            if len(operator_codes) >= 16:
+                return error("OPERATION_REFUSED", 403)
+            operator_codes[__import__("hashlib").sha256(code.encode()).digest()] = clock() + 120
+        return {"code": code, "path": "/?t=" + code}
 
     @app.get("/api/operator/queue")
     async def operator_queue():

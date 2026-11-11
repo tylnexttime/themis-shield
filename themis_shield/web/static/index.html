@@ -114,7 +114,8 @@
 
       <section id="screen-operator" class="screen scroll-screen" aria-labelledby="operator-heading" hidden>
         <div class="screen-heading">
-          <div><h1 id="operator-heading">Operator queue</h1><p>Configured Operator identity only. The server refuses self-approval.</p></div>
+          <div><h1 id="operator-heading">Operator queue</h1><p>Configured Operator identity only. The server refuses self-approval.
+            Needs the Operator session: run <code>themis serve --open-operator</code>; the client session is refused.</p></div>
           <button type="button" id="refresh-operator">Refresh queue</button>
         </div>
         <p>Read the clean summary and redaction counts. Stage 2 binds to the finished package.

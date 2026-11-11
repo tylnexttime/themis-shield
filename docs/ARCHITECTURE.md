@@ -18,8 +18,8 @@ finders, union, propagation, allow-list), the policy decides RELEASE, ASK or
 BLOCK (`policy.py`), found values are replaced with opaque tokens
 (`substitute.py`, `placeholders.py`) whose originals go into the encrypted
 vault (`vault.py`), and the clean package is logged in the job register
-(`register/`) where the Operator approves it (a recorded step under the same
-local credential, not an authenticated second person; see
+(`register/`) where the Operator approves it (with an Operator credential
+separate from the client's, though not proof of a second human; see
 [below](#why-the-hooks-path-re-scans-and-the-web-path-does-not)). Only then,
 after checking that no original value appears in the outgoing JSON, does the
 request go to the cloud (`cloud/openai_compat.py`). The answer's tokens are
@@ -230,12 +230,19 @@ outgoing JSON (`verify_json`). They differ after that:
   on the substituted text. Its release needs the Operator to approve the
   clean package in the register, and that approval is bound to the SHA-256 of
   the exact outgoing request (`manifest_hash`): any change voids it. The
-  Operator is a configured identity name, not an authenticated second person:
-  the web app accepts the same local bearer token on `/v1` and on the
-  Operator's approve endpoints (`web/app.py`), so the approval is a recorded
-  step under one credential, and any holder of the gate token, the API client
-  itself included, can approve, until a separate operator credential exists.
-  The remaining automatic check is the exact-value one above.
+  Operator is a configured identity name acting with its own credential: every
+  `/api/operator/*` endpoint (`web/app.py`) needs the Operator token
+  (`operator-token`, created beside `gate-token`, same format and checks) or
+  an Operator browser session opened with a one-use code that only that token
+  can mint (`themis serve --open-operator`). The client's gate token and the
+  chat session opened with `--open` are refused there (403
+  `OPERATOR_CREDENTIAL_REQUIRED`), and the Operator token is refused on `/v1`,
+  the hooks API and the app's writes; it only reads the app's views. So an API
+  client or agent holding only the gate token cannot approve its own job. Both
+  token files sit under the same OS user's profile, so a process running as
+  that user can read both: this is a separation of credentials, not proof
+  that a second human approved. The remaining automatic check is the
+  exact-value one above.
 
 The cost of the asymmetry is that a value the detectors missed the first time
 is not caught by a second detector pass on the web path; it relies on the

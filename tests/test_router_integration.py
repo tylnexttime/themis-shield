@@ -159,7 +159,7 @@ def test_contract_endpoints_and_one_use_launcher(tmp_path, monkeypatch):
 
     async def exercise():
         app = create_app(
-            h.router, token="synthetic-local-bearer",
+            h.router, token="synthetic-local-bearer", operator_token="synthetic-operator-bearer",
             launcher_code="synthetic-one-use-code",
         )
         transport = httpx.ASGITransport(app=app, client=("127.0.0.1", 12345))
@@ -179,10 +179,16 @@ def test_contract_endpoints_and_one_use_launcher(tmp_path, monkeypatch):
                 return response.json()
 
             for path in (
-                "/api/models", "/api/runtime", "/api/capacity", "/api/jobs",
-                "/api/operator/queue", "/api/settings",
+                "/api/models", "/api/runtime", "/api/capacity", "/api/jobs", "/api/settings",
             ):
                 safe(await client.get(path))
+            # SEC-04: the client launcher session is not the Operator; its own one-use code opens that session.
+            assert (await client.get("/api/operator/queue")).status_code == 403
+            minted = safe(await client.post(
+                "/api/operator/launcher", headers={"Authorization": "Bearer synthetic-operator-bearer"},
+            ))
+            assert (await client.get(minted["path"])).status_code == 303
+            safe(await client.get("/api/operator/queue"))
             local_models = safe(await client.get("/api/models"))["local"]
             assert {"full", "mmap"} == {
                 variant["mode"]
@@ -265,14 +271,15 @@ def test_operator_default_off(tmp_path):
     h = harness(tmp_path)
     async def exercise():
         transport = httpx.ASGITransport(
-            app=create_app(h.router, token="synthetic-local-bearer"),
+            app=create_app(h.router, token="synthetic-local-bearer", operator_token="synthetic-operator-bearer"),
             client=("127.0.0.1", 12345),
         )
         async with httpx.AsyncClient(
             transport=transport, base_url="http://127.0.0.1:8742",
-            headers={"Authorization": "Bearer synthetic-local-bearer"},
+            headers={"Authorization": "Bearer synthetic-operator-bearer"},
         ) as client:
             assert (await client.get("/api/operator/queue")).status_code == 404
+            assert (await client.post("/api/operator/launcher")).status_code == 404
     try:
         asyncio.run(exercise())
     finally:

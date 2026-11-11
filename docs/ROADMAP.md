@@ -297,7 +297,9 @@ DD-25). Design work, in this order:
    arguments only for fields a deployment marks as value-bearing.
 2. **R-02, a separate Operator credential** (SEC-04). Today one local bearer token authenticates `/v1` and the
    Operator's approve endpoints, so the API client can approve its own job. A second token, or an Operator session
-   opened with its own launcher code, so approval means a second person.
+   opened with its own launcher code, so approval means a second person. Done: a separate `operator-token` and
+   Operator browser session are required on every Operator endpoint and refused on `/v1` (a separation of
+   credentials under one OS user, not proof of a second human).
 3. **R-03, ASK on any unmatched personal finder value** (DOC-02). Below the 3-or-10% threshold an unmatched value is
    neither located nor substituted. Hold on any unmatched PERSON or identifier value; measure friction on the
    development sets first.
