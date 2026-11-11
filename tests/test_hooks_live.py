@@ -255,10 +255,11 @@ def test_tool_output_deidentified_in_its_own_shape(live):
     assert live.fake.requests == []
 
 
-def test_tool_input_restored_strictly(live):
+def test_placeholder_in_search_pattern_is_denied_not_restored(live):
+    # A search pattern restored from a placeholder would be a yes/no oracle for the
+    # original value, so the call is denied and nothing is restored into its input.
     token = issue_name(live)
-    path = live.workspace / "clean.txt"
-    path.write_text("Harmless synthetic text.", encoding="utf-8")
+    (live.workspace / "clean.txt").write_text("Harmless synthetic text.", encoding="utf-8")
     code, response, _ = cli(
         live, "PreToolUse", tool_name="Grep",
         tool_input={
@@ -268,9 +269,49 @@ def test_tool_input_restored_strictly(live):
     )
     assert code == 0
     output = response["hookSpecificOutput"]
+    assert output["permissionDecision"] == "deny"
+    assert "updatedInput" not in output
+    assert "Mara Lindahl" not in json.dumps(response)
+
+
+def test_read_of_clean_file_still_allowed_under_approved_job(live):
+    active(live)
+    path = live.workspace / "clean.txt"
+    path.write_text("Harmless synthetic text.", encoding="utf-8")
+    code, response, _ = cli(
+        live, "PreToolUse", tool_name="Read", tool_input={"file_path": str(path)},
+    )
+    assert code == 0
+    output = response["hookSpecificOutput"]
     assert output["permissionDecision"] == "allow"
-    assert output["updatedInput"]["pattern"] == "Mara Lindahl"
-    assert output["updatedInput"]["path"] == str(live.workspace)
+    assert output["updatedInput"] == {"file_path": str(path)}
+
+
+@pytest.mark.parametrize("tool,tool_input", [
+    ("Grep", {"pattern": "Mara.*", "output_mode": "count"}),
+    ("Grep", {"pattern": "Mara.*", "output_mode": "files_with_matches"}),
+    ("Grep", {"pattern": "Mara.*"}),
+    ("Grep", {"pattern": "Mara.*", "output_mode": "content"}),
+    ("Glob", {"pattern": "*.txt"}),
+    ("Glob", {"pattern": "Mara*"}),
+])
+@pytest.mark.parametrize("scoped", [True, False])
+def test_search_tools_denied_under_approved_job(live, tool, tool_input, scoped):
+    # Match counts and file lists carry no personal value, so the post-tool re-scan
+    # would pass them, but each call is a yes/no oracle over the raw contents or
+    # names of every file under [hooks] roots.
+    active(live)
+    (live.workspace / "clean.txt").write_text("Harmless synthetic text.", encoding="utf-8")
+    if scoped:
+        tool_input = dict(tool_input, path=str(live.workspace))
+    code, response, _ = cli(
+        live, "PreToolUse", tool_name=tool, tool_input=tool_input,
+    )
+    assert code == 0
+    output = response["hookSpecificOutput"]
+    assert output["permissionDecision"] == "deny"
+    assert "updatedInput" not in output
+    assert live.fake.requests == []
 
 
 def test_display_restored_and_cross_session_not_restored(live):

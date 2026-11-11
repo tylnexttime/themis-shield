@@ -52,6 +52,11 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   in a single `=` (read as a key with no value). A span that reaches into the stripped comment, a span in the key alone,
   and a span over the key of a value-less line now keep SECRET. A span over the key and the reference together, and a
   span cut out of the reference, still pass. This is a detection change, measured on the development sets afterwards.
+- SEC-01: in hooks mode, PreToolUse now denies the search tools Glob and Grep (only Read is allowed through). Their
+  match counts and file lists carry no personal value, so the post-tool re-scan passed them, but under an approved job
+  each call was a yes/no oracle over the raw contents and names of every file under `[hooks] roots`: a reviewer
+  recovered a de-identified name character by character in 94 Grep calls. Their PostToolUse output profiles stay, so
+  any output that still arrives is re-scanned. `allowed_tools` still accepts both names; they are denied regardless.
 
 ## 0.3.4 (30/10/2026)
 

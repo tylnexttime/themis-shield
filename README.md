@@ -363,8 +363,9 @@ your Claude credentials; the hooks talk only to the local gate.
   not transparent rewriting.
 - **To let clean prompts and tool calls through,** set `[hooks] cloud_authorised = true` together with
   `[gate] synthetic_cloud_authorised = true`, and list the workspace directories in `[hooks] roots`. Optional keys:
-  `allowed_tools` (a subset of Read, Write, Edit, Glob, Grep), `drafts_dir`, `destination_id`, `model`,
-  `deployment_type`.
+  `allowed_tools` (a subset of Read, Write, Edit, Glob, Grep; the search tools Glob and Grep are always denied,
+  because their match counts and file lists would be an oracle over local files), `drafts_dir`, `destination_id`,
+  `model`, `deployment_type`.
 
 ## Evaluation
 

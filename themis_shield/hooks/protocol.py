@@ -32,8 +32,12 @@ EVENT_PATHS = {
 }
 # Candidate allow-list and executable output capability are separate.
 DEFAULT_TOOLS = frozenset({"Read", "Write", "Edit", "Glob", "Grep"})
-EXECUTABLE_TOOLS = frozenset({"Read", "Glob", "Grep"})
-OUTPUT_TOOLS = EXECUTABLE_TOOLS | {"Bash"}
+# Glob and Grep are not executable: their match counts and file lists carry no personal
+# value, so the post-tool re-scan passes them, yet each call is a yes/no oracle over the raw
+# contents and names of every file under [hooks] roots.
+EXECUTABLE_TOOLS = frozenset({"Read"})
+# Defensive post adapters only: a denied tool's output is still re-scanned if it arrives.
+OUTPUT_TOOLS = EXECUTABLE_TOOLS | {"Glob", "Grep", "Bash"}
 
 
 def session_id(value):
