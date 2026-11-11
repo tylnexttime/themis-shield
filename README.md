@@ -7,7 +7,8 @@ language model, themis-shield reads all of it on your own hardware, finds the pe
 then does one of three things:
 
 - **RELEASE**: replace every finding with an opaque placeholder, send the cleaned text to the cloud model, and put
-  the original values back into the answer locally. The cloud never sees the real values.
+  the original values back into the answer locally. The cloud never sees the values the gate *found*; a value it
+  misses is sent as written (see [Evaluation](#evaluation)).
 - **ASK**: hold the job and show you what was found, because something sensitive (a health condition, a criminal
   record, a family-violence disclosure) needs a human decision.
 - **BLOCK**: refuse to send. The cause can be a secret, a classification marking that means local-only, or a
@@ -30,7 +31,8 @@ then does one of three things:
   and one look-alike more than 0.3.0 touched. It caught **every sensitive statement (267 of 267)** and met the
   friction rule for the first time (0.083). See [Evaluation](#evaluation) and
   [eval/RESULTS-v0.4.md](eval/RESULTS-v0.4.md).
-- **The round trip** (de-identify, send, restore) is covered by automated tests against a stand-in cloud endpoint.
+- **The round trip** (de-identify, send, restore) is covered by automated tests against a stand-in cloud endpoint, and
+  by one opt-in live test against a commercial cloud model (see [Quick start](#quick-start)).
 - **Not cleared for real personal data.** By design, themis-shield refuses to start unless it is configured for
   synthetic data.
 
@@ -73,12 +75,16 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
 
 ## So what
 
-- **You can use cloud models on real work without handing over the people in it.** The cloud sees
-  `⟦P:3fa9c1⟧ reported ⟦S:91b2e0⟧`. You see the answer with the real name and statement back in place.
+- **Designed so a cloud model can work on a document without the people in it.** Today it is a preview for synthetic
+  data, and three of the four frozen tests so far released some personal values (5, 28 and 12 spans; see
+  [Evaluation](#evaluation)). A message with a name in it reaches the cloud as `Please email ⟦P:3fa9c1⟧`. When the
+  gate finds a sensitive statement, the whole message text is replaced by one placeholder, `⟦S:91b2e0⟧`. You see the
+  answer with the real values back in place.
 - **When the cloud is the wrong place, you're told, and you can stay local.** Classification markings, secrets and
-  anything your policy marks local-only never leave the device.
-- **Uncertainty becomes a human decision, not a silent leak.** Sensitive statements go to ASK with the findings
-  shown, instead of being guessed at.
+  anything your policy marks local-only that the gate *detects* never leave the device. A marking written with
+  look-alike letters from another script is not detected (see [What it does not do yet](#what-it-does-not-do-yet)).
+- **Uncertainty the gate can see becomes a human decision.** Sensitive statements go to ASK with the findings shown,
+  instead of being guessed at. A detector miss is still a silent leak.
 - **It's measurable.** It ships with a public synthetic evaluation set, a scorer, a frozen evaluation plan and the
   numbers from our runs, so you can check our claims and test your own configuration before trusting it.
 - **It's adoptable.** Everything specific to an organisation lives in a profiles folder outside the code: marking
@@ -102,10 +108,13 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
 ## What v0.2 lets you do
 
 - **Run a privacy-gated chat assistant locally.** `themis serve` starts a web app on `127.0.0.1`, opened with a
-  one-use code. It shows what was found and what was sent, holds each cloud job until a second, configured identity
-  (the Operator) approves it, and streams the cloud answer with your original values restored. It also serves
-  OpenAI-compatible `/v1/chat/completions` and `/v1/models` endpoints on loopback, so tools like
-  [Kilo Code](examples/kilo.example.json) can use it as their provider.
+  one-use code. It shows what was found and what was sent, holds each cloud job until the Operator approves it, and
+  streams the cloud answer with your original values restored. The Operator is a configured identity name, not an
+  authenticated second person: the approve endpoints accept the same local bearer token as `/v1`, so approval is a
+  recorded step under one credential, and anyone who holds the gate token (the API client included) can approve,
+  until a separate operator credential exists. The app also serves OpenAI-compatible `/v1/chat/completions` and
+  `/v1/models` endpoints on loopback, so tools like [Kilo Code](examples/kilo.example.json) can use it as their
+  provider.
 - **Use any OpenAI-compatible cloud endpoint** (OpenAI, Azure OpenAI, or a compatible gateway). The API key stays
   in an environment variable whose *name* is in the config, and only the configured model can be addressed.
 - **Detect personal data in layers:**
@@ -190,6 +199,18 @@ Read this section before you rely on anything above.
   the gate caught 74% of sensitive statements overall, 98% in one half and 67% in the half whose author wrote mostly
   indirect phrasing (union membership 45%, criminal history 51%). Statements found are substituted and held;
   statements missed in a released document are leaks. On split E (a new author's text) 0.3.4 caught all 267.
+- **A few finder values the text doesn't contain are released without a hold.** When a local finder reports a value
+  that is not in the text as written (a name it spelled differently from the source, say), the policy asks only if at
+  least 3 such values came from one finder, or they are at least 10% of what that finder located
+  (`UNMATCHED_ASK_MINIMUM` in `themis_shield/policy.py`). Fewer are not located, so they are not substituted, and the
+  document can be released with that value in it.
+- **Markings written with look-alike letters are not recognised.** Marking detection reads the text and its NFKC
+  form, and NFKC does not fold letters from other scripts: a Cyrillic Е inside RESTRICTED is classified as no marking,
+  and the document is routed as unmarked.
+- **Restoration can alter text the cloud model wrote itself.** The gate doubles every `:`, `\`, `⟦` and `⟧` in
+  outbound text and halves them on the way back, which is exact for text that came from you. A `::` or a doubled
+  backslash that the model wrote itself is halved too (`std::vector` comes back as `std:vector`), and the
+  restoration report still says clean ([DD-18](docs/DEV-DEBT.md)).
 - **A small classifier is a helper, never a judge.** We fine-tuned a small decision encoder (Laya, 421M) on synthetic
   data of our own: it answered 92.3% of questions correctly on sentence templates it had never seen, but its wrong
   answers came with a median confidence of 1.000. **It must never be used as a standalone privacy check.** In
@@ -211,8 +232,10 @@ Read this section before you rely on anything above.
   run has been done.
 - **Slow on purpose.** Every document goes through both finders, taking a median of 12.6 seconds (mean 14.2) on an
   8 GB laptop GPU. It is built for careful work, not for high volume.
-- **No recorded run against a commercial cloud model since this rebuild.** The cloud leg is tested against a stand-in
-  endpoint.
+- **One live cloud test, and it is narrow.** `tests/test_cloud_live.py` (opt-in; see [Quick start](#quick-start)) sent
+  three synthetic documents to Anthropic's OpenAI-compatible endpoint, with one small model and deterministic
+  stand-ins for the local finders. It showed no personal value in any outbound body and byte-exact restoration. It
+  says nothing about detection recall. Every other test of the cloud leg uses a stand-in endpoint.
 
 ## How it works
 
@@ -237,7 +260,8 @@ Read this section before you rely on anything above.
  ┌──────────────────────┐
  │ 3. decision          │   RELEASE · BLOCK (secret, failed stage) · ASK, for any of: a sensitive statement;
  │                      │   injection signs; finders silent (or finding far fewer people) while the classifier
- │                      │   found something; finder values the text doesn't actually contain
+ │                      │   found something; at least 3 finder values (or 10% of a finder's findings) that the
+ │                      │   text doesn't contain (fewer are skipped, not substituted, and may be released)
  └──────────┬───────────┘
             ▼ RELEASE (or ASK, approved)
  ┌──────────────────────┐
@@ -276,6 +300,11 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pytest                             # offline test suite, about a minute
 .\.venv\Scripts\themis.exe --version
 ```
+
+The suite skips the live cloud test. To run it, put `ANTHROPIC_API_KEY` in your environment and run
+`pytest tests/test_cloud_live.py --run-cloud`. It makes real API calls on your account with three invented documents,
+against Anthropic's OpenAI-compatible endpoint; `THEMIS_LIVE_CLOUD_MODEL` picks the model, and the options are
+listed at the top of the file.
 
 **2. Get the engine and the models.** Nothing is bundled; download them from their publishers. By default themis
 looks for:
@@ -316,7 +345,8 @@ $env:THEMIS_CLOUD_API_KEY = "<your key>"                        # the variable's
 [`config/rehearsal.example.toml`](config/rehearsal.example.toml) is a complete configuration for synthetic data.
 It turns on the switches the minimal [`config/themis.example.toml`](config/themis.example.toml) keeps off: that one
 starts but refuses every chat. It authorises the cloud and local routes, turns on the Operator console with a
-separate approver identity, and uses the evaluated pipeline (rule packs `core,au,intl`, the
+separate approver identity name (a recorded label under the same local token, not a second login), and uses the
+evaluated pipeline (rule packs `core,au,intl`, the
 `"a training and research institute"` finder context, and the fictional `harbourline-eval` profile). Every switch is
 explained next to it.
 
@@ -338,9 +368,11 @@ is then blocked.
 
 Other entry points: `themis profiles` (shipped and external profiles), `themis runtime status` (models, back ends,
 memory), `themis register --help` (job register), `themis hooks` (lists the hook events), and `themis vet`, which
-de-identifies a whole folder (a data release) and writes a value-free **vetting record** for the people who sign it
-off: what was found, by type and count, what was held and why, the method's measured baseline, and the parts a
-person completes ([docs/VETTING-RECORD.md](docs/VETTING-RECORD.md)). Off Windows, set
+de-identifies a whole folder (a data release) and writes a **vetting record** for the people who sign it off: what
+was found, by type and count, what was held and why, the method's measured baseline, and the parts a person
+completes ([docs/VETTING-RECORD.md](docs/VETTING-RECORD.md)). The record holds counts, not document text, and is
+checked against every protected value of six characters or more before it is saved; a shorter value (a short name
+typed into the free-text `--purpose`, say) is not caught. Off Windows, set
 `[vault] protector = "passphrase"` and `THEMIS_VAULT_PASSPHRASE` (at least 12 characters).
 
 To adopt it in an organisation, put your own `markings/`, `institution/`, `catalogue/` and `cloud/` JSON files in a

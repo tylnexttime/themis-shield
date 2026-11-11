@@ -18,10 +18,12 @@ finders, union, propagation, allow-list), the policy decides RELEASE, ASK or
 BLOCK (`policy.py`), found values are replaced with opaque tokens
 (`substitute.py`, `placeholders.py`) whose originals go into the encrypted
 vault (`vault.py`), and the clean package is logged in the job register
-(`register/`) where a second identity approves it. Only then, after checking
-that no original value appears in the outgoing JSON, does the request go to
-the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
-(`restore.py`).
+(`register/`) where the Operator approves it (a recorded step under the same
+local credential, not an authenticated second person; see
+[below](#why-the-hooks-path-re-scans-and-the-web-path-does-not)). Only then,
+after checking that no original value appears in the outgoing JSON, does the
+request go to the cloud (`cloud/openai_compat.py`). The answer's tokens are
+restored locally (`restore.py`).
 
 ## Module map
 
@@ -78,7 +80,7 @@ the cloud (`cloud/openai_compat.py`). The answer's tokens are restored locally
 | `register/sqlite_store.py`, `models.py`, `two_stage.py`, `reporting.py`, `cli.py`, `pilot.py` | real | The SQLite job register (append-only history tables), intake validation, two-stage approval, reports, the `themis register` CLI and the off-by-default automatic approval fixture. |
 | `register/client.py` | partial | Real: the register contracts (`JobRecord`, `JobStatus`, approval validation, offline journal) used everywhere. Skeleton: `JobRegisterClient` protocol methods and `HttpRegisterClient`, a non-networking stub for a remote register. |
 | `handover.py`, `app_services.py` | real | Handover mode: a deterministic, re-scanned package for manual use; safe projections for the web app. |
-| `vetting.py` | real, v0.3.1 | `themis vet`: a data release through the chat path's own steps (markings, detection, policy, catalogue, final sweep), derived documents under position-only names, a codebook vault per release, and the value-free vetting record ([VETTING-RECORD.md](VETTING-RECORD.md)). |
+| `vetting.py` | real, v0.3.1 | `themis vet`: a data release through the chat path's own steps (markings, detection, policy, catalogue, final sweep), derived documents under position-only names, a codebook vault per release, and the vetting record, which holds counts, not document text, and is checked against every protected value of six characters or more ([VETTING-RECORD.md](VETTING-RECORD.md)). |
 | `ledger.py` | skeleton | Specification of an append-only evidence ledger per request, for a central register service (roadmap, Later). Today the register's append-only records and decision records carry the evidence (`tests/test_register_immutability.py`). |
 | `audit.py` | skeleton | Specification of value-free audit rows. The register's audit table is the working audit trail. |
 | `adapters/` | skeleton | Specifications for walking Anthropic Messages and OpenAI Responses payloads. The gate accepts Chat Completions only. |
@@ -225,10 +227,15 @@ outgoing JSON (`verify_json`). They differ after that:
   released without a person looking at each call. Re-scanning the exact text
   that will be released is the check that stands in for that person.
 - **The web and API path** (`router_flow.py`) does not re-run the detectors
-  on the substituted text. Its release needs a second identity to approve the
+  on the substituted text. Its release needs the Operator to approve the
   clean package in the register, and that approval is bound to the SHA-256 of
   the exact outgoing request (`manifest_hash`): any change voids it. The
-  remaining automatic check is the exact-value one above.
+  Operator is a configured identity name, not an authenticated second person:
+  the web app accepts the same local bearer token on `/v1` and on the
+  Operator's approve endpoints (`web/app.py`), so the approval is a recorded
+  step under one credential, and any holder of the gate token, the API client
+  itself included, can approve, until a separate operator credential exists.
+  The remaining automatic check is the exact-value one above.
 
 The cost of the asymmetry is that a value the detectors missed the first time
 is not caught by a second detector pass on the web path; it relies on the
@@ -435,3 +442,10 @@ counted, never guessed. Since v0.3 the allocator also never issues an identifier
 already issued in the conversation (one hex digit changed, or two adjacent digits swapped, whatever the class
 letter), so a single damaged character can never turn one person's placeholder into another person's: it restores
 the original placeholder's value or nothing (`tests/test_restore_safety.py`).
+
+Restoration is lexical, not contextual. It looks at the token, never at where the token sits: a placeholder that the
+cloud reply writes inside a URL, a markdown image address, a command or a tool-call argument is restored to the real
+value there (`restore_tool_arguments` refuses invalid JSON, colliding keys and unknown tokens; it does not validate
+what the restored string will do). The gate does not check the context a value is restored into, so a client that
+renders or executes the reply (fetches the image, follows the link, runs the command or the tool call) can send the
+real value onwards.

@@ -1,6 +1,6 @@
 # Security policy
 
-themis-shield is a **preview** (0.2.0). It is meant for rehearsals on
+themis-shield is a **preview** (0.3.4). It is meant for rehearsals on
 **synthetic data only**: the gate refuses to start unless
 `[gate] synthetic_only = true`, and that switch is an attestation you make,
 not a detector. Do not put real personal information through it.
@@ -32,8 +32,9 @@ In scope, for example:
 - a request leaving the device without the approval the policy requires, or
   after the approved clean package changed;
 - a way around the fail-closed paths: startup checks, marking routing
-  (`RESTRICTED` and similar staying local), the hook client's non-zero exits,
-  the outgoing-request check;
+  (`RESTRICTED` and similar staying local, for markings the gate recognises:
+  see [Known limits](#known-limits)), the hook client's non-zero exits, the
+  outgoing-request check;
 - reading the vault without the user's key, or another local user's vault;
 - the loopback server accepting requests from another host, origin or
   without the gate token;
@@ -51,3 +52,21 @@ Out of scope:
 - the skeleton modules listed in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
   which are not wired into the running gate;
 - third-party models, engines and cloud services themselves.
+
+## Known limits
+
+Behaviour that is known and documented, so that nobody relies on the opposite. See also the README's
+"What it does not do yet".
+
+- **Markings written with look-alike letters.** Marking detection reads the
+  text and its NFKC form. NFKC does not fold letters from other scripts, so a
+  marking that uses one (a Cyrillic Е inside `RESTRICTED`) is not recognised:
+  the document is classified as unmarked and routed as such. Only the
+  personal-data decision then stands between it and the cloud.
+- **Restoration is lexical.** The gate puts the original value back wherever
+  the cloud reply writes a placeholder it issued, and does not look at the
+  context. A placeholder the reply puts in a URL, a markdown image address, a
+  command or a tool-call argument is restored to the real value there. A
+  client that renders or executes the reply (fetching the image, following the
+  link, running the command or the tool call) can send that value onwards.
+  See "Restore safety" in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
