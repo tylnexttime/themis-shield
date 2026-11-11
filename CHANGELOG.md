@@ -109,6 +109,15 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   string. The restoration report counts these as `withheld_in_url`, and the router returns that count in its `themis`
   object next to `unknown_tokens`. A placeholder next to a URL is restored as before. Commands, code and other non-URL
   contexts are still restored as written (SECURITY "Known limits").
+- `propagate-detection-view` (on by default; COR-002, DD-19): name propagation and the table name, identifier,
+  quasi-identifier, location and statement passes read the raw text, not the detection view, so one zero-width space or
+  soft hyphen (common in text copied from a PDF) in a table header or in a later mention switched that protection off:
+  `Name,Licen<U+200B>ce Number,Site` released its licence numbers, `Na<U+200B>me` found no name cells, and a later
+  `Lind<U+200B>ahl` (or a soft hyphen, or a full-width `Lindahl`) stayed in clear after `Maria Lindahl` was found. Those
+  passes now run on the view (invisible characters removed, NFKC per character), the findings that come in are mapped
+  into it first, and every span they make maps back to whole source characters, the invisible ones inside it included.
+  Text the view leaves unchanged is read as it is, byte for byte. `--detection-fixes` without it restores the previous
+  behaviour. This is a detection change, measured on the development sets afterwards.
 
 ## 0.3.4 (30/10/2026)
 

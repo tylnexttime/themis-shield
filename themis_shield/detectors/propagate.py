@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left
 import csv
 from dataclasses import replace
 import re
 
+from ..normalise import DetectionView, detection_view
 from ..types import Label, Span
 from .contracts import DetectionFinding, FindingEvidence, finding
 from .settings import fix_on, v02
@@ -570,11 +572,11 @@ def address_line_numbers(text: str, findings: tuple[DetectionFinding, ...]) -> t
     return union_findings(findings, added) if added else findings
 
 
-def propagate(
+def _propagate_text(
     text: str,
     spans: tuple[DetectionFinding, ...],
-    stage: str = "propagate-tier1",
-    tier: int = 1,
+    stage: str,
+    tier: int,
 ) -> tuple[DetectionFinding, ...]:
     base = union_findings(spans, table_spans(text, stage, tier))
     if v02():
@@ -591,3 +593,53 @@ def propagate(
         if fix_on("union-roles"):
             base = union_findings(base, union_role_spans(text, tier))
     return union_findings(base, extra_spans(text, base, stage, tier))
+
+
+# v0.4 fix "propagate-detection-view" (DD-19, review COR-002): name propagation and the table passes read the detection
+# view, like the rules, the marking gate, PII-Tracer and the finders, so one zero-width space or soft hyphen in a table
+# header or in a later mention no longer switches them off. Findings come in as source offsets and are mapped into the
+# view first (the view characters that come from the source characters they cover); every span the passes make is
+# mapped back with ``DetectionView.to_source``, which covers whole source characters and the invisible ones inside the
+# span. The findings that came in are kept as they came in. Text the view leaves unchanged is read as it is.
+def _in_view(starts: list[int], start: int, end: int) -> Span | None:
+    """The view span of the view characters that come from source characters ``[start, end)``; None if none do."""
+    first, last = bisect_left(starts, start), bisect_left(starts, end)
+    return Span(first, last) if first < last else None
+
+
+def _propagate_view(
+    view: DetectionView,
+    spans: tuple[DetectionFinding, ...],
+    stage: str,
+    tier: int,
+) -> tuple[DetectionFinding, ...]:
+    starts = [source[0] for source in view.offsets]
+    mapped = []
+    for item in spans:
+        inside = _in_view(starts, item.start, item.end)
+        if inside is None:  # only invisible characters: nothing in the view to read; kept as it came in below
+            continue
+        statement = item.statement_span
+        if statement is not None:
+            statement = _in_view(starts, statement.start, statement.end)
+        mapped.append(replace(item, span=inside, statement_span=statement))
+    found = []
+    for item in _propagate_text(view.text, tuple(mapped), stage, tier):
+        statement = item.statement_span
+        if statement is not None:
+            statement = Span(*view.to_source(statement.start, statement.end))
+        found.append(replace(item, span=Span(*view.to_source(item.start, item.end)), statement_span=statement))
+    return union_findings(spans, found)
+
+
+def propagate(
+    text: str,
+    spans: tuple[DetectionFinding, ...],
+    stage: str = "propagate-tier1",
+    tier: int = 1,
+) -> tuple[DetectionFinding, ...]:
+    if fix_on("propagate-detection-view"):
+        view = detection_view(text)
+        if view.changed:
+            return _propagate_view(view, spans, stage, tier)
+    return _propagate_text(text, spans, stage, tier)

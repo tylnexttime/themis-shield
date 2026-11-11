@@ -97,6 +97,12 @@ v0.5 detection fixes (from split F, now development data):
   a key alone that is not such an identifier, a literal in a trailing comment and a lone base64 key keep their label
   (COR-001).
   See ``word_structure`` and ``references_only`` in ``detectors/secret_context.py``.
+- ``propagate-detection-view`` (DD-19, review COR-002): name propagation and the table name, identifier,
+  quasi-identifier, location and statement passes read the detection view (invisible characters removed, NFKC per
+  character) like the other detectors, and every span they make maps back to the source characters that produced it,
+  invisible ones inside it included. One zero-width space or soft hyphen in a table header or in a later mention no
+  longer switches that protection off. Findings coming in are mapped into the view first. Text the view leaves
+  unchanged is read as it is; see ``propagate`` in ``detectors/propagate.py``.
 """
 
 from __future__ import annotations
@@ -122,6 +128,8 @@ DETECTION_FIXES = (
     "joined-terms",
     # v0.5, from split F (development data since its v0.5 run; detectors/propagate.py, detectors/secret_context.py).
     "location-columns", "secret-config-lookalikes",
+    # From the 11/11/2026 review (DD-19, COR-002; detectors/propagate.py).
+    "propagate-detection-view",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
