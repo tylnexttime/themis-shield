@@ -3,6 +3,9 @@
 Tests marked ``slow`` need real local models (PII-Tracer weights, llama-server)
 and are skipped unless ``--run-slow`` is given.
 
+Tests marked ``cloud`` call the live cloud API with synthetic, de-identified text. They are skipped unless
+``--run-cloud`` is given (and they skip again, with a reason, when ``ANTHROPIC_API_KEY`` is not set).
+
 ``--shift-clock-days N`` runs the whole session with the wall clock moved N days ahead (needs ``time-machine``,
 in the ``dev`` extra). A test that passes today and fails under it depends on today's date: pin its clock. Run it
 once per release (docs/DEV-DEBT.md, DD-08).
@@ -27,6 +30,10 @@ def pytest_addoption(parser):
     parser.addoption(
         "--run-slow", action="store_true", default=False,
         help="run tests that need real local models",
+    )
+    parser.addoption(
+        "--run-cloud", action="store_true", default=False,
+        help="run the live cloud test (needs ANTHROPIC_API_KEY; sends synthetic, de-identified text to the API)",
     )
     parser.addoption(
         "--shift-clock-days", type=int, default=0,
@@ -55,12 +62,18 @@ def _shifted_wall_clock(request):
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--run-slow"):
-        return
-    skip = pytest.mark.skip(reason="needs real local models; use --run-slow")
-    for item in items:
-        if "slow" in item.keywords:
-            item.add_marker(skip)
+    if not config.getoption("--run-slow"):
+        skip = pytest.mark.skip(reason="needs real local models; use --run-slow")
+        for item in items:
+            if "slow" in item.keywords:
+                item.add_marker(skip)
+    if not config.getoption("--run-cloud"):
+        skip_cloud = pytest.mark.skip(
+            reason="live cloud test: opt in with --run-cloud (and set ANTHROPIC_API_KEY)",
+        )
+        for item in items:
+            if "cloud" in item.keywords:
+                item.add_marker(skip_cloud)
 
 
 @pytest.fixture(autouse=True)

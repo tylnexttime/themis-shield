@@ -66,6 +66,9 @@ themis_shield = [
 ]
 
 [tool.pytest.ini_options]
-markers = ["slow: needs real local models (PII-Tracer weights, llama-server, a running Strata, saved Marian profiles); run with --run-slow"]
+markers = [
+    "slow: needs real local models (PII-Tracer weights, llama-server, a running Strata, saved Marian profiles); run with --run-slow",
+    "cloud: calls the live cloud API with synthetic, de-identified text and needs ANTHROPIC_API_KEY; run with --run-cloud",
+]
 testpaths = ["tests"]
 addopts = "-ra"
