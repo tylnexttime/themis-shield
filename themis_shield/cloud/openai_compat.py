@@ -11,6 +11,11 @@ Redirects, environment proxies and automatic inference retries are disabled.
 Any provider that speaks the OpenAI Chat Completions streaming protocol can be
 used (OpenAI, Azure OpenAI, vLLM or llama.cpp servers, gateways). See
 ``config/themis.example.toml`` for examples.
+
+``api = "anthropic-messages"`` selects the native Anthropic Messages leg
+instead (``anthropic_messages.py``): the same client, locks, capture and stream
+class, with the approved package translated at send time and the reply
+translated back into the chunks read here.
 """
 
 from __future__ import annotations
@@ -110,6 +115,8 @@ def verify_json(raw: bytes, originals: tuple[str, ...], *, decode_arguments: boo
 
 
 AUTH_STYLES = {"bearer", "api-key"}
+OPENAI_API, ANTHROPIC_API = "openai-compatible", "anthropic-messages"
+APIS = {OPENAI_API, ANTHROPIC_API}
 _LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
@@ -124,6 +131,12 @@ class CloudSettings:
     ``auth_style`` is ``bearer`` (``Authorization: Bearer``) or ``api-key``
     (an ``api-key`` header, as Azure OpenAI uses). ``api_version`` adds an
     ``api-version`` query parameter when set.
+
+    ``api`` is ``openai-compatible`` (the default, as above) or
+    ``anthropic-messages``: then ``base_url`` is ``https://api.anthropic.com/v1``
+    with ``/messages`` appended, the key goes in an ``x-api-key`` header next to
+    a fixed ``anthropic-version`` header, ``auth_style`` is not used and
+    ``api_version`` must stay unset.
     """
 
     base_url: str
@@ -131,6 +144,7 @@ class CloudSettings:
     api_key_env: str = "THEMIS_CLOUD_API_KEY"
     auth_style: str = "bearer"
     api_version: str | None = None
+    api: str = OPENAI_API
     destination_id: str = "cloud"
     deployment_type: str = "global-standard"
     max_tokens: int = 32768
@@ -156,6 +170,8 @@ class CloudSettings:
             raise ValueError("invalid-auth-style")
         if self.api_version is not None and not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", self.api_version):
             raise ValueError("invalid-api-version")
+        if self.api not in APIS or (self.api == ANTHROPIC_API and self.api_version is not None):
+            raise ValueError("invalid-cloud-api")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", self.destination_id):
             raise ValueError("invalid-destination-id")
         if (
@@ -166,6 +182,8 @@ class CloudSettings:
 
     @property
     def url(self):
+        if self.api == ANTHROPIC_API:
+            return self.base_url.rstrip("/") + "/messages"
         url = self.base_url.rstrip("/") + "/chat/completions"
         if self.api_version:
             url += "?" + urlencode({"api-version": self.api_version})
@@ -240,12 +258,13 @@ class Capture:
 
 
 class CloudStream:
-    def __init__(self, response, context, outbound, capture, settings):
+    def __init__(self, response, context, outbound, capture, settings, reply=None):
         self.response = response
         self.context = context
         self.outbound = outbound
         self.capture = capture
         self.settings = settings
+        self.reply = reply  # a MessagesReply on the native Anthropic leg: it translates the events into chunks
         self.closed = False
 
     def close(self):
@@ -253,7 +272,45 @@ class CloudStream:
             self.closed = True
             self.context.__exit__(None, None, None)
 
+    def _release(self, clean: dict) -> dict:
+        # The same rule as the Chat Completions path: a known original the model produced is rejected before
+        # it is captured or delivered.
+        verify_json(canonical(clean), self.outbound.originals, decode_arguments=False)
+        self.capture.append({"kind": "answer-tokenised", "chunk": clean})
+        return clean
+
+    def _whole(self) -> Iterator[dict]:
+        """A non-streaming Messages reply: read within the bounds, translated and checked before anything is yielded."""
+        began = time.monotonic()
+        try:
+            raw = bytearray()
+            try:
+                for part in self.response.iter_bytes():
+                    raw += part
+                    if (
+                        len(raw) > self.settings.maximum_response_bytes
+                        or time.monotonic() - began > self.settings.timeout_seconds
+                    ):
+                        raise CloudFailure("CLOUD_RESPONSE_BOUND")
+            except CloudFailure:
+                raise
+            except Exception:
+                raise CloudFailure("CLOUD_TRANSPORT") from None
+            try:
+                chunks = [self._release(clean) for clean in self.reply.message(bytes(raw))]
+            except CloudFailure:
+                raise
+            except Exception:
+                raise CloudFailure("CLOUD_PROTOCOL") from None
+            yield from chunks
+            self.capture.append({"kind": "transport-complete"})
+        finally:
+            self.close()
+
     def __iter__(self) -> Iterator[dict]:
+        if self.reply is not None and not self.reply.streaming:
+            yield from self._whole()
+            return
         decoder = codecs.getincrementaldecoder("utf-8")("strict")
         pending = ""
         event_lines = []
@@ -268,6 +325,15 @@ class CloudStream:
                 return None
             text = "\n".join(event_lines)
             event_lines.clear()
+            if self.reply is not None:
+                try:
+                    clean, ended = self.reply.event(text)
+                    done = done or ended
+                    return None if clean is None else self._release(clean)
+                except CloudFailure:
+                    raise
+                except Exception:
+                    raise CloudFailure("CLOUD_PROTOCOL") from None
             if text == "[DONE]":
                 if not finished:
                     raise CloudFailure("CLOUD_INCOMPLETE")
@@ -393,6 +459,7 @@ class CloudClient:
 
     def open(self, outbound: Outbound) -> CloudStream:
         """Third lock is enforced here, even if the router is bypassed."""
+        sent, reply = outbound.payload, None
         try:
             if (
                 not isinstance(outbound.marking_class, MarkingClass)
@@ -403,6 +470,12 @@ class CloudClient:
             ):
                 raise CloudFailure("CLOUD_RELEASE_LOCK")
             verify_json(outbound.payload, outbound.originals)
+            if self.settings.api == ANTHROPIC_API:
+                from .anthropic_messages import MessagesReply, messages_request, request_headers
+                native = messages_request(outbound.payload)
+                # The last exact-value check is on the bytes that leave, the top-level system text included.
+                verify_json(native.body, outbound.originals)
+                sent, reply = native.body, MessagesReply(native.stream)
         except CloudFailure:
             raise
         except Exception:
@@ -413,30 +486,34 @@ class CloudClient:
             "kind": "outbound",
             "manifest_hash": outbound.manifest_hash,
             "verify_no_originals": True,
-            "payload": strict_json(outbound.payload),
-            "exact_json": outbound.payload.decode("utf-8"),
+            "payload": strict_json(sent),
+            "exact_json": sent.decode("utf-8"),
+            # The approved package is hashed above; the Messages request is derived from it, so its own hash too.
+            **({} if reply is None else {"api": self.settings.api, "sent_sha256": hashlib.sha256(sent).hexdigest()}),
         })
         secret = self.credential.secret()
         # A loaded credential must not itself appear in work content.
-        if secret in outbound.payload.decode("utf-8"):
+        if secret in sent.decode("utf-8"):
             raise CloudFailure("CREDENTIAL_IN_PAYLOAD")
+        streaming = reply is None or reply.streaming
+        content_type = "text/event-stream" if streaming else "application/json"
         context = self.client.stream(
-            "POST", self.settings.url, content=outbound.payload,
+            "POST", self.settings.url, content=sent,
             headers={
-                **self._auth_headers(secret),
+                **(self._auth_headers(secret) if reply is None else request_headers(secret)),
                 "Content-Type": "application/json",
-                "Accept": "text/event-stream",
+                "Accept": content_type,
             },
         )
         try:
             response = context.__enter__()
             if (
                 response.status_code != 200
-                or response.headers.get("content-type", "").split(";", 1)[0] != "text/event-stream"
+                or response.headers.get("content-type", "").split(";", 1)[0] != content_type
             ):
                 context.__exit__(None, None, None)
                 raise CloudFailure("CLOUD_HTTP")
-            return CloudStream(response, context, outbound, capture, self.settings)
+            return CloudStream(response, context, outbound, capture, self.settings, reply)
         except CloudFailure:
             raise
         except Exception:

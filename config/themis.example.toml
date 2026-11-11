@@ -57,6 +57,12 @@ timeout_seconds = 1800
 # auth_style = "api-key"
 # api_version = "2024-10-21"
 
+# Anthropic's native Messages API (no tools; the default api is "openai-compatible"):
+# api = "anthropic-messages"
+# base_url = "https://api.anthropic.com/v1"
+# model = "your-model-name"
+# api_key_env = "ANTHROPIC_API_KEY"
+
 [register]
 factory = "themis_shield.integration:register_factory"
 # path = "~/.local/share/themis-shield/register.db"

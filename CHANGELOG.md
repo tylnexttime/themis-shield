@@ -136,6 +136,28 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   Text the view leaves unchanged is read as it is, byte for byte. `--detection-fixes` without it restores the previous
   behaviour. This is a detection change, measured on the development sets afterwards.
 
+### Native Anthropic Messages leg (ROADMAP: Later)
+
+- `api = "anthropic-messages"` in `[cloud]` (`CloudSettings.api`, default `openai-compatible`, unchanged) sends to
+  `POST <base_url>/messages` (`base_url = https://api.anthropic.com/v1`) with `x-api-key`, read from the configured
+  environment variable by the same `ApiKeyCredential`, and `anthropic-version: 2023-06-01`; no `Authorization` header.
+  The router, register and approvals are untouched: approvals stay bound to the hash of the OpenAI-shaped package, and
+  `CloudClient.open` translates that package at send time (system and developer messages become the top-level `system`
+  text, `max_completion_tokens` becomes `max_tokens`, `stop` becomes `stop_sequences`; a temperature above 1, a message
+  `name` or any other field with no Messages equivalent is refused with `UNSUPPORTED_REQUEST`, and tools or tool
+  results with `UNSUPPORTED_TOOL`, nothing sent). `verify_json` then runs on the translated bytes, so the last
+  exact-value check sees every field that leaves, `system` included; the capture records what left, with its own hash.
+- The reply (streaming `message_start` .. `message_stop`, or one JSON message) is translated into the chunks the router
+  already restores, so restoration, URL withholding (R-01) and the reports are shared. `input_tokens` plus the cache
+  counts become `prompt_tokens`, `output_tokens` becomes `completion_tokens`. Fail closed with the existing codes: an
+  `error` event, an unknown event or block type or an out-of-order event is `CLOUD_PROTOCOL`, a non-200 status is
+  `CLOUD_HTTP`, `max_tokens`/`pause_turn` or a stream without `message_stop` is `CLOUD_INCOMPLETE`, `refusal` is
+  `CLOUD_REFUSED`. Thinking blocks, which the live API sent unasked, are dropped from the reply (never delivered,
+  captured or restored); their tokens count in `output_tokens` and against `max_tokens`.
+- `tests/test_cloud_anthropic_messages.py` (offline, fake transport) covers the request and headers, both reply kinds,
+  the failures above and the exact-value check on `system`; `tests/test_cloud_live.py` now runs its three documents once
+  per leg (`-k openai-compatible`, `-k anthropic-messages`).
+
 ## 0.3.4 (30/10/2026)
 
 **Development measurement only**, like 0.3.2 and 0.3.3: no fresh split has tested it, and a vetting record still quotes

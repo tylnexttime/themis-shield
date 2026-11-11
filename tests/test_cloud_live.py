@@ -1,10 +1,12 @@
-"""Opt-in live proof of the cloud leg: nothing sensitive leaves the machine, and restoration is exact.
+"""Opt-in live proof of both cloud legs: nothing sensitive leaves the machine, and restoration is exact.
 
 Run it with ``pytest tests/test_cloud_live.py --run-cloud`` and ``ANTHROPIC_API_KEY`` in the environment. Without
 the option the live test is skipped; without the key it is skipped with a reason. Optional variables:
 
 - ``THEMIS_LIVE_CLOUD_MODEL``  the model to call (default ``claude-haiku-5-5``);
-- ``THEMIS_LIVE_USAGE_LOG``    a file that receives one JSON line per upstream call (token usage, never headers);
+- ``THEMIS_LIVE_USAGE_LOG``    a file that receives one JSON line per upstream call (the model id the response named,
+  its token usage and the leg; never headers);
+- ``THEMIS_LIVE_DOCS``         comma-separated document keys (``roster,payroll,welfare``) to send; default all three;
 - ``THEMIS_LIVE_EVIDENCE_DIR`` a folder that receives, per document, the outbound body (every placeholder visible), the
   raw reply, the restored reply and a JSON summary of the checks. Request headers are never recorded or written.
 
@@ -24,14 +26,22 @@ host name is resolved and no other address is connected to. (b) The reply, resto
 character for character, and the originals exist only in the encrypted vault: no file the gate wrote holds one in
 clear. What it does not prove: detection recall, the Messages dialect, or a model's behaviour on any other task.
 
-Which wire format this proves. The gate has exactly one cloud leg: ``themis_shield/cloud/openai_compat.py``, a Chat
-Completions client (``POST <base_url>/chat/completions``, ``Authorization: Bearer <key read from the environment
-variable the configuration names>``). The Anthropic Messages adapter (``adapters/anthropic_messages.py``) is a
-skeleton that raises ``NotImplementedError``, ``clients.py`` only describes client profiles, and the router's
-``ChatBoundary`` refuses anything but Chat Completions. So this test configures the gate the way a deployment does
-(``integration.cloud_settings``) with ``base_url = https://api.anthropic.com/v1`` (Anthropic's OpenAI-compatible
-endpoint) and the gate-owned key path (``gate-anthropic-api``). The Messages dialect itself is not exercised because
-the gate does not implement it, and ``output_config.effort`` cannot be sent for the same reason.
+Which wire formats this proves, one run of the same documents per leg (``-k openai-compatible`` or ``-k
+anthropic-messages`` picks one). The gate has two cloud legs, both in ``themis_shield/cloud/``, and the test configures
+the gate the way a deployment does (``integration.cloud_settings``, the gate-owned key path ``gate-anthropic-api``):
+
+- ``openai-compatible`` (``openai_compat.py``, the default): Chat Completions, ``POST <base_url>/chat/completions``,
+  ``Authorization: Bearer <key>``, with ``base_url = https://api.anthropic.com/v1`` (Anthropic's OpenAI-compatible
+  endpoint). The Messages dialect itself is not exercised by this leg.
+- ``anthropic-messages`` (``anthropic_messages.py``): ``api = "anthropic-messages"`` in the same settings, so the
+  gate sends ``POST https://api.anthropic.com/v1/messages`` with ``x-api-key`` and ``anthropic-version``, the system
+  text in the top-level ``system`` field, and reads the Messages streaming events. The key is read from the
+  configured variable by the gate's own credential reader, as on the other leg.
+
+The router's ``ChatBoundary`` takes Chat Completions in either case (the adapter in ``adapters/anthropic_messages.py``
+is a skeleton for a Messages front door, which the gate does not have), and ``output_config.effort`` cannot be sent.
+The upstream is always ``https://api.anthropic.com``, set explicitly: ``ANTHROPIC_BASE_URL`` is neither read nor
+inherited.
 
 Every value in this file is invented. The checks that matter are made on the bytes the transport sent.
 """
@@ -41,6 +51,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import gzip
 import ipaddress
 import json
 import os
@@ -71,13 +82,27 @@ from router_fakes import LocalRuntime, Tracer
 
 API_BASE = "https://api.anthropic.com/v1"
 API_HOST = "api.anthropic.com"
-API_PATH = "/v1/chat/completions"
 KEY_ENV = "ANTHROPIC_API_KEY"
 LOCAL_TOKEN = "synthetic-local-gate-token-0123456789abcdef"  # the loopback front door's own bearer, not an API key
 DEFAULT_MODEL = "claude-haiku-5-5"
-MAX_TOKENS = 8000
 REQUESTER = "synthetic-requester"
 OPERATOR = "synthetic-operator"
+
+
+@dataclass(frozen=True)
+class Leg:
+    """One way the gate reaches the cloud: the ``api`` setting, where the request lands and how it is budgeted."""
+
+    name: str
+    api: str  # CloudSettings.api
+    path: str  # the request path on API_HOST
+    budget_field: str  # the outbound body field that carries the token budget
+    max_tokens: int  # the gate's ceiling and the request's budget; the documents' echo is well inside it
+
+
+OPENAI_LEG = Leg("openai-compatible", "openai-compatible", "/v1/chat/completions", "max_completion_tokens", 8000)
+NATIVE_LEG = Leg("anthropic-messages", "anthropic-messages", "/v1/messages", "max_tokens", 1024)
+LEGS = (OPENAI_LEG, NATIVE_LEG)
 PLACEHOLDER = re.compile(r"⟦([PCAIDSQ]):[0-9a-f]{6}⟧")
 
 # Deliberately plain, and deliberately silent about the injection lines in the documents: a model that obeys one
@@ -426,18 +451,21 @@ class EgressWatch:
 
 def decoded(record: Exchange) -> str:
     body = record.response_body
-    try:
-        if record.content_encoding == "gzip":
-            body = zlib.decompress(body, 16 + zlib.MAX_WBITS)
-        elif record.content_encoding == "deflate":
-            body = zlib.decompress(body)
-    except zlib.error:
-        pass
+    window = {"gzip": 16 + zlib.MAX_WBITS, "deflate": zlib.MAX_WBITS}.get(record.content_encoding)
+    if window is not None:
+        try:
+            # A reply the gate stopped reading (it failed closed) is cut short: keep every byte that does decode.
+            body = zlib.decompressobj(window).decompress(body)
+        except zlib.error:
+            pass
     return body.decode("utf-8", errors="replace")
 
 
 def read_reply(record: Exchange):
-    """The model's text (still carrying placeholders), the last usage object, and whether the stream ended cleanly."""
+    """The model's text (still carrying placeholders), the last usage object, and whether the stream ended cleanly.
+
+    Reads either dialect: Chat Completions chunks (``[DONE]`` ends it) or Messages events (``message_start`` and
+    ``message_delta`` carry usage, ``message_stop`` ends it; the usage is the two merged, the later one winning)."""
     parts, usage, finished = [], None, False
     for line in decoded(record).splitlines():
         if not line.startswith("data:"):
@@ -450,12 +478,40 @@ def read_reply(record: Exchange):
             event = json.loads(payload)
         except ValueError:
             continue
-        if isinstance(event, dict):
+        if not isinstance(event, dict):
+            continue
+        kind = event.get("type")
+        if kind == "message_stop":
+            finished = True
+        elif kind == "message_start":
+            started = (event.get("message") or {}).get("usage")
+            usage = dict(started) if isinstance(started, dict) else usage
+        elif kind == "message_delta" and isinstance(event.get("usage"), dict):
+            usage = {**(usage or {}), **{key: value for key, value in event["usage"].items() if value is not None}}
+        elif kind == "content_block_delta":
+            parts.append((event.get("delta") or {}).get("text") or "")
+        else:
             if isinstance(event.get("usage"), dict):
                 usage = event["usage"]
             for choice in event.get("choices") or []:
                 parts.append((choice.get("delta") or {}).get("content") or "")
     return "".join(parts), usage, finished
+
+
+def response_model(record: Exchange):
+    """The model id the response itself names (a chunk's ``model``, or ``message_start``'s ``message.model``)."""
+    for line in decoded(record).splitlines():
+        if not line.startswith("data:"):
+            continue
+        try:
+            event = json.loads(line[5:].strip())
+        except ValueError:
+            continue
+        if isinstance(event, dict):
+            named = event.get("model") or (event.get("message") or {}).get("model")
+            if isinstance(named, str) and named:
+                return named
+    return None
 
 
 def usage_fields(usage):
@@ -492,6 +548,7 @@ class Gate:
     root: Path
     model: str
     key: str  # compared against the outbound bodies; never printed, logged or written
+    leg: Leg = OPENAI_LEG
 
     def close(self):
         for resource in (self.cloud, self.vault):
@@ -501,7 +558,9 @@ class Gate:
                 pass
 
 
-def build_gate(root: Path, inner: httpx.BaseTransport, model: str, *, key: str, credential=None) -> Gate:
+def build_gate(
+    root: Path, inner: httpx.BaseTransport, model: str, *, key: str, credential=None, leg: Leg = OPENAI_LEG,
+) -> Gate:
     root.mkdir(parents=True, exist_ok=True)
     profiles = root / "profiles"
     (profiles / "institution").mkdir(parents=True, exist_ok=True)
@@ -514,7 +573,8 @@ def build_gate(root: Path, inner: httpx.BaseTransport, model: str, *, key: str, 
         "detection": {"institution_profile": "ormond-reach", "rule_packs": ["core", "au", "intl"]},
         "cloud": {
             "base_url": API_BASE, "model": model, "api_key_env": KEY_ENV, "destination_id": destination,
-            "max_tokens": MAX_TOKENS, "timeout_seconds": 240, "capture_dir": str(root / "cloud-payloads"),
+            "api": leg.api, "max_tokens": leg.max_tokens, "timeout_seconds": 240,
+            "capture_dir": str(root / "cloud-payloads"),
         },
     }
     integration.configure_markings(config)
@@ -522,7 +582,7 @@ def build_gate(root: Path, inner: httpx.BaseTransport, model: str, *, key: str, 
     integration.configure_versions(config)
     institution = integration.institution_profile(config)
     settings = integration.cloud_settings(config)
-    assert settings.base_url == API_BASE and settings.api_key_env == KEY_ENV
+    assert settings.base_url == API_BASE and settings.api_key_env == KEY_ENV and settings.api == leg.api
     recorder = RecordingTransport(inner)
     cloud = CloudClient(settings, credential=credential, transport=recorder)
     register = SqliteRegister(root / "register.db", requester_identity=REQUESTER)
@@ -537,7 +597,7 @@ def build_gate(root: Path, inner: httpx.BaseTransport, model: str, *, key: str, 
         targets=DetectionTargets(tracer=Tracer(), llm_client=GoldFinders(DOCS)),
         requester_identity=REQUESTER, local_authorised=True,
     )
-    return Gate(router, create_app(router, token=LOCAL_TOKEN), register, vault, cloud, recorder, root, model, key)
+    return Gate(router, create_app(router, token=LOCAL_TOKEN), register, vault, cloud, recorder, root, model, key, leg)
 
 
 def reset_process_state():
@@ -617,7 +677,7 @@ async def _through_front_door(gate: Gate, run: DocRun):
 
 def run_document(gate: Gate, doc: Doc) -> DocRun:
     request = {
-        "model": "themis/auto", "max_tokens": MAX_TOKENS,
+        "model": "themis/auto", "max_tokens": gate.leg.max_tokens,
         "messages": [
             {"role": "system", "content": SYSTEM_INSTRUCTION},
             {"role": "user", "content": doc.text},
@@ -694,14 +754,15 @@ def evaluate(gate: Gate, run: DocRun) -> list[Check]:
     first = run.exchanges[0]
     url = httpx.URL(first.url)
     add("upstream_is_anthropic_api",
-        first.method == "POST" and url.scheme == "https" and url.host == API_HOST and url.path == API_PATH,
+        first.method == "POST" and url.scheme == "https" and url.host == API_HOST and url.path == gate.leg.path,
         f"{first.method} {url.scheme}://{url.host}{url.path}")
     add("upstream_answered_200", first.status == 200 and first.error is None,
         f"status={first.status} error={first.error}")
     body = json.loads(first.request_body)
+    budget_field = gate.leg.budget_field
     add("configured_model_and_budget_sent",
-        body.get("model") == gate.model and body.get("max_completion_tokens") == MAX_TOKENS,
-        f"model={body.get('model')} max_completion_tokens={body.get('max_completion_tokens')}")
+        body.get("model") == gate.model and body.get(budget_field) == gate.leg.max_tokens,
+        f"model={body.get('model')} {budget_field}={body.get(budget_field)}")
 
     # (a) nothing sensitive leaves the machine
     outbound = first.request_body.decode("utf-8", errors="replace")
@@ -749,7 +810,8 @@ def log_usage(path: Path, gate: Gate, run: DocRun):
             _, usage, _ = read_reply(record)
             handle.write(json.dumps({
                 "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "source": "tests/test_cloud_live.py", "doc": run.doc.key, "model": gate.model,
+                "source": "tests/test_cloud_live.py", "doc": run.doc.key, "leg": gate.leg.name,
+                "model": response_model(record) or gate.model, "model_requested": gate.model,
                 "http_status": record.status, "error": record.error,
                 **usage_fields(usage), "usage": usage,
             }, ensure_ascii=False, sort_keys=True) + "\n")
@@ -760,7 +822,8 @@ def write_evidence(directory: Path, run_id: str, number: int, gate: Gate, run: D
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "document-original.txt").write_bytes(run.doc.text.encode("utf-8"))
     summary = {
-        "doc": run.doc.key, "model": gate.model, "steps": run.steps, "route": run.route, "reason": run.reason,
+        "doc": run.doc.key, "leg": gate.leg.name, "model": gate.model, "steps": run.steps, "route": run.route,
+        "reason": run.reason,
         "upstream_requests": len(run.exchanges), "restoration": run.report,
         "passed": all(check.passed for check in checks),
         "checks": [{"name": check.name, "passed": check.passed, "detail": check.detail} for check in checks],
@@ -769,7 +832,9 @@ def write_evidence(directory: Path, run_id: str, number: int, gate: Gate, run: D
         first = run.exchanges[0]
         reply, usage, finished = read_reply(first)
         body = json.loads(first.request_body)
-        rendered = "\n\n".join(f"[{message['role']}]\n{message['content']}" for message in body.get("messages", []))
+        # The Messages leg carries the system text in a top-level field, the other leg in a system message.
+        turns = ([{"role": "system", "content": body["system"]}] if "system" in body else []) + body.get("messages", [])
+        rendered = "\n\n".join(f"[{message['role']}]\n{message['content']}" for message in turns)
         (folder / "outbound-body.json").write_bytes(first.request_body)
         (folder / "outbound-text.txt").write_bytes(rendered.encode("utf-8"))
         (folder / "reply-raw.txt").write_bytes(reply.encode("utf-8"))
@@ -783,11 +848,13 @@ def write_evidence(directory: Path, run_id: str, number: int, gate: Gate, run: D
     (folder / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def run_all(gate: Gate, *, usage_log: Path | None, evidence_dir: Path | None):
+def run_all(gate: Gate, *, usage_log: Path | None, evidence_dir: Path | None, docs=DOCS):
     """Send every document through the gate, evaluate it, book its usage and write its evidence."""
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     results = {}
     for number, doc in enumerate(DOCS, 1):
+        if doc not in docs:
+            continue
         run = run_document(gate, doc)
         checks = evaluate(gate, run)
         if usage_log is not None:
@@ -797,7 +864,7 @@ def run_all(gate: Gate, *, usage_log: Path | None, evidence_dir: Path | None):
         results[doc.key] = (run, checks)
     if evidence_dir is not None:
         (evidence_dir / run_id / "run-summary.json").write_text(json.dumps({
-            "model": gate.model, "upstream_requests": len(gate.recorder.exchanges),
+            "leg": gate.leg.name, "model": gate.model, "upstream_requests": len(gate.recorder.exchanges),
             "documents": {key: all(check.passed for check in checks) for key, (_, checks) in results.items()},
         }, indent=2), encoding="utf-8")
     return results
@@ -816,24 +883,29 @@ class LiveRun:
     egress: EgressWatch
 
 
-@pytest.fixture(scope="module")
-def live_run(tmp_path_factory):
+@pytest.fixture(scope="module", params=LEGS, ids=[leg.name for leg in LEGS])
+def live_run(request, tmp_path_factory):
+    leg = request.param
     key = os.environ.get(KEY_ENV, "")
     if not key:
         pytest.skip(f"{KEY_ENV} is not set: the live cloud test needs a key (and --run-cloud)")
     model = os.environ.get("THEMIS_LIVE_CLOUD_MODEL") or DEFAULT_MODEL
     usage_log = os.environ.get("THEMIS_LIVE_USAGE_LOG")
     evidence_dir = os.environ.get("THEMIS_LIVE_EVIDENCE_DIR")
+    wanted = {key.strip() for key in os.environ.get("THEMIS_LIVE_DOCS", "").split(",") if key.strip()}
+    docs = tuple(doc for doc in DOCS if not wanted or doc.key in wanted)
+    if wanted - {doc.key for doc in DOCS}:
+        pytest.fail("THEMIS_LIVE_DOCS names a document that does not exist: " + ",".join(sorted(wanted)))
     patch = pytest.MonkeyPatch()
     patch.delenv("ANTHROPIC_BASE_URL", raising=False)  # the upstream is set explicitly, never inherited
     gate = build_gate(
-        tmp_path_factory.mktemp("cloud-live") / "gate", httpx.HTTPTransport(trust_env=False), model, key=key,
+        tmp_path_factory.mktemp("cloud-live") / "gate", httpx.HTTPTransport(trust_env=False), model, key=key, leg=leg,
     )
     try:
         with EgressWatch() as egress:
             results = run_all(
                 gate, usage_log=Path(usage_log) if usage_log else None,
-                evidence_dir=Path(evidence_dir) if evidence_dir else None,
+                evidence_dir=Path(evidence_dir) if evidence_dir else None, docs=docs,
             )
         yield LiveRun(results, egress)
     finally:
@@ -847,6 +919,8 @@ def live_run(tmp_path_factory):
 def test_cloud_leg_live(live_run, doc):
     """Against the live API: no gold value or variant in any outbound body, the placeholders are there, no API key
     in the body, the reply restores to the original document exactly, and the mapping exists only in the vault."""
+    if doc.key not in live_run.results:
+        pytest.skip(f"THEMIS_LIVE_DOCS did not ask for {doc.key}")
     _, checks = live_run.results[doc.key]
     assert not [check for check in checks if not check.passed], failures(checks)
 
@@ -867,16 +941,41 @@ def last_user_text(sent: dict) -> str:
     return [message for message in sent["messages"] if message["role"] == "user"][-1]["content"]
 
 
-def echo_transport():
+def echo_transport(leg: Leg = OPENAI_LEG):
     """A stand-in cloud that repeats the user's message back, in small SSE chunks, then reports usage."""
-    return scripted_transport(last_user_text)
+    return scripted_transport(last_user_text, leg)
 
 
-def scripted_transport(reply_for):
-    """A stand-in cloud whose reply is ``reply_for(request body as a dict)``, streamed in small chunks."""
+def scripted_transport(reply_for, leg: Leg = OPENAI_LEG):
+    """A stand-in cloud whose reply is ``reply_for(request body as a dict)``, streamed in small chunks, in the
+    dialect of the leg (Chat Completions chunks, or Messages events from ``message_start`` to ``message_stop``)."""
 
     def handler(request: httpx.Request) -> httpx.Response:
-        text = reply_for(json.loads(request.content))
+        sent = json.loads(request.content)
+        text = reply_for(sent)
+        if leg.api == "anthropic-messages":
+            assert request.url.path == leg.path and sent["stream"] is True and sent["max_tokens"] == leg.max_tokens
+            assert "x-api-key" in request.headers and "authorization" not in request.headers
+            events = [
+                {"type": "message_start", "message": {
+                    "id": "msg_synthetic", "type": "message", "role": "assistant", "model": "claude-synthetic-model",
+                    "content": [], "stop_reason": None, "stop_sequence": None,
+                    "usage": {"input_tokens": 123, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 7,
+                              "output_tokens": 1}}},
+                {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+                {"type": "ping"},
+                *({"type": "content_block_delta", "index": 0,
+                   "delta": {"type": "text_delta", "text": text[start:start + 11]}}
+                  for start in range(0, len(text), 11)),
+                {"type": "content_block_stop", "index": 0},
+                {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                 "usage": {"output_tokens": 45}},
+                {"type": "message_stop"},
+            ]
+            raw = "".join(
+                f"event: {event['type']}\ndata: " + json.dumps(event, ensure_ascii=False) + "\n\n" for event in events
+            )
+            return httpx.Response(200, headers={"Content-Type": "text/event-stream"}, content=raw.encode())
         events = [
             {"choices": [{"index": 0, "delta": {"content": text[start:start + 11]}, "finish_reason": None}]}
             for start in range(0, len(text), 11)
@@ -892,6 +991,20 @@ def scripted_transport(reply_for):
         )
 
     return httpx.MockTransport(handler)
+
+
+def test_decoded_keeps_what_a_cut_short_compressed_reply_holds():
+    """A reply the gate stopped reading (it failed closed) arrives truncated: the evidence keeps what decodes."""
+    text = "".join(f"data: line {number} of a long reply\n\n" for number in range(400))
+    whole = zlib.compress(text.encode(), 9)
+    for encoding, packed in (
+        ("deflate", whole),
+        ("gzip", gzip.compress(text.encode(), 9)),
+    ):
+        cut = Exchange("POST", "https://x.invalid/", b"", 200, packed[: len(packed) // 2], encoding)
+        kept = decoded(cut)
+        assert kept and text.startswith(kept) and len(kept) < len(text), encoding
+        assert decoded(Exchange("POST", "https://x.invalid/", b"", 200, packed, encoding)) == text
 
 
 def test_scanner_finds_every_variant_and_nothing_else():
@@ -939,12 +1052,14 @@ def test_egress_watch_records_names_and_connections(monkeypatch):
     assert socket.getaddrinfo is stub and socket.socket.connect is refuse  # the watch put both back
 
 
-def test_machinery_round_trip_offline(tmp_path, monkeypatch):
-    """The whole pipeline, recorder, usage log and evidence writer against an echo cloud (no network, no key)."""
+@pytest.mark.parametrize("leg", LEGS, ids=[leg.name for leg in LEGS])
+def test_machinery_round_trip_offline(tmp_path, monkeypatch, leg):
+    """The whole pipeline, recorder, usage log and evidence writer against an echo cloud (no network, no key), once
+    per leg: the stand-in speaks that leg's dialect, so the readers of the live run are exercised too."""
     monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
     fake_key = "synthetic-key-not-a-real-credential-0000"
     monkeypatch.setenv(KEY_ENV, fake_key)
-    gate = build_gate(tmp_path / "gate", echo_transport(), "claude-synthetic-model", key=fake_key)
+    gate = build_gate(tmp_path / "gate", echo_transport(leg), "claude-synthetic-model", key=fake_key, leg=leg)
     usage_log, evidence = tmp_path / "out" / "usage.jsonl", tmp_path / "out" / "evidence"
     try:
         results = run_all(gate, usage_log=usage_log, evidence_dir=evidence)
@@ -961,6 +1076,7 @@ def test_machinery_round_trip_offline(tmp_path, monkeypatch):
         assert [line["doc"] for line in lines] == [doc.key for doc in DOCS]
         assert all(line["input_tokens"] == 123 and line["output_tokens"] == 45 for line in lines)
         assert all(line["cache_read_input_tokens"] == 7 and line["http_status"] == 200 for line in lines)
+        assert all(line["leg"] == leg.name and line["model"] == "claude-synthetic-model" for line in lines)
         # the evidence: per document, no header, no key
         folders = sorted((evidence / next(path.name for path in evidence.iterdir())).glob("doc-*"))
         assert len(folders) == len(DOCS)
@@ -981,7 +1097,9 @@ def test_machinery_round_trip_offline(tmp_path, monkeypatch):
         run, _ = results["roster"]
         original = run.exchanges[0]
         body = json.loads(original.request_body)
-        body["messages"][1]["content"] += " Imogen  Whitlock " + fake_key
+        [message for message in body["messages"] if message["role"] == "user"][-1]["content"] += (
+            " Imogen  Whitlock " + fake_key
+        )
         run.exchanges[0] = Exchange(
             original.method, original.url, json.dumps(body).encode(), original.status, original.response_body,
             original.content_encoding,
@@ -992,6 +1110,17 @@ def test_machinery_round_trip_offline(tmp_path, monkeypatch):
                 "restored_reply_equals_original"} <= set(failed)
         assert "leading or trailing whitespace only" in failed["restored_reply_equals_original"]
         assert fake_key not in "".join(failed.values())
+        if leg.api == "anthropic-messages":
+            # the system text is a field of its own on this leg: a value there is found just the same
+            assert "system" in json.loads(original.request_body)
+            body = json.loads(original.request_body)
+            body["system"] += " ORG-EMP-48213"
+            run.exchanges[0] = Exchange(
+                original.method, original.url, json.dumps(body).encode(), original.status, original.response_body,
+                original.content_encoding,
+            )
+            leaks = {check.name for check in evaluate(gate, run) if not check.passed}
+            assert "no_gold_value_or_variant_in_outbound_body" in leaks
     finally:
         gate.close()
         reset_process_state()

@@ -22,8 +22,9 @@ vault (`vault.py`), and the clean package is logged in the job register
 separate from the client's, though not proof of a second human; see
 [below](#why-the-hooks-path-re-scans-and-the-web-path-does-not)). Only then,
 after checking that no original value appears in the outgoing JSON, does the
-request go to the cloud (`cloud/openai_compat.py`). The answer's tokens are
-restored locally (`restore.py`).
+request go to the cloud (`cloud/openai_compat.py`, or
+`cloud/anthropic_messages.py` for the native Messages leg). The answer's
+tokens are restored locally (`restore.py`).
 
 ## Module map
 
@@ -76,7 +77,7 @@ restored locally (`restore.py`).
 |---|---|---|
 | `router.py`, `router_flow.py` | real | Orchestration: register, markings, detection, substitution, approval, cloud, restoration. |
 | `chat_boundary.py` | real | The accepted Chat Completions subset; only the configured cloud model can be addressed. |
-| `cloud/` | real | Fixed-destination OpenAI-compatible transport; API key read from the named environment variable at send time. |
+| `cloud/` | real | Fixed-destination transport, OpenAI-compatible by default; `api = "anthropic-messages"` selects the native Messages leg (`anthropic_messages.py`), which translates the approved package at send time, checks the translated body (`system` included) and translates the reply back; no tools. API key read from the named environment variable at send time. |
 | `register/sqlite_store.py`, `models.py`, `two_stage.py`, `reporting.py`, `cli.py`, `pilot.py` | real | The SQLite job register (append-only history tables), intake validation, two-stage approval, reports, the `themis register` CLI and the off-by-default automatic approval fixture. |
 | `register/client.py` | partial | Real: the register contracts (`JobRecord`, `JobStatus`, approval validation, offline journal) used everywhere. Skeleton: `JobRegisterClient` protocol methods and `HttpRegisterClient`, a non-networking stub for a remote register. |
 | `handover.py`, `app_services.py` | real | Handover mode: a deterministic, re-scanned package for manual use; safe projections for the web app. |

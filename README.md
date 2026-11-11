@@ -117,8 +117,9 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
   second human approved. The app also serves OpenAI-compatible `/v1/chat/completions` and
   `/v1/models` endpoints on loopback, so tools like [Kilo Code](examples/kilo.example.json) can use it as their
   provider.
-- **Use any OpenAI-compatible cloud endpoint** (OpenAI, Azure OpenAI, or a compatible gateway). The API key stays
-  in an environment variable whose *name* is in the config, and only the configured model can be addressed.
+- **Use any OpenAI-compatible cloud endpoint** (OpenAI, Azure OpenAI, or a compatible gateway), or Anthropic's native
+  Messages API (`api = "anthropic-messages"` in `[cloud]`). The API key stays in an environment variable whose *name*
+  is in the config, and only the configured model can be addressed.
 - **Detect personal data in layers:**
   - rule packs with checksums: `core` (emails, URLs, keys and secrets) is always on; `au` (TFN, Medicare, ABN, USI,
     Australian phone numbers) and `intl` (E.164 phone numbers, IBAN) are opt-in, and the rehearsal config enables
@@ -223,9 +224,11 @@ Read this section before you rely on anything above.
   published study of injection attacks on PII detectors; treat it as an open risk.
 - **English first, Australian-first taxonomy.** The label set includes Australian identifiers (TFN, Medicare, ABN,
   USI). Other national identifiers are covered by generic patterns and the LLM finders, not by checksummed rules.
-- **Only OpenAI-compatible cloud APIs.** There is no native Anthropic Messages leg: approvals are bound to the hash
-  of the exact OpenAI-shaped request, so a second wire format needs translation inside the router. Claude Code is
-  supported through hooks instead.
+- **Two cloud APIs, and no tools on the native one.** The router builds one OpenAI-shaped package per job and
+  approvals are bound to its hash. The native Anthropic Messages leg translates that approved package at send time,
+  runs the exact-value check on the translated body (the `system` text included) and translates the reply back, so
+  restoration is shared; it refuses tool use. The front door is still Chat Completions only. Claude Code is supported
+  through hooks instead.
 - **Text only.** No file uploads yet (PDF, Word, images).
 - **No central register.** The register is a local SQLite store; transport, authentication and synchronisation to a
   shared service are skeletons. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) lists every module that is still a
@@ -235,9 +238,10 @@ Read this section before you rely on anything above.
 - **Slow on purpose.** Every document goes through both finders, taking a median of 12.6 seconds (mean 14.2) on an
   8 GB laptop GPU. It is built for careful work, not for high volume.
 - **One live cloud test, and it is narrow.** `tests/test_cloud_live.py` (opt-in; see [Quick start](#quick-start)) sent
-  three synthetic documents to Anthropic's OpenAI-compatible endpoint, with one small model and deterministic
-  stand-ins for the local finders. It showed no personal value in any outbound body and byte-exact restoration. It
-  says nothing about detection recall. Every other test of the cloud leg uses a stand-in endpoint.
+  three synthetic documents to Anthropic's OpenAI-compatible endpoint, and again through the native Messages leg, with
+  one small model and deterministic stand-ins for the local finders. It showed no personal value in any outbound body
+  and byte-exact restoration on each leg. It says nothing about detection recall. Every other test of the cloud leg
+  uses a stand-in endpoint.
 
 ## How it works
 
@@ -305,8 +309,9 @@ py -3.12 -m venv .venv
 
 The suite skips the live cloud test. To run it, put `ANTHROPIC_API_KEY` in your environment and run
 `pytest tests/test_cloud_live.py --run-cloud`. It makes real API calls on your account with three invented documents,
-against Anthropic's OpenAI-compatible endpoint; `THEMIS_LIVE_CLOUD_MODEL` picks the model, and the options are
-listed at the top of the file.
+once through Anthropic's OpenAI-compatible endpoint and once through the native Messages leg (`-k openai-compatible` or
+`-k anthropic-messages` runs one); `THEMIS_LIVE_CLOUD_MODEL` picks the model, and the options are listed at the top of
+the file.
 
 **2. Get the engine and the models.** Nothing is bundled; download them from their publishers. By default themis
 looks for:
@@ -637,8 +642,8 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
 4. **Runtime memory on an 8 GB laptop:** re-acquiring the 26B while PII-Tracer is loaded can fail closed; fix the
    scheduler so a long-running gate does not block on memory alone.
 5. **Prove the empty-finder rule** on designed double misses; a **fast path**; a **real-data evaluation protocol**
-   before `synthetic_only` can be unlocked; file inputs that cannot fail silently; Linux and macOS; a native Anthropic
-   Messages leg; a central register service.
+   before `synthetic_only` can be unlocked; file inputs that cannot fail silently; Linux and macOS; a central
+   register service.
 
 Each needs a fresh test split nobody has seen: split D is now development data.
 
