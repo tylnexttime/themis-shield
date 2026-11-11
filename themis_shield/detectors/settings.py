@@ -73,6 +73,11 @@ v0.4 detection fixes (from split D, now development data):
   view (invisible characters removed, NFKC per character) like every other detector, and their spans map back to the
   source; see ``on_detection_view`` in ``detectors/contracts.py``. Text the view leaves unchanged is read as it is,
   so only documents with invisible or compatibility characters change.
+- ``joined-terms`` (DD-17): an institutional term the allow-list finds inside a finding's value, joined to the rest of
+  that value by a hyphen, dash, underscore, slash, backslash or by nothing (the ``KWA`` of a staff number
+  ``KWA-EMP-92315``), is part of the value and does not cut it, so no prefix of a personal identifier is left in
+  clear. A term that is the whole value, or is set apart by a space or punctuation, is trimmed as before; see
+  ``_joined`` in ``detectors/allowlist.py``.
 """
 
 from __future__ import annotations
@@ -94,6 +99,8 @@ DETECTION_FIXES = (
     "sensitive-columns", "union-roles",
     # v0.4 friction (split D's clean documents held; detectors/secret_context.py, detectors/tracer_sanity.py).
     "secret-references", "tracer-evidence-sanity",
+    # v0.4, from split E (DD-17; detectors/allowlist.py).
+    "joined-terms",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",

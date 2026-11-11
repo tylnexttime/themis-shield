@@ -115,6 +115,31 @@ def _own_identifier(value: str, own: frozenset[str]) -> bool:
     return bool(own) and re.sub(r"[^0-9]", "", value) in own
 
 
+# DD-17 ("joined-terms"): an institutional term that sits inside a finding's value and is joined to the rest of the
+# value by one of these characters (or by nothing) is part of the value, not a separate institutional mention: the
+# "KWA" of the staff number "KWA-EMP-92315". Cutting it off leaves "KWA-" in clear beside the substituted rest.
+# Hyphen-minus, underscore, slash, backslash, and the Unicode hyphens and dashes. Never a space or punctuation.
+_JOINERS = frozenset("-_/\\\u2010\u2011\u2012\u2013\u2014\u2212\uff0d")
+
+
+def _joined(text: str, span: DetectionFinding, start: int, end: int) -> bool:
+    """True when the term at ``start:end`` is joined, inside ``span``, to alphanumeric text of the same value.
+
+    On its right (or left) the term is joined when the next character inside the span is alphanumeric (joined by
+    nothing), or is a joiner with an alphanumeric character somewhere after (before) it, still inside the span. A
+    trailing joiner with nothing alphanumeric after it ("KWA-" as a whole span) joins nothing.
+    """
+    if end < span.end:
+        after = text[end]
+        if after.isalnum() or (after in _JOINERS and any(ch.isalnum() for ch in text[end + 1:span.end])):
+            return True
+    if start > span.start:
+        before = text[start - 1]
+        if before.isalnum() or (before in _JOINERS and any(ch.isalnum() for ch in text[span.start:start - 1])):
+            return True
+    return False
+
+
 def trim(
     span: DetectionFinding,
     intervals: tuple[tuple[int, int, str], ...],
@@ -171,10 +196,18 @@ def trim(
 
     pieces = [(span.start, span.end)]
     touched = False
+    joined_terms = fix_on("joined-terms")
     for start, end, kind in intervals:
         if kind == "phone":
             continue
         if kind == "date" and span.labels != frozenset({Label.OTHER_DATE}):
+            continue
+        if (
+            joined_terms and kind == "term" and start < span.end and end > span.start
+            and not (start <= span.start and span.end <= end) and _joined(text, span, start, end)
+        ):
+            # DD-17: a term joined to the rest of the value does not cut it. A term that covers the whole value
+            # still removes it (a whole institutional value is not personal), through the loop below.
             continue
         next_pieces = []
         for a, b in pieces:

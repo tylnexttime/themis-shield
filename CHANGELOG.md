@@ -11,6 +11,14 @@ organisation prefix `KWA-` left beside a substituted staff number (DEV-DEBT DD-1
 than 0.3.0. Every other condition passed, including sensitive recall 1.000 and clean friction 0.083. Split E
 (`eval/cases/test-e-k.jsonl`, generator under `eval/generator_e/`) is published and is now development data.
 
+### Organisation terms joined to an identifier (DD-17)
+
+- `joined-terms` (on by default): the institutional allow-list no longer trims an organisation's own term off a finding
+  when the term is joined to the rest of the value by a hyphen, dash, underscore, slash, backslash or by nothing, so the
+  `KWA` of the staff number `KWA-EMP-92315` is substituted with the rest and `KWA-` is not left in clear. A term that is
+  the whole value, or is set apart by a space or punctuation ("Priya Kimura, KWA"), is trimmed as before.
+  `--detection-fixes` without it (or `fixes = "none"`) restores the 0.3.4 behaviour byte for byte.
+
 ### Placeholder legend (v0.4, optional, off by default)
 
 - `[legend] enabled = true` adds one system message to the request sent to the cloud, listing every placeholder it
