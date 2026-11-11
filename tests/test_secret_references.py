@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from themis_shield.detectors.contracts import finding
+from themis_shield.detectors import DetectionTargets, detect
+from themis_shield.detectors.contracts import StageReport, StageResult, Status, finding
 from themis_shield.detectors.secret_context import references_only, relabel_secrets
-from themis_shield.types import Label
+from themis_shield.types import Decision, Label, ReasonCode
 
 
 @pytest.mark.parametrize("text", [
     "import os\n\nSECRET_KEY = os.environ['SECRET_KEY']",
     '    "password": "{{secrets.db_password}}"',
     "password = %(env:DB_PASSWORD)s",
-    'API_TOKEN = os.environ["RECORDS_API_TOKEN"]  # from the vault',
     "DB_PASSWORD=${DB_PASSWORD}\nAPI_KEY=<your-api-key>\nSMTP_PASSWORD=REPLACE_ME",
     'variable "db_password" {',
     "  administrator_login_password = var.db_password",
@@ -91,3 +91,81 @@ def test_no_labelled_secret_in_the_evaluation_sets_reads_as_a_reference():
                         passed.append((case["id"], case["text"][span["start"]:span["end"]]))
     assert checked > 100
     assert passed == []
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# COR-001 (independent review, 11/11/2026): a finding is a reference only where it sits in the reference, not on the line
+# ----------------------------------------------------------------------------------------------------------------------
+LIVE_KEY = "sk_" "live_" "51Hx9AbCdEfGhIjKlMnOpQrStUv"  # synthetic, built in parts
+PADDED_KEY = "dGhpcy1pcy1h" "LXN5bnRoZXRpYy1r" "ZXktMTIzNDU2Nzg5MDE="  # synthetic base64, one "=", no "+" or "/"
+
+
+class _Tracer:
+    def __init__(self, findings):
+        self.findings = tuple(findings)
+
+    def detect(self, text):
+        return StageResult(self.findings, StageReport("pii-tracer", Status.OK))
+
+
+class _Finders:
+    def __init__(self, value):
+        self.value = value
+
+    def chat_json(self, model_role, messages, schema, max_tokens):
+        return {"entities": [{"label": "SECRET", "value": self.value}]}
+
+
+def _detect_secret(text, value):
+    """The rules, PII-Tracer and both finders all report ``value`` as a SECRET."""
+    start = text.index(value)
+    tracer = _Tracer([finding(start, start + len(value), Label.SECRET, "pii-tracer", 1)])
+    return detect(text, {}, DetectionTargets(tracer=tracer, llm_client=_Finders(value), thorough=True))
+
+
+def _secret_kept(result, text, value):
+    return any(Label.SECRET in f.labels and value in text[f.start:f.end] for f in result.findings)
+
+
+@pytest.mark.parametrize("text", [
+    'API_KEY = os.environ["API_KEY"]  # old: ' + LIVE_KEY,
+    "API_KEY = process.env.API_KEY  // old: " + LIVE_KEY,
+    'API_KEY = os.environ["API_KEY"]  // rotated, was ' + LIVE_KEY + "\nDEBUG = 0",
+    PADDED_KEY,
+    "Rotate the deploy key tonight.\n" + PADDED_KEY + "\nThen restart the service.",
+])
+def test_a_real_key_beside_or_instead_of_a_reference_is_blocked(text):
+    value = LIVE_KEY if LIVE_KEY in text else PADDED_KEY
+    result = _detect_secret(text, value)
+    assert result.decision == Decision.BLOCK and ReasonCode.SECRET in result.reasons
+    assert _secret_kept(result, text, value)
+
+
+def test_a_reference_with_a_harmless_comment_is_still_released():
+    text = 'API_KEY = os.environ["API_KEY"]  # from the vault\nDEBUG = 0'
+    result = _detect_secret(text, 'os.environ["API_KEY"')  # what the rules and finders cut out of the reference
+    assert result.decision == Decision.RELEASE and not result.findings
+
+
+def test_a_span_must_sit_in_the_reference_not_in_its_comment_or_key():
+    line = 'API_TOKEN = os.environ["RECORDS_API_TOKEN"]  # from the vault'
+    reference = line.index("os.environ")
+    comment = line.index("#")
+    assert references_only(line, reference, line.index("]") + 1)  # the reference itself
+    assert references_only(line, 0, comment - 2)  # key and reference together
+    assert not references_only(line, 0, len(line))  # the span reaches into the comment
+    assert not references_only(line, comment, len(line))
+    assert not references_only(line, 0, len("API_TOKEN"))  # the key alone is not the reference
+    slash = "API_KEY = process.env.API_KEY  // old: " + LIVE_KEY
+    assert references_only(slash, 0, slash.index("  //"))
+    assert not references_only(slash, slash.index(LIVE_KEY), len(slash))
+
+
+def test_a_key_with_no_value_is_not_a_reference_for_a_span_over_the_key():
+    assert not references_only(PADDED_KEY, 0, len(PADDED_KEY))
+    text = "Rotate the deploy key tonight.\n" + PADDED_KEY + "\n"
+    start = text.index(PADDED_KEY)
+    assert not references_only(text, start, start + len(PADDED_KEY))
+    assert not references_only("password:", 0, len("password:"))
+    commented = "API_KEY =  # old: " + LIVE_KEY  # a comment never makes a value-free line a reference
+    assert not references_only(commented, 0, len(commented))

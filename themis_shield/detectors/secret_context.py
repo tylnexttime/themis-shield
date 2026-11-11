@@ -253,12 +253,18 @@ _VALUE_FREE = re.compile(
 )
 
 
-def _reference(value: str) -> bool:
-    from .rules import PLACEHOLDER
-
+def _bare(value: str) -> str:
+    """An assignment's value without its trailing comment, closing comma or semicolon, and one pair of quotes."""
     value = _TRAILING.sub("", value).strip().rstrip(",;").strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
         value = value[1:-1].strip()
+    return value
+
+
+def _reference(value: str) -> bool:
+    from .rules import PLACEHOLDER
+
+    value = _bare(value)
     if not value:
         return True  # a key with no value carries no secret
     if ENV_REFERENCE.fullmatch(value) or PLACEHOLDER.fullmatch(value):
@@ -267,20 +273,45 @@ def _reference(value: str) -> bool:
     return bool(url) and _reference(url.group("password"))
 
 
+def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
+    """True when the span ``[start, end)`` of the line does not leave the assignment's reference for something else.
+
+    A span that reaches into a trailing comment ("... # old: sk_live_...") holds text no reference test has read. A
+    span in the key alone is not the reference, and over an empty value it is the key itself: a lone padded base64 key
+    ("Zm9v...MQ=") parses as a key with no value. A span over the key and the reference together passes.
+    """
+    if start >= end:
+        return True  # the span only touches this line at its line break
+    value = assignment.group("value")
+    value_start = assignment.start("value")
+    comment = _TRAILING.search(value)
+    if comment and end > value_start + comment.end() - len(comment.group().lstrip()):
+        return False
+    if not _bare(value):
+        return start >= value_start  # nothing to refer to: a span over the key is the key itself
+    return end > value_start
+
+
 def references_only(text: str, start: int, end: int) -> bool:
-    """True when every non-blank line the span touches is a reference-only assignment or holds no value at all."""
+    """True when every non-blank line the span touches is a reference-only assignment or holds no value at all.
+
+    On an assignment the span must also sit in the reference: not in the key, not in a trailing comment.
+    """
     line_start = max(text.rfind("\n", 0, start), text.rfind("\r", 0, start)) + 1
     ends = [i for i in (text.find("\n", max(start, end - 1)), text.find("\r", max(start, end - 1))) if i >= 0]
     line_end = min(ends) if ends else len(text)
-    lines = [line for line in re.split(r"\r\n|\r|\n", text[line_start:line_end]) if line.strip()]
+    lines = [(line_start + m.start(), m.group()) for m in re.finditer(r"[^\r\n]+", text[line_start:line_end])]
+    lines = [(offset, line) for offset, line in lines if line.strip()]
     if not lines:
         return False
-    for line in lines:
+    for offset, line in lines:
         if _DECLARATION.match(line):
             continue
         assignment = _ASSIGNMENT.match(line)
         if assignment:
-            if not _reference(assignment.group("value")):
+            if not _reference(assignment.group("value")) or not _in_reference(
+                assignment, max(start - offset, 0), min(end - offset, len(line))
+            ):
                 return False
             continue
         # Not an assignment: passes only when it plainly holds no value ("import os", a lone brace).

@@ -45,6 +45,13 @@ than 0.3.0. Every other condition passed, including sensitive recall 1.000 and c
   as invalid UTF-8 or failed. The hook now reads `sys.stdin.buffer` and decodes strict UTF-8 (a decode error is refused
   like malformed JSON) and writes its reply as UTF-8 bytes. The input limit (1,048,576 characters) is unchanged. The
   managed settings example also sets `PYTHONUTF8=1`, as a second layer.
+- `secret-references` (COR-001): a SECRET finding is dropped only when its span lies in the reference part of the
+  assignment's value, not when the whole line parses as a reference. Before, two shapes released a real secret in the
+  default configuration: a literal key in a trailing comment after an environment lookup
+  (`API_KEY = os.environ["API_KEY"]  # old: <key>`, also with `//`) and a padded base64 key alone on its line that ends
+  in a single `=` (read as a key with no value). A span that reaches into the stripped comment, a span in the key alone,
+  and a span over the key of a value-less line now keep SECRET. A span over the key and the reference together, and a
+  span cut out of the reference, still pass. This is a detection change, measured on the development sets afterwards.
 
 ## 0.3.4 (30/10/2026)
 
