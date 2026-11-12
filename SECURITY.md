@@ -1,6 +1,6 @@
 # Security policy
 
-themis-shield is a **preview** (0.3.4). It is meant for rehearsals on
+themis-shield is a **preview** (0.4.0). It is meant for rehearsals on
 **synthetic data only**: the gate refuses to start unless
 `[gate] synthetic_only = true`, and that switch is an attestation you make,
 not a detector. Do not put real personal information through it.

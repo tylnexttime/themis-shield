@@ -6,7 +6,7 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
 [awesome-pii-tools](https://github.com/henrikaronsson/awesome-pii-tools) list, and evaluation data), all listed in
 [SOURCES.md](SOURCES.md#roadmap-research-27102026). Dates are day-first.
 
-## Where we are (11/11/2026)
+## Where we are (12/11/2026)
 
 - **v0.3.0 shipped on 27/10/2026 and failed its frozen test** (split D: 28 released spans, sensitive-statement recall
   0.740, friction 0.248 against a 0.15 rule; [results](../eval/RESULTS-v0.3.md)). Its friction changes worked; detection
@@ -29,6 +29,12 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   (every organisation-issued identifier protected whole, no measure worse than 0.3.4). An opt-in live cloud-leg test
   now exists, and an independent review's quick fixes landed (see "From the independent review" below). Split F is
   now development data.
+- **0.4.0 (12/11/2026), preview:** the candidate split F tested, plus everything since its kit tag, all development
+  measurements only: the review fixes, a separate Operator credential (R-02), placeholders inside URLs withheld
+  (R-01), `location-columns`, `secret-config-lookalikes`, `propagate-detection-view`, the three switches under "From
+  split F, development" below, the native Anthropic Messages leg and the web UI's first browser load. By replay of the
+  frozen candidate's split F finder answers (development evidence, not a test result): 1 released span, sensitive
+  recall 0.961, quasi-identifier recall 0.955, friction 0.150. No fresh split has tested 0.4.0.
 - **Next:** split F's remaining misses that need finder-prompt changes (R-09) and the last released date cell
   (R-10), measured on development sets with fresh captures; then the placeholder legend's utility measurement; then a new split with author and labeller from
   different families, under its own plan and the same thresholds.
@@ -315,7 +321,7 @@ DD-25). Design work, in this order:
 8. **R-08, the evaluation narrative** (DOC-04 to DOC-08, DOC-12). Re-state split D's failure cause from its data,
    split E's improvement with its control and its single-author limit, the v0.3 friction headline's configuration,
    and the authors' families; mark promised evaluations that were not run as dropped; give the next release its own
-   version number (this branch still says 0.3.4 but behaves differently).
+   version number (done: 0.4.0).
 ## From split F, development (12/11/2026)
 
 Split F is development data since its result was published. Three default switches written from its misses

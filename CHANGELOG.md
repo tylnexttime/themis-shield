@@ -2,7 +2,15 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
-## Unreleased
+## 0.4.0 (12/11/2026)
+
+**Preview, like every release before it.** Split F, the frozen test of this release's candidate (0.3.4 plus
+`joined-terms`), **failed** its rule on four conditions: released leaks, sensitive recall, quasi-identifier recall and
+clean friction ([results](eval/RESULTS-v0.5.md)). Every change after the kit tag `eval-kit-v0.5-frozen` (the review
+fixes, `location-columns`, `secret-config-lookalikes`, `propagate-detection-view`, the three split F switches, the
+Operator credential, the native Messages leg) is a development measurement only, several of them on split F itself,
+which they were written from; no fresh split has tested 0.4.0. A vetting record still quotes 0.3.0's frozen FAIL as
+its method baseline.
 
 ### Split F result (eval-kit-v0.5-frozen)
 
@@ -15,25 +23,12 @@ protected whole (R_full on them 0.553 -> 1.000), released leaks 13 -> 12, no mea
 
 The review fix to `secret-references` below (COR-001) came after the kit tag and is not part of that run; on the
 development sets it changed no safety measure and held one more clean document on each split D half (friction
-0.064 -> 0.079 and 0.161 -> 0.177).
+0.064 -> 0.079 and 0.161 -> 0.177), until the follow-up fix below restored 0.064 and 0.161.
 
-### Clean configuration files held as secrets (split F friction)
-
-- `secret-config-lookalikes` (on by default): on split F, six of the 80 clean documents were BLOCKed for `secret`, all
-  configuration or code files. Four shapes a rule can tell from a credential are no longer read as one (from any
-  detector): a template call to a secret manager (`{{ vault 'kv/app/db#password' }}`, `{{ vault('kv/app/db', 'password') }}`),
-  a URI of a non-web scheme made only of lower-case words under a key that says it is a reference
-  (`credentialRef: "keyhold://kv-prod/edge/syd#admin"`), a path of lower-case words that is a directory (`kv/team/prod/`)
-  or a configuration file (`deploy/environments/production.yaml`), and a camel-case key name
-  (`targetCPUUtilizationPercentage: 65`). The same shapes as a value after `password:`, a literal key in a trailing
-  comment, a lone base64 key and a key alone that is not such a name still BLOCK (COR-001), and no gold
-  SECRET span in `eval/cases` passes the new rules. One of the six (`code: DC-SYD`, read as a secret by PII-Tracer
-  alone) cannot be told from a verification code by any rule and is left held. `--detection-fixes` without the switch
-  restores the previous behaviour byte for byte.
-  Measured by replay as development evidence only (written from split F's six clean configuration files): split F
-  friction 0.2125 -> 0.150 (five of the six now released; the sixth, distribution-centre codes under a `code:` key, is
-  left held because a rule cannot tell it from a recovery code), every safety measure unchanged; split E and the four
-  other development sets identical on every measure.
+After every change in this release, a replay of the frozen candidate's split F finder answers gives 1 released span
+(was 12), sensitive recall 0.961 (0.937), quasi-identifier recall 0.955 (0.929) and friction 0.150 (0.2125), with
+over-redaction unchanged. Those changes were written from split F's misses, so this is development evidence, not a
+test result.
 
 ### Split E result (development: 0.3.4 now has a fresh-split verdict)
 
@@ -84,17 +79,23 @@ vocabulary or document structure only. `--detection-fixes` without a switch rest
   is not widened (it marks single sensitive words). Over `eval/cases`, given the first half of every gold QUASI_ID:
   329 cells, each completing its gold span, none on a hard negative.
 
-### Placeholder legend (v0.4, optional, off by default)
+### Clean configuration files held as secrets (split F friction)
 
-- `[legend] enabled = true` adds one system message to the request sent to the cloud, listing every placeholder it
-  carries with the kind of value it hides ("a bank account number", "a date of birth", "a person"), and asks the
-  model to keep each placeholder exactly as written. The legend is part of the protected request: checked for
-  originals and approved with everything else the cloud sees. Chat requests only.
-- A sensitive statement is described generically ("a sensitive statement about a person"). `[legend]
-  sensitive_categories = true`, also off by default, names the category instead ("a statement about a person's
-  health"), which tells the cloud such a fact exists.
-- A placeholder first sent in an earlier turn is described by its class ("an identifier"); history still pairs each
-  client message with what was sent for it, the legend left out.
+- `secret-config-lookalikes` (on by default): on split F, six of the 80 clean documents were BLOCKed for `secret`, all
+  configuration or code files. Four shapes a rule can tell from a credential are no longer read as one (from any
+  detector): a template call to a secret manager (`{{ vault 'kv/app/db#password' }}`, `{{ vault('kv/app/db', 'password') }}`),
+  a URI of a non-web scheme made only of lower-case words under a key that says it is a reference
+  (`credentialRef: "keyhold://kv-prod/edge/syd#admin"`), a path of lower-case words that is a directory (`kv/team/prod/`)
+  or a configuration file (`deploy/environments/production.yaml`), and a camel-case key name
+  (`targetCPUUtilizationPercentage: 65`). The same shapes as a value after `password:`, a literal key in a trailing
+  comment, a lone base64 key and a key alone that is not such a name still BLOCK (COR-001), and no gold
+  SECRET span in `eval/cases` passes the new rules. One of the six (`code: DC-SYD`, read as a secret by PII-Tracer
+  alone) cannot be told from a verification code by any rule and is left held. `--detection-fixes` without the switch
+  restores the previous behaviour byte for byte.
+  Measured by replay as development evidence only (written from split F's six clean configuration files): split F
+  friction 0.2125 -> 0.150 (five of the six now released; the sixth, distribution-centre codes under a `code:` key, is
+  left held because a rule cannot tell it from a recovery code), every safety measure unchanged; split E and the four
+  other development sets identical on every measure.
 
 ### Fixes from the 11/11/2026 independent review
 
@@ -208,6 +209,18 @@ vocabulary or document structure only. `--detection-fixes` without a switch rest
   could not have passed. It now serves `themis_shield/web/static`, falls back to an installed Chrome, and its stale
   fixtures are fixed (the `/api/canary` call, a due time that rendered 01:00 not 11:00, waits for screens that load
   after the click). It passes in Chrome.
+
+### Placeholder legend (v0.4, optional, off by default)
+
+- `[legend] enabled = true` adds one system message to the request sent to the cloud, listing every placeholder it
+  carries with the kind of value it hides ("a bank account number", "a date of birth", "a person"), and asks the
+  model to keep each placeholder exactly as written. The legend is part of the protected request: checked for
+  originals and approved with everything else the cloud sees. Chat requests only.
+- A sensitive statement is described generically ("a sensitive statement about a person"). `[legend]
+  sensitive_categories = true`, also off by default, names the category instead ("a statement about a person's
+  health"), which tells the cloud such a fact exists.
+- A placeholder first sent in an earlier turn is described by its class ("an identifier"); history still pairs each
+  client message with what was sent for it, the legend left out.
 
 ## 0.3.4 (30/10/2026)
 

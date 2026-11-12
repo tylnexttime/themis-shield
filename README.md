@@ -19,7 +19,7 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.3.4, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status: v0.4.0, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
 - **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
   is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
@@ -27,10 +27,14 @@ then does one of three things:
   new authors. Its own changes did what they were for: friction on clean documents fell from 0.320 to 0.248 with no
   safety measure worse. v0.2 had released 0 leaks on its fresh split and failed on friction. **0.3.4 failed its
   rule on split E, narrowly** (210 documents by a DeepSeek author): 12 released spans, all one organisation's
-  acronym left beside a staff number whose personal digits were substituted (a trimming defect, now being fixed),
+  acronym left beside a staff number whose personal digits were substituted (a trimming defect, fixed in 0.4.0),
   and one look-alike more than 0.3.0 touched. It caught **every sensitive statement (267 of 267)** and met the
-  friction rule for the first time (0.083). See [Evaluation](#evaluation) and
-  [eval/RESULTS-v0.4.md](eval/RESULTS-v0.4.md).
+  friction rule for the first time (0.083). **0.4.0's candidate (0.3.4 plus that fix) failed its rule on split F**
+  (240 documents written whole by a Claude model) on four conditions: 12 released spans (9 of them one table's
+  postcode column), sensitive recall 0.937, quasi-identifiers one span behind the control, and friction 0.2125. The
+  fix itself held: every organisation-issued identifier was protected whole. The changes made in 0.4.0 after that test
+  are development measurements only. See [Evaluation](#evaluation), [eval/RESULTS-v0.4.md](eval/RESULTS-v0.4.md) and
+  [eval/RESULTS-v0.5.md](eval/RESULTS-v0.5.md).
 - **The round trip** (de-identify, send, restore) is covered by automated tests against a stand-in cloud endpoint, and
   by one opt-in live test against a commercial cloud model (see [Quick start](#quick-start)).
 - **Not cleared for real personal data.** By design, themis-shield refuses to start unless it is configured for
@@ -635,8 +639,9 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
 [docs/ROADMAP.md](docs/ROADMAP.md). In short, each item a known gap from our own runs:
 
 1. **Detection on new authors' text** (from split D): column-aware identifier propagation, finder windows for long
-   documents and detection-view readers are in 0.3.2, two sensitive-statement passes in 0.3.3 and two friction fixes
-   in 0.3.4 (development data only); next is a fresh split E that tests them.
+   documents and detection-view readers are in 0.3.2, two sensitive-statement passes in 0.3.3, two friction fixes
+   in 0.3.4, and the fixes written from splits E and F in 0.4.0 (development data only; split F, 0.4.0's frozen
+   test, failed); next is a new split with author and labeller from different families.
 2. **Keep the work possible** (v0.4): typed placeholders with a codebook by default, optional partially synthetic
    values with per-job date shifting, per-task profiles, and a utility measurement next to the leak measurement
    ([story](docs/CODEBOOK-AND-SYNTHETIC-DATA.md)).
