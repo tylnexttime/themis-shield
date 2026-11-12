@@ -109,7 +109,7 @@ def test_the_switch_turns_the_pass_off():
 # Split G (published 12/11/2026 with eval/RESULTS-v0.6.md) came after this switch shipped in 0.4.0 and breaks the
 # guard: 1 of its 20 spans on split G covers no gold QUASI_ID span (DEV-DEBT DD-26). The guard stays strict on the sets it was written from; on split G it is a strict
 # expected failure, so it fails loudly once the switch is fixed.
-_CASE_FILES = sorted((ROOT / "eval" / "cases").glob("*.jsonl"))
+_CASE_FILES = sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl"))
 _GUARD_SETS = [
     pytest.param([p for p in _CASE_FILES if not p.name.startswith("test-g-")], (120, 120), id="sets-before-split-g"),
     pytest.param([p for p in _CASE_FILES if p.name.startswith("test-g-")], (0, 0), id="split-g",

@@ -371,7 +371,7 @@ def _guard(name, profile_path):
 def test_no_gold_value_of_the_evaluation_sets_is_shortened_to_a_joined_remainder():
     started = time.perf_counter()
     checked = 0
-    for path in sorted((ROOT / "eval" / "cases").glob("*.jsonl")):
+    for path in sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl")):
         profile = GUARD_PROFILES.get(path.name)
         if profile is None:
             continue

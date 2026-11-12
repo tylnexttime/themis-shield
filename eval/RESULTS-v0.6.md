@@ -138,3 +138,24 @@ control 38 minutes; half T candidate 38, previous 4, control 40. No arm was resu
 3. **Sensitive recall is stuck near 0.94** on both free-prose splits (F 0.937, G 0.939), weakest on union, family
    violence and criminal statements; the misses are held, not released, but the rule measures recall.
 4. **Split G is now development data.** The next exam needs a new split under its own plan, with the same thresholds.
+
+## Addendum (13/11/2026): split G against its adjudicated gold. The frozen verdict above stands.
+
+After publication, split G (now development data) had its disputed gold adjudicated against `eval/taxonomy.md`: every
+span 0.4.0 missed, every clean case it held, and the blind labeller's spans touching them (43 items; method, verdicts
+and changes in [`generator_g/adjudication/`](generator_g/adjudication/README.md)). Two gold spans were wrong and are
+removed in [`cases/test-g-t.adjudicated.jsonl`](cases/test-g-t.adjudicated.jsonl) (half R had no gold error; its
+adjudicated file is identical to the sealed one). The sealed files are unchanged. 38 of the 43 items are gate errors
+and 3 are grey. The arms' existing predictions were re-scored against the adjudicated gold; no gate was run:
+
+| Split G pooled | 0.3.0 control | 0.3.4 previous | 0.4.0 candidate |
+|---|---|---|---|
+| Sensitive R_any, sealed gold (328 spans) | 0.930 | 0.933 | 0.939 (308) |
+| Sensitive R_any, adjudicated gold (326 spans) | 0.936 | 0.939 | **0.945 (308)** |
+| R_any, sealed / adjudicated | 0.9893 / 0.9901 | 0.9908 / 0.9915 | 0.9915 / **0.9923** |
+| R_full, sealed / adjudicated | 0.9300 / 0.9307 | 0.9367 / 0.9374 | 0.9540 / **0.9547** |
+| Released leaks, QUASI_ID R_any, friction, over-redaction | unchanged | unchanged | unchanged (0, 1.000, 0.308, 615) |
+
+Against the adjudicated gold the candidate would still fail the same three conditions: sensitive recall 0.945 (2
+spans short of 0.95 instead of 4), friction 0.308 and over-redaction 615 against the control's 613. The misses and
+the clean holds are, with two exceptions, the gate's errors, not the labels'.
