@@ -127,6 +127,15 @@ v0.5 detection fixes (from split F, now development data):
   rest of a role description is not released beside it. A finding across cells, a cell over 160 characters and a
   QUASI_ID label given only by PII-Tracer (it calls single sensitive words quasi-identifiers) are left as they are;
   see ``quasi_cell_spans`` in ``detectors/propagate.py``.
+- ``policy-statements`` (from split G's friction): a sensitive finding, from any detector, is dropped when the clause it
+  lies in is plainly a general rule about a class of people and about no one in particular (taxonomy section 3: a
+  sensitive statement is labelled only when it is about a person). Fixed wording only: a generic subject (``staff with
+  a disability``, ``employees``, ``any employee``, ``anyone who``, ``union matters``, ``union activity``, ``the College
+  does not ask whether any employee ...``) followed by a modal or generic verb (``can request``, ``may apply``, ``are
+  entitled to``, ``is treated as``, ``are governed by``, ``does not ask whether``), and nothing personal in the clause
+  (no he/she/I/you, no name or PERSON finding, no ``the only``/``sole``/``one``, no ``a staff member at ...``, no
+  ``asked``/``said``). A finding across sentences, a sensitive-column cell and a finding with another label are kept;
+  no other finding changes. See ``drop_policy_statements`` in ``detectors/policy_statements.py``.
 """
 
 from __future__ import annotations
@@ -156,6 +165,8 @@ DETECTION_FIXES = (
     "propagate-detection-view",
     # v0.5, from split F's weakest safety areas (detectors/statements.py, detectors/propagate.py).
     "negative-statements", "unique-roles", "quasi-cells",
+    # v0.5, from split G's friction (detectors/policy_statements.py).
+    "policy-statements",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",

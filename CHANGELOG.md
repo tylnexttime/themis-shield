@@ -35,6 +35,21 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
   0.308 -> 0.246 (four of the six released; GR-083 is now held only for a sensitive finding and GR-098 still for
   fourteen `code:` values PII-Tracer alone reads as secrets and for its injection signal), every safety measure unchanged.
 
+### General policy statements are not sensitive statements (split G friction)
+
+- `policy-statements` (new default switch): a sensitive finding, from any detector, is dropped when the clause it lies
+  in is plainly a general rule about a class of people and about no one in particular (taxonomy section 3: a statement
+  is labelled only when it is about a person; section 4's `policy_statement`, "staff with a disability can request
+  reasonable adjustments"). Fixed wording only: a generic subject (staff, employees, applicants, "any employee",
+  "anyone who", "union matters", "the College does not ask whether any employee ...") followed by a modal or generic
+  verb ("can request", "may apply", "are entitled to", "is treated as", "are governed by"), and nothing personal in
+  the clause (no pronoun, no name or PERSON or QUASI_ID finding, no "the only", "sole" or "one", no "a staff member
+  at ...", no speech verb such as "asked" or "said"). A finding across sentences, a sensitive-column cell and a finding
+  with any other label are never dropped. Guard: over every evaluation set (split G adjudicated), none of 3,248 gold
+  sensitive spans, nor the sentence around each, reads as a general rule. Measured by replay as development evidence
+  only (written from split G's three documents): split G friction 0.246 -> 0.200 (GR-083, GT-083 and GR-034
+  released), over-redaction 615 -> 611, every safety measure unchanged.
+
 ## 0.4.0 (12/11/2026)
 
 **Preview, like every release before it.** Split F, the frozen test of this release's candidate (0.3.4 plus

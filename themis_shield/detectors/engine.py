@@ -291,6 +291,10 @@ def _finish(document):
         from .tracer_sanity import mark_implausible_tracer_values
 
         findings = mark_implausible_tracer_values(text, findings)
+    if fix_on("policy-statements"):
+        from .policy_statements import drop_policy_statements
+
+        findings = drop_policy_statements(text, findings)
     document.timings[tier] += (perf_counter() - began) * 1000
     if any(
         not isfinite(value) or value < 0
