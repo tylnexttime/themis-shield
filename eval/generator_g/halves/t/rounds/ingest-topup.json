@@ -1,0 +1,25 @@
+{
+ "call_stats": {
+  "model:glm-5.3": 14
+ },
+ "cases_clean_of_issues": 8,
+ "cases_in_round": 14,
+ "cases_with_issues": 6,
+ "cases_with_wrong_closer_accepted": 9,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {
+  "PROFILE_HN": 1,
+  "P_DENYLIST": 1,
+  "P_PARSE": 1,
+  "REPEAT": 4
+ },
+ "requests": 14,
+ "round": "topup",
+ "status_totals": {
+  "dropped": 24,
+  "valid": 89
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 0,
+ "wrong_closers_accepted": 55
+}

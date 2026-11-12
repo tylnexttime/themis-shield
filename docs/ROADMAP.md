@@ -34,10 +34,16 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   (R-01), `location-columns`, `secret-config-lookalikes`, `propagate-detection-view`, the three switches under "From
   split F, development" below, the native Anthropic Messages leg and the web UI's first browser load. By replay of the
   frozen candidate's split F finder answers (development evidence, not a test result): 1 released span, sensitive
-  recall 0.961, quasi-identifier recall 0.955, friction 0.150. No fresh split has tested 0.4.0.
-- **Next:** split F's remaining misses that need finder-prompt changes (R-09) and the last released date cell
-  (R-10), measured on development sets with fresh captures; then the placeholder legend's utility measurement; then a new split with author and labeller from
-  different families, under its own plan and the same thresholds.
+  recall 0.961, quasi-identifier recall 0.955, friction 0.150.
+- **12/11/2026: split G run: 0.4.0 as released FAILS its frozen rule** ([results](../eval/RESULTS-v0.6.md)), on text
+  written and labelled by non-Claude families: sensitive recall 0.939 (limit 0.95), friction 0.308 (limit 0.15),
+  over-redaction two look-alikes above the control. Released leaks 0 in every arm; R_any 0.992; quasi-identifiers
+  1.000; every ratchet condition against 0.3.4 holds. Split G is now development data.
+- **Next:** friction on clean documents, the largest gap on split G (fiction about invented people held for
+  sensitive statements; configuration files blocked as secrets), and sensitive recall on union, family-violence,
+  criminal and negative statements, measured on development sets (splits F and G now among them); split F's
+  remaining misses that need finder-prompt changes (R-09) and the last released date cell (R-10); then the
+  placeholder legend's utility measurement; then a new split under its own plan and the same thresholds.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
 

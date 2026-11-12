@@ -1,0 +1,81 @@
+known-answer tests: ok (61 published test cards loaded)
+cases: 88   failures: 0   warnings: 14
+warnings by rule: {'SCHEMA': 5, 'REPEAT': 9}
+
+quotas (brief.md):
+  SHORT cases: 88 (target 90-110 (about 100))
+  ok   clean documents (no spans): 33 (target >= 30)
+  ok   gold spans PERSON: 581 (target >= 8)
+  ok   gold spans USERNAME: 18 (target >= 8)
+  ok   gold spans EMAIL: 46 (target >= 8)
+  ok   gold spans PHONE: 20 (target >= 8)
+  ok   gold spans ADDRESS: 22 (target >= 8)
+  ok   gold spans URL_PERSONAL: 16 (target >= 8)
+  ok   gold spans INTERNAL_ID: 77 (target >= 8)
+  ok   gold spans TFN: 20 (target >= 8)
+  ok   gold spans MEDICARE: 14 (target >= 8)
+  ok   gold spans ABN: 11 (target >= 8)
+  ok   gold spans NATIONAL_ID: 17 (target >= 8)
+  ok   gold spans DRIVER_LICENCE: 17 (target >= 8)
+  ok   gold spans PASSPORT: 11 (target >= 8)
+  ok   gold spans BANK_ACCOUNT: 18 (target >= 8)
+  ok   gold spans PAYMENT_CARD: 10 (target >= 8)
+  ok   gold spans SECRET: 16 (target >= 8)
+  ok   gold spans DATE_OF_BIRTH: 42 (target >= 8)
+  ok   gold spans OTHER_DATE: 83 (target >= 8)
+  ok   gold spans QUASI_ID: 45 (target >= 8)
+  ok   gold spans HEALTH: 22 (target >= 12)
+  ok   gold spans DISABILITY: 22 (target >= 12)
+  ok   gold spans ETHNICITY: 22 (target >= 12)
+  ok   gold spans SEXUALITY: 15 (target >= 12)
+  ok   gold spans RELIGION: 21 (target >= 12)
+  ok   gold spans CRIMINAL: 24 (target >= 12)
+  ok   gold spans FAMILY_VIOLENCE: 24 (target >= 12)
+  ok   gold spans UNION: 12 (target >= 12)
+  ok   indirect share of sensitive spans (span field 'indirect'): 117/162 = 72% (target >= 65%)
+  ok   sensitive categories with a negative statement (span field 'negative'): 8/8 (target 8/8)
+  ok   tables (CSV/TSV/markdown) with a QUASI_ID span: 13 (target >= 8)
+  ok   hard-to-spot format cases (as marked): 15 (target >= 6)
+  ok   injected cases: 11 (target 11-14)
+  ok   injection positions before/inside/after: {'before': 4, 'after': 3, 'inside': 4} (target balanced (each >= 25% of injections))
+  ok   injected cases with no personal information: 3 (target >= 3)
+  ok   long documents (8,000-26,000 chars): 5 (target >= 3)
+  ok   genre families present: 14/14 (target all 14)
+  ok   clean docs carry the brief's look-alike kinds: 9/9 (target all 9)
+  ok   clean code/config documents: 4 (target >= 1)
+  ok   scripts/languages present: 11: ['Japanese kana', 'Korean', 'Han (Chinese/Japanese)', 'Vietnamese', 'Polish', 'Arabic', 'Greek', 'Thai', 'Cyrillic', 'Devanagari', 'Māori/macrons'] (target >= 5 ('several'))
+  ok   profiled-organisation cases (case field 'organisation'): 43 = 49% (target about half (40-60%))
+  ok   other invented workplaces: 7 (target >= 5)
+  info label_counts: {'PERSON': 581, 'USERNAME': 18, 'EMAIL': 46, 'PHONE': 20, 'ADDRESS': 22, 'URL_PERSONAL': 16, 'INTERNAL_ID': 77, 'TFN': 20, 'MEDICARE': 14, 'ABN': 11, 'NATIONAL_ID': 17, 'DRIVER_LICENCE': 17, 'PASSPORT': 11, 'BANK_ACCOUNT': 18, 'PAYMENT_CARD': 10, 'SECRET': 16, 'DATE_OF_BIRTH': 42, 'OTHER_DATE': 83, 'QUASI_ID': 45, 'HEALTH': 22, 'DISABILITY': 22, 'ETHNICITY': 22, 'SEXUALITY': 15, 'RELIGION': 21, 'CRIMINAL': 24, 'FAMILY_VIOLENCE': 24, 'UNION': 12}
+  info injection_subtypes: {'approve': 2, 'reveal': 2, 'exfiltrate': 1, 'include_verbatim': 1, 'roleplay_override': 1, 'rewrite_placeholders': 1, 'call_url': 1, 'translate_leak': 1, 'hidden_comment': 1}
+  info genre_families: {'emails': 9, 'meeting minutes': 6, 'tickets': 6, 'chat logs': 4, 'forms': 6, 'letters': 5, 'reports': 6, 'CSV/TSV': 6, 'markdown tables': 6, 'code and config': 5, 'logs': 7, 'news': 4, 'fiction': 4, 'FAQs': 8}
+  info scripts: {'Japanese kana': 2, 'Korean': 3, 'Han (Chinese/Japanese)': 4, 'Vietnamese': 2, 'Polish': 3, 'Arabic': 2, 'Greek': 2, 'Hebrew': 0, 'Thai': 2, 'Cyrillic': 2, 'Devanagari': 1, 'Māori/macrons': 4}
+
+VERDICT: FAIL
+
+denylist: 47 patterns loaded (0 unusable lines); 88 cases scanned
+profile: 0 hit(s)
+DENYLIST VERDICT: PASS  (cases with hits: 0)
+
+extra quotas (split-G plan):
+  ok   clean documents: 33 (target >= 30)
+  ok   every label >= 8 gold spans (min over 27): 10 (target >= 8)
+  ok   every sensitive category >= 12 gold spans (min over 8): 12 (target >= 12)
+  ok   indirect share of sensitive spans: 117/162 = 72% (target >= 65%)
+  ok   categories with negative statements: 8/8 (target 8/8)
+  ok   tables with a QUASI_ID span: 13 (target >= 8)
+  ok   hard-to-spot cases: 15 (target >= 6)
+  ok   injected cases: 11 (target 11-14)
+  ok   injection positions: {'before': 4, 'after': 3, 'inside': 4} (target each >= 25% of injections)
+  ok   injected cases without personal information: 3 (target >= 3)
+  ok   distinct injection subtypes: 9 (target >= 6)
+  ok   long documents (9,000-24,000 characters): 5 (target >= 3)
+  ok   scripts/languages present (validator's detector): 11 (target >= 6)
+  ok   other invented workplaces: 7 (target >= 5)
+  ok   profiled-organisation share: 43/88 = 49% (target 40-60%)
+  info INTERNAL_ID spans written with the organisation's prefix (profiled cases): 22 (target info)
+  info documents with personal dates and identifiers: also a meeting/letter-date hard negative: 10 (target info)
+  info documents with personal dates and identifiers: also a ticket/case/reference-number hard negative: 24 (target info)
+  info documents with a sensitive statement next to a sensitive look-alike hard negative: 27 (target info)
+  info sensitive statements by label (min): 12 (target info)
+EXTRA VERDICT: PASS

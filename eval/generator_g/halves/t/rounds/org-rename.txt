@@ -1,0 +1,6 @@
+half T: 88 cases; cases.jsonl on disk == rebuild from state: True
+cases with a hit in `organisation`: 4; distinct labels hit: 1; hits in every other field: 0
+the label hit is workplace 4's; it carries 4 cases; new neutral label: 'Other workplace 4'
+text+spans hash identical in 88/88 cases; aggregate before 00c338c8ea27e0c5d1890904059329158dbbe3c130ae4bcaa077e735806caff5 after 00c338c8ea27e0c5d1890904059329158dbbe3c130ae4bcaa077e735806caff5
+fields changed: ['organisation'] in 4 cases (== the hit cases: True); denylist hits after: 0
+halves/t/cases.jsonl rewritten from state with the override; done

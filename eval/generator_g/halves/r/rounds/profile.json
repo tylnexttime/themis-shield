@@ -1,0 +1,23 @@
+{
+ "tries": [
+  {
+   "attempt": 1,
+   "denylist_hits": 0,
+   "fixes": {
+    "abn": 1,
+    "abn_forms": 1,
+    "email_domain": 0,
+    "mailboxes": 0,
+    "phones": 0
+   },
+   "issued_formats": 5,
+   "issued_formats_with_org_prefix": 5,
+   "organisation_abn_regenerated_by_code": true,
+   "reference_formats": 13,
+   "role_titles": 36,
+   "sites": 12,
+   "validator_codes": [],
+   "validator_failures": 0
+  }
+ ]
+}

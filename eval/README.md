@@ -67,6 +67,23 @@ in the plan as a limitation). Pipeline, inputs, validator, profile, plan, manife
 `c8ef6854379e5c43b090bb55ae2068cb92bfaec00bf517bf8c68ae38a7506afd`, identical to the sealed file. Plan:
 [`FROZEN-PLAN-v0.5.md`](FROZEN-PLAN-v0.5.md); results: [`RESULTS-v0.5.md`](RESULTS-v0.5.md).
 
+## Split G: the test of 0.4.0 as released
+
+`cases/test-g-r.jsonl` (92 cases, 1,470 gold spans, 32 clean, 1,789 hard negatives, 13 injection cases) and
+`cases/test-g-t.jsonl` (88 cases, 1,246 gold spans, 33 clean, 1,014 hard negatives, 11 injection cases): 328
+sensitive statements between them (242 indirect, 43 negative). Built like split F (a deterministic planner per half,
+each document written whole with gold marked inline, offsets by code), but written and labelled by non-Claude families
+through Alibaba Cloud Model Studio, one job per model: half R by `kimi-k3` about an invented port and freight
+authority, labelled blind by `deepseek-v4-pro-0813`; half T by `glm-5.3` about an invented municipal council,
+labelled blind by `deepseek-v4.1-flash-1017`. Label agreement is lower than split F's (exact recall / precision before
+review R 0.864 / 0.886, T 0.892 / 0.689). A third half did not converge and was dropped unsealed; half T was accepted
+at 88 cases (two under the plan's size floor) and one metadata label was renamed by script, both written into the plan
+before any arm ran. Data handling: no training per the provider's terms; retention not stated. Pipeline, inputs,
+validator, profiles, plans, manifest, provenance and agreement: [`generator_g/`](generator_g) (its README lists what
+differs from the authoring workspace). sha256 `5c4dce5c26264df8c748054b58627d0dfc9441aebef7f21f249681c55b01d26d` (R)
+and `02fb925125d19621aebaa1b9095d8430833ffee8d4d23b93d586285e1bb69bac` (T), identical to the sealed files. Plan:
+[`FROZEN-PLAN-v0.6.md`](FROZEN-PLAN-v0.6.md); results: [`RESULTS-v0.6.md`](RESULTS-v0.6.md).
+
 ## How it was built
 
 **Two independent generators.** A and B share no templates, no name pools (the build fails if a name token appears

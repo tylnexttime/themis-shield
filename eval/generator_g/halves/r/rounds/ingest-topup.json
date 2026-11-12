@@ -1,0 +1,23 @@
+{
+ "call_stats": {
+  "model:kimi-k3": 2
+ },
+ "cases_clean_of_issues": 1,
+ "cases_in_round": 2,
+ "cases_with_issues": 1,
+ "cases_with_wrong_closer_accepted": 0,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {
+  "PHONE": 1,
+  "PROFILE_HN": 1
+ },
+ "requests": 2,
+ "round": "topup",
+ "status_totals": {
+  "dropped": 9,
+  "valid": 92
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 0,
+ "wrong_closers_accepted": 0
+}

@@ -1,0 +1,382 @@
+{
+ "_about": "Institutional deployment profile for one invented Australian regional port and freight authority, for a privacy gate allow-list.",
+ "organisation": "Kestrel Bay Port and Freight Authority",
+ "organisation_forms": [
+  "KBPFA",
+  "The Kestrel Bay Authority",
+  "kestrel bay port and freight authority",
+  "Kestrel Bay Ports"
+ ],
+ "description": "Kestrel Bay Port and Freight Authority is an invented regional Australian statutory authority that operates wharves, container and bulk terminals, freight yards, pilot and tug bases, and a logistics park. It manages berth booking, pilotage, dangerous-goods permits, port security and freight coordination across a dispersed coastal network, working with shipping lines, rail operators, transport companies and primary producers. The authority runs safety, environmental and trade-facilitation programmes, publishes port notices, and maintains a head office with corporate, engineering and harbour-master functions. All names, identifiers and contact details in this profile are fictional and institutional only.",
+ "business_identifier": {
+  "scheme": "ABN",
+  "value": "35 117 266 079",
+  "forms": [
+   "35 117 266 079",
+   "35117266079"
+  ]
+ },
+ "email_domain": "kbpfa.example",
+ "sites": [
+  {
+   "name": "Kestrel Bay",
+   "forms": [
+    "Kestrel Bay Main Harbour",
+    "KB Main"
+   ],
+   "address": "1 Anchorage Parade, Kestrel Bay QLD 4820",
+   "reception": "(07) 5550 4100"
+  },
+  {
+   "name": "Wirrinya",
+   "forms": [
+    "Wirrinya Container Terminal",
+    "WCT"
+   ],
+   "address": "14 Gantry Road, Wirrinya NSW 2830",
+   "reception": "(02) 5550 4200"
+  },
+  {
+   "name": "Coolabah",
+   "forms": [
+    "Coolabah Bulk Terminal",
+    "CBT"
+   ],
+   "address": "8 Loader Crescent, Coolabah QLD 4825",
+   "reception": "(07) 5550 4300"
+  },
+  {
+   "name": "Tarragal",
+   "forms": [
+    "Tarragal Freight Yard",
+    "TFY"
+   ],
+   "address": "22 Siding Street, Tarragal VIC 3312",
+   "reception": "(03) 5550 4400"
+  },
+  {
+   "name": "Mulloka",
+   "forms": [
+    "Mulloka Pilot Base",
+    "MPB"
+   ],
+   "address": "3 Beacon Lane, Mulloka NSW 2835",
+   "reception": "(02) 5550 4500"
+  },
+  {
+   "name": "Yarralin",
+   "forms": [
+    "Yarralin Tug Base",
+    "YTB"
+   ],
+   "address": "5 Bollard Way, Yarralin QLD 4830",
+   "reception": "(07) 5550 4600"
+  },
+  {
+   "name": "Bunderra",
+   "forms": [
+    "Bunderra Logistics Park",
+    "BLP"
+   ],
+   "address": "30 Intermodal Drive, Bunderra NSW 2840",
+   "reception": "(02) 5550 4700"
+  },
+  {
+   "name": "Kalkadoon",
+   "forms": [
+    "Kalkadoon Wharf",
+    "KDW"
+   ],
+   "address": "11 Wharf Street, Kalkadoon QLD 4824",
+   "reception": "(07) 5550 4800"
+  },
+  {
+   "name": "Gunyarra",
+   "forms": [
+    "Gunyarra Rail Terminal",
+    "GRT"
+   ],
+   "address": "17 Freight Loop, Gunyarra NSW 2845",
+   "reception": "(02) 5550 4900"
+  },
+  {
+   "name": "Warruwi",
+   "forms": [
+    "Warruwi Head Office",
+    "WHO"
+   ],
+   "address": "2 Harbourview Terrace, Warruwi NT 0822",
+   "reception": "(08) 5550 4000"
+  },
+  {
+   "name": "Nillumbik",
+   "forms": [
+    "Nillumbik Laydown Area",
+    "NLA"
+   ],
+   "address": "9 Storage Road, Nillumbik VIC 3315",
+   "reception": "(03) 5550 4950"
+  },
+  {
+   "name": "Pindari",
+   "forms": [
+    "Pindari Dangerous Goods Depot",
+    "PDGD"
+   ],
+   "address": "6 Segregation Avenue, Pindari QLD 4835",
+   "reception": "(07) 5550 4970"
+  }
+ ],
+ "site_note": "A site's bare name is also a suburb or town where staff and clients live; site names are institutional places, not people.",
+ "buildings": [
+  "Harbourmaster Tower",
+  "Operations Control Room",
+  "Berth Planning Suite",
+  "Customs and Biosecurity Wing",
+  "Stevedoring Amenities Block",
+  "Crane Maintenance Workshop",
+  "Pilot Ready Room",
+  "Tug Crew Quarters",
+  "Dangerous Goods Inspection Bay",
+  "Logistics Park Gatehouse",
+  "Freight Coordination Centre",
+  "Port Security Operations Room",
+  "Training and Simulation Wing",
+  "Marine Stores Warehouse"
+ ],
+ "role_mailboxes": [
+  "enquiries@kbpfa.example",
+  "privacy@kbpfa.example",
+  "servicedesk@kbpfa.example",
+  "harbourmaster@kbpfa.example",
+  "berthplanning@kbpfa.example",
+  "pilotage@kbpfa.example",
+  "dangerousgoods@kbpfa.example",
+  "portsecurity@kbpfa.example",
+  "freightcoordination@kbpfa.example",
+  "accounts@kbpfa.example"
+ ],
+ "main_lines": [
+  "1300 975 707",
+  "1800 975 708",
+  "(07) 5550 4000"
+ ],
+ "reception_numbers": [
+  "(07) 5550 4100",
+  "(02) 5550 4200",
+  "(07) 5550 4300",
+  "(03) 5550 4400",
+  "(02) 5550 4500",
+  "(07) 5550 4600",
+  "(02) 5550 4700",
+  "(08) 5550 4000"
+ ],
+ "role_titles": [
+  "Harbour Master",
+  "Deputy Harbour Master",
+  "Berth Planner",
+  "Senior Berth Planner",
+  "Crane Operator",
+  "Senior Crane Operator",
+  "Stevedore Supervisor",
+  "Stevedore",
+  "Tug Master",
+  "Tug Engineer",
+  "Marine Pilot",
+  "Pilot Boat Coxswain",
+  "Port Security Officer",
+  "Port Security Supervisor",
+  "Freight Coordinator",
+  "Logistics Coordinator",
+  "Dangerous Goods Inspector",
+  "Dangerous Goods Officer",
+  "Terminal Operations Manager",
+  "Wharf Supervisor",
+  "Yard Supervisor",
+  "Rail Operations Coordinator",
+  "Vessel Traffic Services Operator",
+  "Hydrographic Surveyor",
+  "Marine Engineer",
+  "Maintenance Fitter",
+  "Electrician",
+  "Environmental Officer",
+  "Safety Advisor",
+  "Emergency Response Coordinator",
+  "Port Services Officer",
+  "Customer Service Officer",
+  "Finance Officer",
+  "Procurement Officer",
+  "Records Officer",
+  "IT Support Officer"
+ ],
+ "programmes": [
+  {
+   "code": "BRTH-101",
+   "title": "Berth Booking Service"
+  },
+  {
+   "code": "PILT-201",
+   "title": "Pilotage Service"
+  },
+  {
+   "code": "DGPM-301",
+   "title": "Dangerous Goods Permits"
+  },
+  {
+   "code": "TUGS-401",
+   "title": "Tug and Towage Coordination"
+  },
+  {
+   "code": "VTSO-501",
+   "title": "Vessel Traffic Services"
+  },
+  {
+   "code": "FRTY-601",
+   "title": "Freight Yard Access Program"
+  },
+  {
+   "code": "LOGP-701",
+   "title": "Logistics Park Tenancy Service"
+  },
+  {
+   "code": "PORTSEC-801",
+   "title": "Port Security Pass Program"
+  },
+  {
+   "code": "ENVIRO-901",
+   "title": "Harbour Environmental Monitoring"
+  },
+  {
+   "code": "CRAN-110",
+   "title": "Crane and Plant Hire Coordination"
+  },
+  {
+   "code": "BULK-210",
+   "title": "Bulk Commodity Export Facilitation"
+  },
+  {
+   "code": "RAIL-310",
+   "title": "Rail Interface Coordination"
+  }
+ ],
+ "research_projects": [
+  {
+   "code": "RES-KEST-01",
+   "title": "Kestrel Bay Sediment and Dredging Study"
+  },
+  {
+   "code": "RES-KEST-02",
+   "title": "Regional Freight Decarbonisation Pathways"
+  },
+  {
+   "code": "RES-KEST-03",
+   "title": "Automated Mooring Feasibility Trial"
+  },
+  {
+   "code": "RES-KEST-04",
+   "title": "Coastal Resilience and Wharf Adaptation Project"
+  },
+  {
+   "code": "RES-KEST-05",
+   "title": "Port Community Noise and Amenity Research"
+  }
+ ],
+ "committees": [
+  "Port Safety and Health Committee",
+  "Disability Access and Inclusion Network",
+  "Multifaith Chaplaincy Reference Group",
+  "Pride at the Port Network",
+  "Workplace Union Consultative Committee",
+  "Aboriginal and Torres Strait Islander Advisory Group",
+  "Harbour Users Consultative Committee",
+  "Environmental Stewardship Committee",
+  "Emergency Management Liaison Group",
+  "Freight Industry Roundtable"
+ ],
+ "initiatives": [
+  "Safe Wharves Awareness Week",
+  "Marine Debris Clean-Up Day",
+  "Fatigue Management Campaign",
+  "Mental Health at the Port Month",
+  "Dangerous Goods Safety Blitz",
+  "National Safe Work Month Activities",
+  "Port Open Day",
+  "Careers in Stevedoring Expo",
+  "Cultural Awareness Training Program",
+  "Biosecurity Readiness Exercise",
+  "Cyber Security Awareness Fortnight",
+  "Annual Harbour Clean-Up"
+ ],
+ "committee_note": "These are institutional committee and network names, not statements about any person.",
+ "code_formats": {
+  "programme_code": "@@@@-###",
+  "project_code": "RES-@@@@-##",
+  "berth_code": "BTH-@@-##",
+  "permit_code": "DG-####-@@",
+  "notice_code": "PN-##-####"
+ },
+ "reference_number_formats": {
+  "ticket_number": "INC-######",
+  "case_number": "CASE-@@-#####",
+  "reference_number": "REF-########",
+  "order_number": "PO-######",
+  "invoice_number": "INV-#######",
+  "asset_id": "AST-@@-#####",
+  "cost_centre": "CC-####",
+  "form_number": "FM-@@-###",
+  "provider_number": "PRV-######",
+  "client_account": "CA-########",
+  "software_version": "v#.##.##",
+  "build_number": "BLD-#####",
+  "payroll_group": "PG-@@##"
+ },
+ "public_dates": [
+  {
+   "event": "New Year's Day",
+   "date": "1 January 2026"
+  },
+  {
+   "event": "Australia Day",
+   "date": "26 January 2026"
+  },
+  {
+   "event": "Good Friday",
+   "date": "3 April 2026"
+  },
+  {
+   "event": "ANZAC Day",
+   "date": "25 April 2026"
+  },
+  {
+   "event": "National Safe Work Month Launch",
+   "date": "1 October 2026"
+  },
+  {
+   "event": "Kestrel Bay Port Open Day",
+   "date": "17 October 2026"
+  },
+  {
+   "event": "Annual General Meeting",
+   "date": "26 November 2026"
+  },
+  {
+   "event": "Christmas Day",
+   "date": "25 December 2026"
+  },
+  {
+   "event": "New Year's Day",
+   "date": "1 January 2027"
+  },
+  {
+   "event": "World Day for Safety and Health at Work",
+   "date": "28 April 2027"
+  }
+ ],
+ "personal_identifier_formats_issued": {
+  "staff_number": "KBPFA-S######",
+  "contractor_number": "KBPFA-C######",
+  "volunteer_number": "KBPFA-V#####",
+  "port_user_id": "KBPFA-U#######",
+  "trainee_number": "KBPFA-T#####"
+ }
+}

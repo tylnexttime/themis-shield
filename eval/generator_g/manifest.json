@@ -1,0 +1,675 @@
+{
+ "halves": {
+  "R": {
+   "cases_planned": 101,
+   "counts": {
+    "by_genre": {
+     "case note": 5,
+     "chat log": 6,
+     "clinical note": 4,
+     "config": 6,
+     "csv": 5,
+     "email": 10,
+     "faq": 5,
+     "fiction": 4,
+     "form": 6,
+     "letter": 7,
+     "log": 4,
+     "markdown table": 6,
+     "minutes": 6,
+     "news": 4,
+     "notice": 2,
+     "report": 5,
+     "ticket": 4,
+     "tsv": 3
+    },
+    "by_injection_position": {
+     "after": 4,
+     "before": 4,
+     "inside": 5
+    },
+    "by_label": {
+     "ABN": 15,
+     "ADDRESS": 24,
+     "BANK_ACCOUNT": 14,
+     "CRIMINAL": 23,
+     "DATE_OF_BIRTH": 28,
+     "DISABILITY": 15,
+     "DRIVER_LICENCE": 14,
+     "EMAIL": 53,
+     "ETHNICITY": 14,
+     "FAMILY_VIOLENCE": 22,
+     "HEALTH": 32,
+     "INTERNAL_ID": 66,
+     "MEDICARE": 16,
+     "NATIONAL_ID": 16,
+     "OTHER_DATE": 67,
+     "PASSPORT": 14,
+     "PAYMENT_CARD": 19,
+     "PERSON": 805,
+     "PHONE": 32,
+     "QUASI_ID": 42,
+     "RELIGION": 25,
+     "SECRET": 27,
+     "SEXUALITY": 13,
+     "TFN": 19,
+     "UNION": 22,
+     "URL_PERSONAL": 15,
+     "USERNAME": 18
+    },
+    "by_organisation_kind": {
+     "other_workplace": 48,
+     "other_workplaces_distinct": 7,
+     "profiled": 44
+    },
+    "cases": 92,
+    "characters_total": 279641,
+    "clean_documents": 32,
+    "gold_spans": 1470,
+    "hard_negatives": 1789,
+    "hard_to_spot_cases": 27,
+    "injected_cases": 13,
+    "injected_cases_without_pi": 4,
+    "long_documents": 5,
+    "sensitive_spans": {
+     "indirect": 125,
+     "negative": 23,
+     "total": 166
+    }
+   },
+   "dropped_total": 9,
+   "generator": "R",
+   "half": "R",
+   "id_prefix": "GR-",
+   "models_assigned": {
+    "author": "kimi-k3",
+    "labeller": "deepseek-v4-pro-0813"
+   },
+   "models_final": {
+    "author": "kimi-k3",
+    "labeller": "deepseek-v4-pro-0813"
+   },
+   "organisation_kind": "a regional port and freight authority",
+   "profile_fixes": {
+    "abn": 1,
+    "abn_forms": 1,
+    "email_domain": 0,
+    "mailboxes": 0,
+    "phones": 0
+   },
+   "rounds": {
+    "agreement-after": {
+     "any_r": 1344,
+     "documents compared": 92,
+     "documents with at least one disagreement item left": 51,
+     "ex_p": 1297,
+     "ex_r": 1297,
+     "gold": 1470,
+     "lab": 1401,
+     "ov_p": 1342,
+     "ov_r": 1342,
+     "review: cases changed by script": 28,
+     "review: cases with a disagreement item": 58,
+     "review: fixes rejected by the script (text changed / validator / no document)": 7,
+     "review: items": 294,
+     "review: items decided fix": 92,
+     "review: items decided keep": 202,
+     "review: requests that failed": 0
+    },
+    "agreement-before": {
+     "any_r": 1303,
+     "documents compared": 92,
+     "documents where the labeller's echo differed from the text (aligned by diff)": 4,
+     "documents with at least one disagreement item": 58,
+     "documents with no labeller output": 0,
+     "ex_p": 1241,
+     "ex_r": 1241,
+     "gold": 1437,
+     "lab": 1401,
+     "labeller markup errors (lenient parse)": 1,
+     "labeller model:deepseek-v4-pro-0813": 92,
+     "labeller outputs cut off at max_tokens": 0,
+     "labeller spans dropped in alignment": 0,
+     "ov_p": 1299,
+     "ov_r": 1299
+    },
+    "ingest-author": {
+     "call_stats": {
+      "model:kimi-k3": 99,
+      "truncated_at_max_tokens": 1
+     },
+     "cases_clean_of_issues": 65,
+     "cases_in_round": 99,
+     "cases_with_issues": 34,
+     "cases_with_wrong_closer_accepted": 5,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "CHECKSUM": 1,
+      "EMAIL": 1,
+      "LONG": 1,
+      "PHONE": 4,
+      "PHONE_SCAN": 1,
+      "PROFILE_HN": 17,
+      "P_DENYLIST": 2,
+      "P_LANG": 1,
+      "P_LEN": 2,
+      "P_NOOUTPUT": 1,
+      "P_PARSE": 8,
+      "P_PI": 4,
+      "P_QUASI": 1,
+      "REPEAT": 3
+     },
+     "requests": 99,
+     "round": "author",
+     "status_totals": {
+      "invalid": 34,
+      "valid": 65
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 5,
+     "wrong_closers_accepted": 38
+    },
+    "ingest-pointer-v1": {
+     "checked": 98,
+     "flagged": 68,
+     "model:deepseek-v4-pro-0813": 98,
+     "name": "pointer",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-pointer2": {
+     "checked": 1,
+     "flagged": 0,
+     "model:deepseek-v4-pro-0813": 1,
+     "name": "pointer2",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-pointerb": {
+     "checked": 98,
+     "flagged": 3,
+     "model:deepseek-v4-pro-0813": 98,
+     "name": "pointerb",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-repair": {
+     "call_stats": {
+      "model:kimi-k3": 36
+     },
+     "cases_clean_of_issues": 29,
+     "cases_in_round": 36,
+     "cases_with_issues": 7,
+     "cases_with_wrong_closer_accepted": 1,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "CHECKSUM": 1,
+      "PHONE": 2,
+      "PROFILE_HN": 3,
+      "P_LANG": 1,
+      "REPEAT": 2
+     },
+     "requests": 36,
+     "round": "repair",
+     "status_totals": {
+      "dropped": 7,
+      "valid": 92
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 5,
+     "wrong_closers_accepted": 1
+    },
+    "ingest-topup": {
+     "call_stats": {
+      "model:kimi-k3": 2
+     },
+     "cases_clean_of_issues": 1,
+     "cases_in_round": 2,
+     "cases_with_issues": 1,
+     "cases_with_wrong_closer_accepted": 0,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "PHONE": 1,
+      "PROFILE_HN": 1
+     },
+     "requests": 2,
+     "round": "topup",
+     "status_totals": {
+      "dropped": 9,
+      "valid": 92
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 0,
+     "wrong_closers_accepted": 0
+    },
+    "review-1": {
+     "cases_all_keep": 23,
+     "cases_with_a_fix": 35,
+     "fix_applied": 28,
+     "fix_applied_no_net_change": 0,
+     "fix_rejected_text_changed": 3,
+     "fix_rejected_validator": 4,
+     "items_decided": 294,
+     "items_fix": 92,
+     "items_keep": 202,
+     "items_total": 294
+    },
+    "topup-plan": {
+     "entries": 2,
+     "shortfalls": {
+      "cases": 1,
+      "sens DISABILITY": 1,
+      "sens SEXUALITY": 2
+     },
+     "valid_cases_before": 91
+    }
+   },
+   "seed_plan": 20261112,
+   "seed_safe_values_plan": 20261113,
+   "seed_safe_values_topup": 20261114,
+   "seed_topup_choices": 20261115,
+   "settings": {
+    "deepseek-v4-pro-0813": {
+     "stream": true,
+     "thinking": false
+    },
+    "kimi-k3": {
+     "author_temperature": null,
+     "stream": true,
+     "thinking": false
+    }
+   },
+   "sha256": {
+    "agreement_md": "33fe9820b0a4617dbe0dc4248987f63b1c1caf1a3e078dc885ef46d16cafc62d",
+    "cases": "5c4dce5c26264df8c748054b58627d0dfc9441aebef7f21f249681c55b01d26d",
+    "context": "8711caefc3fe74bc47b401c2be868db630105e410b1280a3149744d050f83b8d",
+    "institution_profile": "2dad2f40679513ab7904d88e67f952358e14f0315898f012b446a4aa04806ef4",
+    "plan": "addf1c1729e5c460ed0fb99fa6de123c81c294acd7ff12c13567e2d1d3365bc2",
+    "plan_topup": "c1e06a1753fd4f9e58eae4f32b37ac63afd03453f41ace2173b7f380ca8d95d4",
+    "profile": "1c7b148e8168dbdd3946985d1fcdeac11f8fc31a8b9e2a8263d65fbd81d86594"
+   },
+   "split": "test-g",
+   "status_totals": {
+    "dropped": 9,
+    "valid": 92
+   },
+   "substitutions": []
+  },
+  "T": {
+   "cases_planned": 113,
+   "counts": {
+    "by_genre": {
+     "case note": 6,
+     "chat log": 4,
+     "clinical note": 1,
+     "config": 5,
+     "csv": 5,
+     "email": 9,
+     "faq": 8,
+     "fiction": 4,
+     "form": 6,
+     "letter": 5,
+     "log": 3,
+     "markdown table": 6,
+     "minutes": 6,
+     "news": 4,
+     "notice": 3,
+     "report": 6,
+     "ticket": 6,
+     "tsv": 1
+    },
+    "by_injection_position": {
+     "after": 3,
+     "before": 4,
+     "inside": 4
+    },
+    "by_label": {
+     "ABN": 11,
+     "ADDRESS": 22,
+     "BANK_ACCOUNT": 18,
+     "CRIMINAL": 24,
+     "DATE_OF_BIRTH": 42,
+     "DISABILITY": 22,
+     "DRIVER_LICENCE": 17,
+     "EMAIL": 46,
+     "ETHNICITY": 22,
+     "FAMILY_VIOLENCE": 24,
+     "HEALTH": 22,
+     "INTERNAL_ID": 77,
+     "MEDICARE": 14,
+     "NATIONAL_ID": 17,
+     "OTHER_DATE": 83,
+     "PASSPORT": 11,
+     "PAYMENT_CARD": 10,
+     "PERSON": 581,
+     "PHONE": 20,
+     "QUASI_ID": 45,
+     "RELIGION": 21,
+     "SECRET": 16,
+     "SEXUALITY": 15,
+     "TFN": 20,
+     "UNION": 12,
+     "URL_PERSONAL": 16,
+     "USERNAME": 18
+    },
+    "by_organisation_kind": {
+     "other_workplace": 45,
+     "other_workplaces_distinct": 7,
+     "profiled": 43
+    },
+    "cases": 88,
+    "characters_total": 279515,
+    "clean_documents": 33,
+    "gold_spans": 1246,
+    "hard_negatives": 1014,
+    "hard_to_spot_cases": 15,
+    "injected_cases": 11,
+    "injected_cases_without_pi": 3,
+    "long_documents": 5,
+    "sensitive_spans": {
+     "indirect": 117,
+     "negative": 20,
+     "total": 162
+    }
+   },
+   "dropped_total": 25,
+   "generator": "T",
+   "half": "T",
+   "id_prefix": "GT-",
+   "models_assigned": {
+    "author": "glm-5.3",
+    "labeller": "deepseek-v4.1-flash-1017"
+   },
+   "models_final": {
+    "author": "glm-5.3",
+    "labeller": "deepseek-v4.1-flash-1017"
+   },
+   "organisation_kind": "a municipal council",
+   "profile_fixes": {
+    "abn": 0,
+    "abn_forms": 0,
+    "email_domain": 0,
+    "mailboxes": 0,
+    "phones": 0
+   },
+   "rounds": {
+    "agreement-after": {
+     "any_r": 1204,
+     "documents compared": 88,
+     "documents with at least one disagreement item left": 46,
+     "ex_p": 1142,
+     "ex_r": 1142,
+     "gold": 1246,
+     "lab": 1301,
+     "ov_p": 1198,
+     "ov_r": 1198,
+     "review: cases changed by script": 38,
+     "review: cases with a disagreement item": 56,
+     "review: fixes rejected by the script (text changed / validator / no document)": 7,
+     "review: items": 438,
+     "review: items decided fix": 283,
+     "review: items decided keep": 155,
+     "review: requests that failed": 0
+    },
+    "agreement-before": {
+     "any_r": 965,
+     "documents compared": 88,
+     "documents where the labeller's echo differed from the text (aligned by diff)": 3,
+     "documents with at least one disagreement item": 56,
+     "documents with no labeller output": 0,
+     "ex_p": 896,
+     "ex_r": 896,
+     "gold": 1005,
+     "lab": 1301,
+     "labeller markup errors (lenient parse)": 0,
+     "labeller model:deepseek-v4.1-flash-1017": 88,
+     "labeller outputs cut off at max_tokens": 0,
+     "labeller spans dropped in alignment": 0,
+     "ov_p": 955,
+     "ov_r": 955
+    },
+    "ingest-author": {
+     "call_stats": {
+      "model:glm-5.3": 99
+     },
+     "cases_clean_of_issues": 40,
+     "cases_in_round": 99,
+     "cases_with_issues": 59,
+     "cases_with_wrong_closer_accepted": 71,
+     "fence_stripped": 4,
+     "issue_case_counts_by_code": {
+      "CHECKSUM": 1,
+      "EMAIL": 1,
+      "FORMAT": 1,
+      "PHONE": 4,
+      "PHONE_SCAN": 1,
+      "PROFILE_HN": 22,
+      "P_DENYLIST": 8,
+      "P_INJ": 3,
+      "P_PARSE": 10,
+      "P_PI": 1,
+      "P_QUASI": 3,
+      "REPEAT": 31
+     },
+     "requests": 99,
+     "round": "author",
+     "status_totals": {
+      "invalid": 59,
+      "valid": 40
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 5,
+     "wrong_closers_accepted": 736
+    },
+    "ingest-pointer": {
+     "checked": 99,
+     "flagged": 10,
+     "model:deepseek-v4.1-flash-1017": 99,
+     "name": "pointer",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-pointer2": {
+     "checked": 8,
+     "dropped_after_recheck": 1,
+     "flagged": 1,
+     "model:deepseek-v4.1-flash-1017": 8,
+     "name": "pointer2",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-repair": {
+     "call_stats": {
+      "model:glm-5.3": 63
+     },
+     "cases_clean_of_issues": 50,
+     "cases_in_round": 63,
+     "cases_with_issues": 13,
+     "cases_with_wrong_closer_accepted": 38,
+     "fence_stripped": 2,
+     "issue_case_counts_by_code": {
+      "FORMAT": 1,
+      "PROFILE_HN": 8,
+      "P_INJ": 1,
+      "P_PARSE": 1,
+      "REPEAT": 2
+     },
+     "requests": 63,
+     "round": "repair",
+     "status_totals": {
+      "dropped": 13,
+      "valid": 86
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 2,
+     "wrong_closers_accepted": 385
+    },
+    "ingest-topup": {
+     "call_stats": {
+      "model:glm-5.3": 14
+     },
+     "cases_clean_of_issues": 8,
+     "cases_in_round": 14,
+     "cases_with_issues": 6,
+     "cases_with_wrong_closer_accepted": 9,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "PROFILE_HN": 1,
+      "P_DENYLIST": 1,
+      "P_PARSE": 1,
+      "REPEAT": 4
+     },
+     "requests": 14,
+     "round": "topup",
+     "status_totals": {
+      "dropped": 24,
+      "valid": 89
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 0,
+     "wrong_closers_accepted": 55
+    },
+    "review-1": {
+     "cases_all_keep": 11,
+     "cases_with_a_fix": 45,
+     "fix_applied": 38,
+     "fix_applied_no_net_change": 0,
+     "fix_rejected_text_changed": 5,
+     "fix_rejected_validator": 2,
+     "items_decided": 438,
+     "items_fix": 283,
+     "items_keep": 155,
+     "items_total": 438
+    },
+    "topup-plan": {
+     "entries": 14,
+     "shortfalls": {
+      "cases": 11,
+      "clean": 2,
+      "injections": 2,
+      "injections without pi": 2,
+      "label PAYMENT_CARD": 1,
+      "negative RELIGION": 1,
+      "sens ETHNICITY": 4,
+      "sens HEALTH": 1,
+      "sens RELIGION": 6,
+      "sens SEXUALITY": 1,
+      "sens UNION": 5
+     },
+     "valid_cases_before": 81
+    }
+   },
+   "seed_plan": 20261114,
+   "seed_safe_values_plan": 20261115,
+   "seed_safe_values_topup": 20261116,
+   "seed_topup_choices": 20261117,
+   "settings": {
+    "deepseek-v4.1-flash-1017": {
+     "stream": true,
+     "thinking": false
+    },
+    "glm-5.3": {
+     "extra": {
+      "reasoning_effort": "low"
+     },
+     "stream": true,
+     "thinking": null
+    }
+   },
+   "sha256": {
+    "agreement_md": "dfd8da223d0e3c92fbaf2592a3737ed048274bfc9c3e0dd8bdbe307f841e3979",
+    "cases": "02fb925125d19621aebaa1b9095d8430833ffee8d4d23b93d586285e1bb69bac",
+    "context": "34399e08e35451ce6bf9e4ef86e37ee629358eac3b0f04db116dc8cc7b7708e4",
+    "institution_profile": "9ad6fc6fc5829dc08c1563573272bd61a6d1825cd4cb5724a05af46176f8c113",
+    "plan": "34f6440628fa1aa1993547c49b0a5aca21709e327ac925d6273891d8f33c22fb",
+    "plan_topup": "cca83e7ce37a0935980a04ecc179105339d4e21ffed02958598a82b3866b1906",
+    "profile": "d6f50ff3a238533abe6e3c5a5f4067e3dbbc2def04f971f475b5ad361b1f9d79"
+   },
+   "split": "test-g",
+   "status_totals": {
+    "dropped": 25,
+    "valid": 88
+   },
+   "substitutions": []
+  }
+ },
+ "halves_not_sealed": [
+  "S"
+ ],
+ "halves_sealed": [
+  "R",
+  "T"
+ ],
+ "probe_findings": {
+  "author probes (two throwaway specifications per author, ids PROBE-<half>-1/2, kept in probe/)": "all three authors followed the markup and returned only the document (0 parse errors). glm-5.3 returned one personal probe document without any gold marker (rule P_PI); one prompt revision was made (a reminder line in the user message; Japanese names asked in kana, because the validator's Japanese detector looks for kana) and glm-5.3 then followed the markup on both probe specifications. No substitution for an author was needed.",
+  "glm-5.3 settings": "enable_thinking cannot be switched off (HTTP 400: the value is restricted to True). thinking_budget is ignored (519 vs 535 reasoning tokens for one trivial prompt with and without budget 100); reasoning_effort=low gave 0 reasoning tokens on that prompt (535 at the default) and 98-811 reasoning tokens on probe documents (377 on average over the 99 documents of the author round) -> reasoning_effort low, thinking switch left at the model default.",
+  "kimi-k3 settings": "a non-default temperature is rejected (HTTP 400 invalid_parameter_error: temperature=0.7 not supported), so no temperature is sent. enable_thinking=false is honoured. Thinking on, one probe document: 8,000 completion tokens, all reasoning, no output (max_tokens reached) -> thinking off. Thinking off: 480-602 completion tokens per 1.2-1.9K-character probe document, about 4.4K prompt tokens.",
+  "labellers": "deepseek-v4-pro-0813, kimi-k3.1-pro and deepseek-v4.1-flash-1017 follow the markup (probe: 0 markup errors, 10-14 of 11-16 gold spans matched exactly on the probe text); enable_thinking=false honoured; temperature 0.",
+  "max_tokens": "all six codes accept max_tokens up to 32,000 (probe at 16,000 and 32,000).",
+  "prefix caching": "implicit: cached_tokens is 0 on the first request and about 3,000-4,000 from the second request with the same system prompt on; about 80% of the prompt tokens of the author round were cached.",
+  "qwen3.8-max-0902 settings": "enable_thinking=false honoured. Thinking on, one probe document: 28,263 completion tokens (27,591 reasoning), 628 s, against 364-631 completion tokens and 10-18 s with thinking off -> thinking off.",
+  "system prompt size": "author system prompt = compact brief + compact taxonomy + minified profile: about 5.55K prompt tokens per author request on average (user specification included; aimed under 5K, not reached). Repair requests carry the brief only, review requests the marker protocol part of the brief plus the compact taxonomy.",
+  "tiny probe (one request per code, a few tokens)": "all six assigned codes accepted by POST /chat/completions (HTTP 200). kimi-k3.1-pro is NOT in the GET /models list (101 models listed; the other eight codes used or named as substitutes are listed) but chat completions accepted it, so no substitution was made for it."
+ },
+ "sha256_common": {
+  "brief": "5e616eca737b5ebcadb4b484a8d438f9ca26a97d35c91292e57bdcfecd845d29",
+  "extra_quotas": "87dfe9aea6c771fd962ba5f40991efe781c37490bd217fbb81189aec02d6afd7",
+  "taxonomy": "90611d0a05963e08cceea7dbb22f2a32bceec65a957b3765818b53de931a5159",
+  "taxonomy_compact": "147eaebadfe79734759d5e84a756323670f77423650e43c08af00a9196a802b9",
+  "validator": "01bf5aa8edef8b7d89e87eb9a802a9174440a222562a2ae8a3a4479d97b3e27b"
+ },
+ "split": "test-g",
+ "substitutions": [],
+ "tokens_all": 5834297,
+ "tokens_by_model": {
+  "deepseek-v4-pro-0813": {
+   "cached": 312576,
+   "calls": 315,
+   "completion": 89913,
+   "http_ok": 311,
+   "prompt": 584738,
+   "reasoning": 0,
+   "total": 674651
+  },
+  "deepseek-v4.1-flash-1017": {
+   "cached": 290560,
+   "calls": 208,
+   "completion": 82761,
+   "http_ok": 208,
+   "prompt": 477422,
+   "reasoning": 0,
+   "total": 560183
+  },
+  "glm-5.3": {
+   "cached": 791296,
+   "calls": 245,
+   "completion": 297513,
+   "http_ok": 244,
+   "prompt": 1075728,
+   "reasoning": 68603,
+   "total": 1373241
+  },
+  "kimi-k3": {
+   "cached": 497664,
+   "calls": 235,
+   "completion": 237189,
+   "http_ok": 234,
+   "prompt": 1035135,
+   "reasoning": 8000,
+   "total": 1272324
+  },
+  "kimi-k3.1-pro": {
+   "cached": 167936,
+   "calls": 219,
+   "completion": 119931,
+   "http_ok": 219,
+   "prompt": 487350,
+   "reasoning": 0,
+   "total": 607281
+  },
+  "qwen3.8-max-0902": {
+   "cached": 781696,
+   "calls": 209,
+   "completion": 304403,
+   "http_ok": 206,
+   "prompt": 1042214,
+   "reasoning": 50999,
+   "total": 1346617
+  }
+ }
+}

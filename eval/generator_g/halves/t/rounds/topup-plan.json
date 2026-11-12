@@ -1,0 +1,17 @@
+{
+ "entries": 14,
+ "shortfalls": {
+  "cases": 11,
+  "clean": 2,
+  "injections": 2,
+  "injections without pi": 2,
+  "label PAYMENT_CARD": 1,
+  "negative RELIGION": 1,
+  "sens ETHNICITY": 4,
+  "sens HEALTH": 1,
+  "sens RELIGION": 6,
+  "sens SEXUALITY": 1,
+  "sens UNION": 5
+ },
+ "valid_cases_before": 81
+}

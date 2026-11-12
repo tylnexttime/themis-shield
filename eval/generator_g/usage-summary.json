@@ -1,0 +1,359 @@
+{
+ "all_total": 5834297,
+ "models": {
+  "deepseek-v4-pro-0813": {
+   "cumulative": {
+    "cached": 312576,
+    "calls": 315,
+    "completion": 89913,
+    "http_ok": 311,
+    "prompt": 584738,
+    "reasoning": 0,
+    "total": 674651
+   },
+   "free_quota_at_start": 1000000,
+   "phases": {
+    "label": {
+     "cached": 305408,
+     "calls": 96,
+     "completion": 79504,
+     "http_ok": 92,
+     "prompt": 389389,
+     "reasoning": 0,
+     "total": 468893
+    },
+    "pointer": {
+     "cached": 0,
+     "calls": 98,
+     "completion": 5301,
+     "http_ok": 98,
+     "prompt": 85356,
+     "reasoning": 0,
+     "total": 90657
+    },
+    "pointer2": {
+     "cached": 256,
+     "calls": 3,
+     "completion": 113,
+     "http_ok": 3,
+     "prompt": 2361,
+     "reasoning": 0,
+     "total": 2474
+    },
+    "pointerb": {
+     "cached": 6912,
+     "calls": 98,
+     "completion": 3756,
+     "http_ok": 98,
+     "prompt": 93392,
+     "reasoning": 0,
+     "total": 97148
+    },
+    "probe": {
+     "cached": 0,
+     "calls": 20,
+     "completion": 1239,
+     "http_ok": 20,
+     "prompt": 14240,
+     "reasoning": 0,
+     "total": 15479
+    }
+   }
+  },
+  "deepseek-v4.1-flash-1017": {
+   "cumulative": {
+    "cached": 290560,
+    "calls": 208,
+    "completion": 82761,
+    "http_ok": 208,
+    "prompt": 477422,
+    "reasoning": 0,
+    "total": 560183
+   },
+   "free_quota_at_start": 1000000,
+   "phases": {
+    "label": {
+     "cached": 289024,
+     "calls": 88,
+     "completion": 76719,
+     "http_ok": 88,
+     "prompt": 373449,
+     "reasoning": 0,
+     "total": 450168
+    },
+    "pointer": {
+     "cached": 0,
+     "calls": 99,
+     "completion": 4512,
+     "http_ok": 99,
+     "prompt": 88858,
+     "reasoning": 0,
+     "total": 93370
+    },
+    "pointer2": {
+     "cached": 1536,
+     "calls": 16,
+     "completion": 810,
+     "http_ok": 16,
+     "prompt": 10465,
+     "reasoning": 0,
+     "total": 11275
+    },
+    "probe": {
+     "cached": 0,
+     "calls": 5,
+     "completion": 720,
+     "http_ok": 5,
+     "prompt": 4650,
+     "reasoning": 0,
+     "total": 5370
+    }
+   }
+  },
+  "glm-5.3": {
+   "cumulative": {
+    "cached": 791296,
+    "calls": 245,
+    "completion": 297513,
+    "http_ok": 244,
+    "prompt": 1075728,
+    "reasoning": 68603,
+    "total": 1373241
+   },
+   "free_quota_at_start": 1000000,
+   "phases": {
+    "author": {
+     "cached": 496640,
+     "calls": 99,
+     "completion": 130915,
+     "http_ok": 99,
+     "prompt": 549727,
+     "reasoning": 37341,
+     "total": 680642
+    },
+    "probe": {
+     "cached": 11776,
+     "calls": 12,
+     "completion": 5448,
+     "http_ok": 11,
+     "prompt": 17265,
+     "reasoning": 2924,
+     "total": 22713
+    },
+    "profile": {
+     "cached": 0,
+     "calls": 1,
+     "completion": 3211,
+     "http_ok": 1,
+     "prompt": 1709,
+     "reasoning": 576,
+     "total": 4920
+    },
+    "repair": {
+     "cached": 112640,
+     "calls": 63,
+     "completion": 77113,
+     "http_ok": 63,
+     "prompt": 228374,
+     "reasoning": 12697,
+     "total": 305487
+    },
+    "review": {
+     "cached": 98560,
+     "calls": 56,
+     "completion": 72771,
+     "http_ok": 56,
+     "prompt": 202437,
+     "reasoning": 14438,
+     "total": 275208
+    },
+    "topup": {
+     "cached": 71680,
+     "calls": 14,
+     "completion": 8055,
+     "http_ok": 14,
+     "prompt": 76216,
+     "reasoning": 627,
+     "total": 84271
+    }
+   }
+  },
+  "kimi-k3": {
+   "cumulative": {
+    "cached": 497664,
+    "calls": 235,
+    "completion": 237189,
+    "http_ok": 234,
+    "prompt": 1035135,
+    "reasoning": 8000,
+    "total": 1272324
+   },
+   "free_quota_at_start": 857000,
+   "phases": {
+    "author": {
+     "cached": 437760,
+     "calls": 99,
+     "completion": 101495,
+     "http_ok": 99,
+     "prompt": 549521,
+     "reasoning": 0,
+     "total": 651016
+    },
+    "probe": {
+     "cached": 3072,
+     "calls": 9,
+     "completion": 10241,
+     "http_ok": 8,
+     "prompt": 22075,
+     "reasoning": 8000,
+     "total": 32316
+    },
+    "profile": {
+     "cached": 0,
+     "calls": 1,
+     "completion": 2467,
+     "http_ok": 1,
+     "prompt": 1725,
+     "reasoning": 0,
+     "total": 4192
+    },
+    "repair": {
+     "cached": 21504,
+     "calls": 66,
+     "completion": 74251,
+     "http_ok": 66,
+     "prompt": 248288,
+     "reasoning": 0,
+     "total": 322539
+    },
+    "review": {
+     "cached": 26112,
+     "calls": 58,
+     "completion": 47456,
+     "http_ok": 58,
+     "prompt": 202641,
+     "reasoning": 0,
+     "total": 250097
+    },
+    "topup": {
+     "cached": 9216,
+     "calls": 2,
+     "completion": 1279,
+     "http_ok": 2,
+     "prompt": 10885,
+     "reasoning": 0,
+     "total": 12164
+    }
+   }
+  },
+  "kimi-k3.1-pro": {
+   "cumulative": {
+    "cached": 167936,
+    "calls": 219,
+    "completion": 119931,
+    "http_ok": 219,
+    "prompt": 487350,
+    "reasoning": 0,
+    "total": 607281
+   },
+   "free_quota_at_start": 1000000,
+   "phases": {
+    "label": {
+     "cached": 165888,
+     "calls": 85,
+     "completion": 112885,
+     "http_ok": 85,
+     "prompt": 350312,
+     "reasoning": 0,
+     "total": 463197
+    },
+    "pointer": {
+     "cached": 0,
+     "calls": 98,
+     "completion": 4762,
+     "http_ok": 98,
+     "prompt": 106200,
+     "reasoning": 0,
+     "total": 110962
+    },
+    "pointer2": {
+     "cached": 2048,
+     "calls": 31,
+     "completion": 1615,
+     "http_ok": 31,
+     "prompt": 26250,
+     "reasoning": 0,
+     "total": 27865
+    },
+    "probe": {
+     "cached": 0,
+     "calls": 5,
+     "completion": 669,
+     "http_ok": 5,
+     "prompt": 4588,
+     "reasoning": 0,
+     "total": 5257
+    }
+   }
+  },
+  "qwen3.8-max-0902": {
+   "cumulative": {
+    "cached": 781696,
+    "calls": 209,
+    "completion": 304403,
+    "http_ok": 206,
+    "prompt": 1042214,
+    "reasoning": 50999,
+    "total": 1346617
+   },
+   "free_quota_at_start": 808000,
+   "phases": {
+    "author": {
+     "cached": 502784,
+     "calls": 99,
+     "completion": 125594,
+     "http_ok": 99,
+     "prompt": 552933,
+     "reasoning": 0,
+     "total": 678527
+    },
+    "probe": {
+     "cached": 7168,
+     "calls": 7,
+     "completion": 53284,
+     "http_ok": 7,
+     "prompt": 17957,
+     "reasoning": 50999,
+     "total": 71241
+    },
+    "profile": {
+     "cached": 0,
+     "calls": 1,
+     "completion": 2044,
+     "http_ok": 1,
+     "prompt": 1785,
+     "reasoning": 0,
+     "total": 3829
+    },
+    "repair": {
+     "cached": 76416,
+     "calls": 61,
+     "completion": 90270,
+     "http_ok": 61,
+     "prompt": 261820,
+     "reasoning": 0,
+     "total": 352090
+    },
+    "topup": {
+     "cached": 195328,
+     "calls": 41,
+     "completion": 33211,
+     "http_ok": 38,
+     "prompt": 207719,
+     "reasoning": 0,
+     "total": 240930
+    }
+   }
+  }
+ }
+}

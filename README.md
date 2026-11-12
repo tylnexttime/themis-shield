@@ -431,6 +431,8 @@ themis-shield ships synthetic evaluation data ([`eval/`](eval/README.md)), all a
   ([`eval/RESULTS-v0.4.md`](eval/RESULTS-v0.4.md)).
 - **Split F:** 240 cases, the v0.5 kit's held-out test, each document written whole by a Claude model from a
   per-case specification and labelled blind by another Claude model ([`eval/generator_f/`](eval/generator_f)).
+- **Split G:** 180 cases in two halves, the test of 0.4.0 as released, written the same way by a Moonshot Kimi model
+  and a Zhipu GLM model and labelled blind by DeepSeek models ([`eval/generator_g/`](eval/generator_g)).
 
 `eval/run_eval.py` runs the real detection and policy (rules, PII-Tracer, Gemma 4 E4B and 26B-A4B through llama.cpp,
 union, allow-list, policy), and `eval/score.py` scores it. Each release follows the same discipline:
@@ -438,6 +440,26 @@ union, allow-list, policy), and `eval/score.py` scores it. Each release follows 
 2. Write a pass rule and a negative control into a frozen plan.
 3. Open the test split once.
 4. Change nothing afterwards.
+
+### v0.6 kit, split G: 0.4.0 as released (12/11/2026)
+
+**Verdict: FAIL** (details: [`eval/RESULTS-v0.6.md`](eval/RESULTS-v0.6.md); plan:
+[`eval/FROZEN-PLAN-v0.6.md`](eval/FROZEN-PLAN-v0.6.md)). The candidate is 0.4.0 as released.
+
+| Split G (180 cases, 2,716 gold spans, 65 clean) | 0.3.0 control | 0.3.4 | 0.4.0 |
+|---|---|---|---|
+| Released leaks (limit 3) | 0 | 0 | **0** |
+| R_any / R_full | 0.989 / 0.930 | 0.991 / 0.937 | **0.992 / 0.954** |
+| Sensitive statements, R_any (limit 0.95) | 0.930 | 0.933 | **0.939** |
+| Quasi-identifiers, R_any | 0.989 | 1.000 | **1.000** |
+| Clean documents held (of 65; limit 9) | 22 | 19 | **20** |
+| Over-redaction (hard negatives touched, of 2,803) | 613 | 614 | **615** |
+
+- **Where it failed:** sensitive recall (4 statements short; union, family-violence and criminal statements found
+  least), friction (fiction about invented people held for sensitive statements, configuration files blocked as
+  secrets) and over-redaction (two look-alikes more than the control).
+- **What held:** nothing was released in any arm, no injection case released anything, and 0.4.0 is ahead of 0.3.4
+  and 0.3.0 on recall and sensitive recall.
 
 ### v0.5 kit, split F (11/11/2026)
 

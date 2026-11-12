@@ -1,0 +1,380 @@
+{
+ "_about": "Invented institutional deployment profile for a fictional Australian regional municipal council, used to build a privacy-gate allow-list; all identifiers, sites and contacts are synthetic.",
+ "organisation": "Kowari Plains Shire Council",
+ "organisation_forms": [
+  "Kowari Plains Council",
+  "KPSC",
+  "The Kowari Plains Shire Council",
+  "kowari plains shire council"
+ ],
+ "description": "A regional shire council delivering local government services across the Kowari Plains district. The council operates a town hall, branch libraries, community centres, an aquatic centre, works depots, a waste transfer station and child-care centres, and administers development applications, rates, waste collection, ranger services and youth programmes. It is entirely fictional and exists only for synthetic privacy-gate evaluation.",
+ "business_identifier": {
+  "scheme": "ABN",
+  "value": "51 824 930 752",
+  "forms": [
+   "51 824 930 752",
+   "51824930752"
+  ]
+ },
+ "email_domain": "kowariplains.example",
+ "sites": [
+  {
+   "name": "Kowari Plains Civic Centre",
+   "forms": [
+    "Civic Centre",
+    "KPSC Civic Centre"
+   ],
+   "address": "1 Brindabella Way, Dubbo NSW 2830",
+   "reception": "(02) 5550 1200"
+  },
+  {
+   "name": "Warrigal Town Hall",
+   "forms": [
+    "Warrigal Hall",
+    "the Town Hall"
+   ],
+   "address": "14 Merriwa Street, Orange NSW 2800",
+   "reception": "(02) 5550 1201"
+  },
+  {
+   "name": "Gilgai Library and Knowledge Hub",
+   "forms": [
+    "Gilgai Library",
+    "the Knowledge Hub"
+   ],
+   "address": "7 Kalari Road, Bathurst NSW 2795",
+   "reception": "(02) 5550 1202"
+  },
+  {
+   "name": "Booroolong Community Centre",
+   "forms": [
+    "Booroolong Centre"
+   ],
+   "address": "22 Lachlan Terrace, Cowra NSW 2794",
+   "reception": "(02) 5550 1203"
+  },
+  {
+   "name": "Kowari Aquatic Centre",
+   "forms": [
+    "the Aquatic Centre",
+    "Kowari Pools"
+   ],
+   "address": "5 Bilarong Avenue, Forbes NSW 2871",
+   "reception": "(02) 5550 1204"
+  },
+  {
+   "name": "Mallee Street Depot",
+   "forms": [
+    "Mallee Depot",
+    "Works Depot"
+   ],
+   "address": "48 Mallee Street, Parkes NSW 2870",
+   "reception": "(02) 5550 1205"
+  },
+  {
+   "name": "Tuckonie Waste Transfer Station",
+   "forms": [
+    "Tuckonie Tip",
+    "the Transfer Station"
+   ],
+   "address": "Goolma Road, Young NSW 2594",
+   "reception": "(02) 5550 1206"
+  },
+  {
+   "name": "Bundjal Family Services Hub",
+   "forms": [
+    "Bundjal Hub",
+    "Family Services"
+   ],
+   "address": "31 Kengal Close, Grenfell NSW 2810",
+   "reception": "(02) 5550 1207"
+  },
+  {
+   "name": "Yarragil Youth and Community Centre",
+   "forms": [
+    "Yarragil Youth Centre"
+   ],
+   "address": "9 Wilga Lane, Lithgow NSW 2790",
+   "reception": "(02) 5550 1208"
+  },
+  {
+   "name": "Callandoon Depot and Field Base",
+   "forms": [
+    "Callandoon Depot",
+    "Field Base"
+   ],
+   "address": "12 Callandoon Road, Mudgee NSW 2850",
+   "reception": "(02) 5550 1209"
+  },
+  {
+   "name": "Ngalu Child-Care Centre",
+   "forms": [
+    "Ngalu Early Learning",
+    "Ngalu Centre"
+   ],
+   "address": "18 Wambuul Street, Dubbo NSW 2830",
+   "reception": "(02) 5550 1210"
+  }
+ ],
+ "site_note": "Each site's bare name (e.g. Warrigal, Booroolong, Tuckonie) is also an invented suburb or town where staff and clients live, so a bare site name can refer to a place as well as a facility.",
+ "buildings": [
+  "Civic Centre North Wing",
+  "Civic Centre South Wing",
+  "Chambers Gallery",
+  "Gilgai Reading Room",
+  "Gilgai Annex",
+  "Booroolong Hall A",
+  "Booroolong Meeting Rooms 1-4",
+  "Aquatic Centre Amenities Block",
+  "Mallee Depot Workshop 2",
+  "Bundjal Playrooms 1-3",
+  "Yarragil Studio",
+  "Records and Archives Store"
+ ],
+ "role_mailboxes": [
+  "enquiries@kowariplains.example",
+  "privacy@kowariplains.example",
+  "servicedesk@kowariplains.example",
+  "rates@kowariplains.example",
+  "planning@kowariplains.example",
+  "rangers@kowariplains.example",
+  "waste@kowariplains.example",
+  "youthservices@kowariplains.example",
+  "tenders@kowariplains.example",
+  "media@kowariplains.example"
+ ],
+ "main_lines": [
+  "(02) 5550 1200",
+  "1300 975 707",
+  "1800 975 708"
+ ],
+ "reception_numbers": [
+  "(02) 5550 1200",
+  "(02) 5550 1201",
+  "(02) 5550 1202",
+  "(02) 5550 1203",
+  "(02) 5550 1204",
+  "(02) 5550 1205",
+  "(02) 5550 1206",
+  "(02) 5550 1207",
+  "(02) 5550 1208",
+  "(02) 5550 1209",
+  "(02) 5550 1210"
+ ],
+ "role_titles": [
+  "Chief Executive Officer",
+  "General Manager",
+  "Director of Corporate Services",
+  "Director of Infrastructure",
+  "Director of Community Services",
+  "Director of Planning and Environment",
+  "Chief Financial Officer",
+  "Chief Information Officer",
+  "Manager Governance",
+  "Manager Customer Service",
+  "Manager Libraries",
+  "Manager Waste Services",
+  "Manager Aquatic Facilities",
+  "Manager Family Services",
+  "Manager Youth Services",
+  "Coordinator Parks and Gardens",
+  "Maintenance Coordinator",
+  "Works Supervisor",
+  "Ranger",
+  "Senior Ranger",
+  "Planning Officer",
+  "Development Assessment Officer",
+  "Building Surveyor",
+  "Rates Officer",
+  "Revenue Officer",
+  "Procurement Officer",
+  "Librarian",
+  "Branch Librarian",
+  "Community Development Officer",
+  "Events Coordinator",
+  "Customer Service Officer",
+  "Records Officer",
+  "Environmental Health Officer",
+  "Asset Officer",
+  "Communications Officer",
+  "Human Resources Advisor",
+  "Payroll Officer",
+  "Accounts Payable Officer",
+  "Grant Writer",
+  "IT Support Officer",
+  "Child-Care Centre Director",
+  "Lead Educator",
+  "Swim Program Coordinator",
+  "Volunteer Coordinator",
+  "Civil Design Engineer",
+  "Plant Operator",
+  "Waste Transfer Station Attendant"
+ ],
+ "programmes": [
+  {
+   "code": "DA",
+   "title": "Development Applications Service"
+  },
+  {
+   "code": "WST",
+   "title": "Kerbside Waste Collection Programme"
+  },
+  {
+   "code": "YTH",
+   "title": "Yarragil Youth Programme"
+  },
+  {
+   "code": "LIB",
+   "title": "Branch Libraries Programme"
+  },
+  {
+   "code": "AQU",
+   "title": "Learn-to-Swim and Aquatics Programme"
+  },
+  {
+   "code": "FAM",
+   "title": "Bundjal Family Services Programme"
+  },
+  {
+   "code": "RAT",
+   "title": "Rates and Revenue Programme"
+  },
+  {
+   "code": "RNG",
+   "title": "Ranger and Compliance Programme"
+  },
+  {
+   "code": "GRN",
+   "title": "Streetscape Greening Programme"
+  },
+  {
+   "code": "EVT",
+   "title": "Community Events and Festivals Programme"
+  },
+  {
+   "code": "SMT",
+   "title": "Sister Town Exchange Programme"
+  },
+  {
+   "code": "HRD",
+   "title": "Home Rubbish Disposal Voucher Scheme"
+  }
+ ],
+ "research_projects": [
+  {
+   "code": "WRP",
+   "title": "Kowari Waterways Riparian Study"
+  },
+  {
+   "code": "HSG",
+   "title": "Housing Growth Futures Project"
+  },
+  {
+   "code": "HAB",
+   "title": "Roadside Habitat Mapping Project"
+  },
+  {
+   "code": "THR",
+   "title": "Heat Resilience in Regional Towns Project"
+  },
+  {
+   "code": "TRF",
+   "title": "Visitor Traffic Flow Analysis Project"
+  }
+ ],
+ "committees": [
+  "Kowari Plains Audit and Risk Committee",
+  "Accessibility and Disability Advisory Group",
+  "Kowari Aboriginal Community Reference Group",
+  "Mental Health and Wellbeing Network",
+  "Interfaith Community Liaison Group",
+  "Kowari Pride Advisory Network",
+  "United Services Union Workplace Delegates Group",
+  "Environmental Sustainability Advisory Committee",
+  "Youth Council",
+  "Ageing Well in Kowari Plains Reference Group",
+  "Multicultural Communities Advisory Group",
+  "Road Safety Committee"
+ ],
+ "initiatives": [
+  "Kowari Clean Green Waste Fortnight",
+  "Plastic-Free Plains Campaign",
+  "Neighbour Day at Booroolong",
+  "Kowari Plains Open Gardens Weekend",
+  "Summer Reading Challenge",
+  "River Rescue Tree Planting Day",
+  "Seniors Expo and Information Fair",
+  "Waste to Art Competition",
+  "Ranger Community Safety Talks",
+  "Small Business Grants Roadshow",
+  "NAIDOC Week Community Programmes",
+  "Christmas in Warrigal Square"
+ ],
+ "committee_note": "Committee, network and initiative names are institutional labels only and are not statements about any person's beliefs, health, identity or affiliations.",
+ "code_formats": {
+  "programme_code": "KPC-@@-##",
+  "project_code": "PRJ-@@@-##",
+  "module_code": "MOD-##@@",
+  "event_code": "EV-####-@"
+ },
+ "reference_number_formats": {
+  "ticket_number": "TKT-######",
+  "case_number": "CR-######",
+  "reference_number": "REF########",
+  "order_number": "PO-#####",
+  "invoice_number": "INV-#######",
+  "asset_id": "AST-####-@",
+  "cost_centre": "CC####@@",
+  "form_number": "KPSC-F###",
+  "provider_number": "PRV-######",
+  "client_account": "CL########",
+  "software_version": "v#.#.##",
+  "build_number": "BLD-#####",
+  "payroll_group": "PG-###"
+ },
+ "public_dates": [
+  {
+   "event": "Australia Day",
+   "date": "26 January 2026"
+  },
+  {
+   "event": "Kowari Plains Open Day",
+   "date": "14 March 2026"
+  },
+  {
+   "event": "ANZAC Day",
+   "date": "25 April 2026"
+  },
+  {
+   "event": "National Reconciliation Week",
+   "date": "27 May 2026"
+  },
+  {
+   "event": "Kowari Plains Annual General Meeting",
+   "date": "20 August 2026"
+  },
+  {
+   "event": "National Recycling Week",
+   "date": "9 November 2026"
+  },
+  {
+   "event": "Australia Day",
+   "date": "26 January 2027"
+  },
+  {
+   "event": "Kowari Plains Open Day",
+   "date": "13 March 2027"
+  },
+  {
+   "event": "Kowari Plains Annual General Meeting",
+   "date": "19 August 2027"
+  }
+ ],
+ "personal_identifier_formats_issued": {
+  "staff_number": "KPSC-S######",
+  "member_number": "KPSC-M#####",
+  "volunteer_number": "KPSC-V####",
+  "library_card_number": "KPSC-L######",
+  "child_enrolment_number": "KPSC-E#####"
+ }
+}

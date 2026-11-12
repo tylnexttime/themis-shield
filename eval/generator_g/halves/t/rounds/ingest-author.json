@@ -1,0 +1,33 @@
+{
+ "call_stats": {
+  "model:glm-5.3": 99
+ },
+ "cases_clean_of_issues": 40,
+ "cases_in_round": 99,
+ "cases_with_issues": 59,
+ "cases_with_wrong_closer_accepted": 71,
+ "fence_stripped": 4,
+ "issue_case_counts_by_code": {
+  "CHECKSUM": 1,
+  "EMAIL": 1,
+  "FORMAT": 1,
+  "PHONE": 4,
+  "PHONE_SCAN": 1,
+  "PROFILE_HN": 22,
+  "P_DENYLIST": 8,
+  "P_INJ": 3,
+  "P_PARSE": 10,
+  "P_PI": 1,
+  "P_QUASI": 3,
+  "REPEAT": 31
+ },
+ "requests": 99,
+ "round": "author",
+ "status_totals": {
+  "invalid": 59,
+  "valid": 40
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 5,
+ "wrong_closers_accepted": 736
+}

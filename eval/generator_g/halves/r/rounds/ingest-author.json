@@ -1,0 +1,36 @@
+{
+ "call_stats": {
+  "model:kimi-k3": 99,
+  "truncated_at_max_tokens": 1
+ },
+ "cases_clean_of_issues": 65,
+ "cases_in_round": 99,
+ "cases_with_issues": 34,
+ "cases_with_wrong_closer_accepted": 5,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {
+  "CHECKSUM": 1,
+  "EMAIL": 1,
+  "LONG": 1,
+  "PHONE": 4,
+  "PHONE_SCAN": 1,
+  "PROFILE_HN": 17,
+  "P_DENYLIST": 2,
+  "P_LANG": 1,
+  "P_LEN": 2,
+  "P_NOOUTPUT": 1,
+  "P_PARSE": 8,
+  "P_PI": 4,
+  "P_QUASI": 1,
+  "REPEAT": 3
+ },
+ "requests": 99,
+ "round": "author",
+ "status_totals": {
+  "invalid": 34,
+  "valid": 65
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 5,
+ "wrong_closers_accepted": 38
+}

@@ -2,6 +2,19 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## Unreleased
+
+### Split G result (eval-kit-v0.6-frozen): 0.4.0 as released fails its frozen rule
+
+0.4.0 as released **fails** its frozen rule on split G ([results](eval/RESULTS-v0.6.md)), the first fresh split to
+test it, on three conditions: sensitive recall 0.939 (limit 0.95; 4 statements short), clean friction 0.308 (limit
+0.15; 20 of 65 clean documents held) and over-redaction 615 against the control's 613. **Released leaks 0** in every
+arm (every missed span sat in a held document), R_any 0.9915, quasi-identifiers 1.000, and every ratchet condition
+against 0.3.4 holds. Split G was written and labelled by non-Claude families (half R `kimi-k3` / `deepseek-v4-pro`,
+half T `glm-5.3` / `deepseek-v4.1-flash`, 180 cases pooled); a third half was dropped before sealing and half T was
+accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`eval/cases/test-g-r.jsonl`,
+`test-g-t.jsonl`, pipeline under `eval/generator_g/`) is published and is now development data. No code changed.
+
 ## 0.4.0 (12/11/2026)
 
 **Preview, like every release before it.** Split F, the frozen test of this release's candidate (0.3.4 plus

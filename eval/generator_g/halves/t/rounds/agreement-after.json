@@ -1,0 +1,18 @@
+{
+ "any_r": 1204,
+ "documents compared": 88,
+ "documents with at least one disagreement item left": 46,
+ "ex_p": 1142,
+ "ex_r": 1142,
+ "gold": 1246,
+ "lab": 1301,
+ "ov_p": 1198,
+ "ov_r": 1198,
+ "review: cases changed by script": 38,
+ "review: cases with a disagreement item": 56,
+ "review: fixes rejected by the script (text changed / validator / no document)": 7,
+ "review: items": 438,
+ "review: items decided fix": 283,
+ "review: items decided keep": 155,
+ "review: requests that failed": 0
+}

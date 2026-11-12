@@ -1,0 +1,17 @@
+{
+ "any_r": 1303,
+ "documents compared": 92,
+ "documents where the labeller's echo differed from the text (aligned by diff)": 4,
+ "documents with at least one disagreement item": 58,
+ "documents with no labeller output": 0,
+ "ex_p": 1241,
+ "ex_r": 1241,
+ "gold": 1437,
+ "lab": 1401,
+ "labeller markup errors (lenient parse)": 1,
+ "labeller model:deepseek-v4-pro-0813": 92,
+ "labeller outputs cut off at max_tokens": 0,
+ "labeller spans dropped in alignment": 0,
+ "ov_p": 1299,
+ "ov_r": 1299
+}

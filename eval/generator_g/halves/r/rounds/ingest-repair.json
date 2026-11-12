@@ -1,0 +1,26 @@
+{
+ "call_stats": {
+  "model:kimi-k3": 36
+ },
+ "cases_clean_of_issues": 29,
+ "cases_in_round": 36,
+ "cases_with_issues": 7,
+ "cases_with_wrong_closer_accepted": 1,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {
+  "CHECKSUM": 1,
+  "PHONE": 2,
+  "PROFILE_HN": 3,
+  "P_LANG": 1,
+  "REPEAT": 2
+ },
+ "requests": 36,
+ "round": "repair",
+ "status_totals": {
+  "dropped": 7,
+  "valid": 92
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 5,
+ "wrong_closers_accepted": 1
+}

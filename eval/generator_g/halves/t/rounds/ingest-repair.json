@@ -1,0 +1,26 @@
+{
+ "call_stats": {
+  "model:glm-5.3": 63
+ },
+ "cases_clean_of_issues": 50,
+ "cases_in_round": 63,
+ "cases_with_issues": 13,
+ "cases_with_wrong_closer_accepted": 38,
+ "fence_stripped": 2,
+ "issue_case_counts_by_code": {
+  "FORMAT": 1,
+  "PROFILE_HN": 8,
+  "P_INJ": 1,
+  "P_PARSE": 1,
+  "REPEAT": 2
+ },
+ "requests": 63,
+ "round": "repair",
+ "status_totals": {
+  "dropped": 13,
+  "valid": 86
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 2,
+ "wrong_closers_accepted": 385
+}
