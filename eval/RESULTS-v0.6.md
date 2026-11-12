@@ -141,20 +141,27 @@ control 38 minutes; half T candidate 38, previous 4, control 40. No arm was resu
 
 ## Addendum (13/11/2026): split G against its adjudicated gold. The frozen verdict above stands.
 
-After publication, split G (now development data) had its disputed gold adjudicated against `eval/taxonomy.md`: every
-span 0.4.0 missed, every clean case it held, and the blind labeller's spans touching them (43 items; method, verdicts
-and changes in [`generator_g/adjudication/`](generator_g/adjudication/README.md)). Two gold spans were wrong and are
-removed in [`cases/test-g-t.adjudicated.jsonl`](cases/test-g-t.adjudicated.jsonl) (half R had no gold error; its
-adjudicated file is identical to the sealed one). The sealed files are unchanged. 38 of the 43 items are gate errors
-and 3 are grey. The arms' existing predictions were re-scored against the adjudicated gold; no gate was run:
+After publication, split G (now development data) had its disputed gold adjudicated against `eval/taxonomy.md` in two
+batches (method, verdicts and changes in [`generator_g/adjudication/`](generator_g/adjudication/README.md)). **First
+batch** (43 items): every span 0.4.0 missed, every clean case it held, and the blind labeller's spans touching them;
+38 are gate errors, 3 grey, and 2 gold spans were wrong and are removed. **Second batch** (DEV-DEBT DD-26: the 5
+places where three 0.4.0 switches broke their guards): 2 are the switches' errors, and 3 are spans the gold omitted,
+now added (two negative statements about named people, one "the only ..." description). Every span of the second
+batch was found by a 0.4.0 switch, so that batch can only raise the arms that run those switches; the first batch's
+figure is given separately for that reason. The corrections are in
+[`cases/test-g-r.adjudicated.jsonl`](cases/test-g-r.adjudicated.jsonl) and
+[`cases/test-g-t.adjudicated.jsonl`](cases/test-g-t.adjudicated.jsonl); the sealed files are unchanged. The arms'
+existing predictions were re-scored; no gate was run:
 
 | Split G pooled | 0.3.0 control | 0.3.4 previous | 0.4.0 candidate |
 |---|---|---|---|
 | Sensitive R_any, sealed gold (328 spans) | 0.930 | 0.933 | 0.939 (308) |
-| Sensitive R_any, adjudicated gold (326 spans) | 0.936 | 0.939 | **0.945 (308)** |
+| Sensitive R_any, first batch only (326 spans) | 0.936 | 0.939 | 0.945 (308) |
+| Sensitive R_any, adjudicated gold (328 spans) | 0.936 | 0.939 | **0.945 (310)** |
 | R_any, sealed / adjudicated | 0.9893 / 0.9901 | 0.9908 / 0.9915 | 0.9915 / **0.9923** |
-| R_full, sealed / adjudicated | 0.9300 / 0.9307 | 0.9367 / 0.9374 | 0.9540 / **0.9547** |
-| Released leaks, QUASI_ID R_any, friction, over-redaction | unchanged | unchanged | unchanged (0, 1.000, 0.308, 615) |
+| R_full, sealed / adjudicated | 0.9300 / 0.9301 | 0.9367 / 0.9367 | 0.9540 / **0.9547** |
+| QUASI_ID R_any, sealed / adjudicated | 0.9885 / 0.9886 | 1.000 / 1.000 | 1.000 / 1.000 |
+| Released leaks, friction, over-redaction | unchanged | unchanged | unchanged (0, 0.308, 615) |
 
 Against the adjudicated gold the candidate would still fail the same three conditions: sensitive recall 0.945 (2
 spans short of 0.95 instead of 4), friction 0.308 and over-redaction 615 against the control's 613. The misses and

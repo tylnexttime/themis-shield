@@ -4,10 +4,10 @@ Split G's gold was written by non-Claude authors (`kimi-k3`, `glm-5.3`) and labe
 cross-family agreement of only 0.86-0.92 exact ([plan amendment](../../FROZEN-PLAN-v0.6.md)). After the frozen result
 ([RESULTS-v0.6.md](../../RESULTS-v0.6.md)) split G became development data, so its disputed gold was adjudicated. The
 sealed files `eval/cases/test-g-r.jsonl` and `test-g-t.jsonl` are **not edited**; the corrections are in separate files
-beside them, `test-g-r.adjudicated.jsonl` (no change: byte-identical to the sealed file) and
-`test-g-t.adjudicated.jsonl` (two spans removed). **The frozen verdict stands as it was.**
+beside them, `test-g-r.adjudicated.jsonl` (one span added) and `test-g-t.adjudicated.jsonl` (two spans removed, two
+added), written by `apply_adjudication.py`. **The frozen verdict stands as it was.**
 
-## Scope (`build_items.py`)
+## First batch: scope (`build_items.py`)
 
 Every gold span that 0.4.0's candidate arm missed (no prediction overlapped it: 23), every clean case it held (20),
 and every blind-labeller span touching either (86): 43 items in all. Nothing outside that scope was changed, even
@@ -43,6 +43,24 @@ no fiction marker in the text.
 one (8 fiction pieces), a public date, or a secret-manager reference path (6 configuration files), all hard negatives
 by taxonomy section 4. The 19 holds are gate errors against the taxonomy; the two held only for an injection signal
 are gate errors against a taxonomy that does not cover injection (whether such holds are wanted is a policy choice).
+
+## Second batch: the DD-26 cases (`build_items_dd26.py`, `decisions-dd26.jsonl`)
+
+DEV-DEBT DD-26 lists five places where three 0.4.0 switches (`negative-statements`, `unique-roles`, `quasi-cells`)
+make a span their guard tests call wrong against the gold. The same adjudicator (cost US$0.42) decided them against
+the taxonomy; the orchestrator checked all three gold errors and agreed.
+
+| Case | Switch | Verdict | Change |
+|---|---|---|---|
+| GR-075 | negative-statements | gold error | HEALTH added: "denies any current substance use but notes past alcohol dependence" |
+| GT-008 | negative-statements | switch error | none: "a person with no criminal record" in an FAQ is a policy statement |
+| GT-027 | unique-roles | gold error | QUASI_ID added: "the only apprentice in this cycle's hairdressing cohort who grew up speaking Mandarin at home" (the switch's span also stops mid-clause) |
+| GT-079 | negative-statements | gold error | CRIMINAL added: "has no criminal record", said of a named customer |
+| GT-081 | quasi-cells | switch error | none: the widened cell runs past a ";" into a role title |
+
+Every span this batch adds was found by a 0.4.0 switch, so it can only raise the arms that run those switches;
+the results addendum gives the first batch's figure on its own for that reason. The added sensitive spans carry the
+`indirect` / `negative` flags of the sealed format, set by the orchestrator (both negative, both direct).
 
 ## Noted, not applied (outside the scope)
 
