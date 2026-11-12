@@ -96,7 +96,7 @@ tokens are restored locally (`restore.py`).
 | `catalogues/false_positives.py` | real, off by default | The reviewed false-positive catalogue (`no_hold` and `allow` entries), scoped and expiring. |
 | `catalogues/tripwire.py` | real, off by default | The optional cloud trip-wire: fixed instruction, strict JSON reply, fail closed. |
 | `catalogues/gate.py` | real | Configuration (`[known_miss]`, `[false_positives]`, `[tripwire]`) and how the router applies them; a no-op when all are off. |
-| `catalogues/cli.py`, `store.py` | real | `themis kmr`, `themis fpc`, `themis tripwire`; shared append-only SQLite plumbing. |
+| `catalogues/cli.py`, `store.py` | real | `themis kmr`, `themis fpc`, `themis tripwire`; shared append-only SQLite storage helpers. |
 
 ### Web app and hooks
 

@@ -1,4 +1,4 @@
-"""Small shared SQLite plumbing for the catalogues: per-call transactions and append-only tables.
+"""Small shared SQLite storage helpers for the catalogues: per-call transactions and append-only tables.
 
 The same discipline as the job register: history tables refuse UPDATE and DELETE through triggers, so an
 application bug cannot rewrite what was decided. That guards against mistakes, not against someone with access to
