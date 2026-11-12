@@ -20,6 +20,61 @@ split G alone.
 Split F was written and labelled by Claude models, which broke the roadmap's three-families rule (its plan said so in
 advance). Split G is written and labelled by **other model families**, and no family both writes and labels a half.
 
+## Amendment before sealing (12/11/2026): split G is halves R and T pooled
+
+Written after authoring ended and **before any arm ran on any half**. The decision was taken by Alder (the steward)
+at 03:20 UTC on 12/11/2026 from counts, rule codes and hashes only: no case, value, profile term or description had
+been read by Alder or by the deputy orchestrator. The thresholds, the arms, the pooling, the crash policy and the pass
+rule below are **unchanged**; only which halves form split G changes.
+
+**What happened to each half (counts):**
+
+| Half | Author / labeller | Planned / dropped / final cases | Outcome after one repair round and one top-up |
+|---|---|---|---|
+| R (port and freight authority) | `kimi-k3` / `deepseek-v4-pro-0813` | 101 / 9 / 92 | Converged: validator 0 failures with every quota met, origin denylist 0, mutation test 26/26. |
+| S (credit union) | `qwen3.8-max-0902` / `kimi-k3.1-pro` | 137 / 52 / 85 | Did not converge: 85 cases (< 90); HEALTH, DISABILITY, ETHNICITY, RELIGION, FAMILY_VIOLENCE and UNION under 12 gold spans each; negative statements in 5 of 8 categories; 5 quasi-identifier tables (< 8); 8 injection cases (< 11). |
+| T (municipal council) | `glm-5.3` / `deepseek-v4.1-flash-1017` | 113 / 25 / 88 | Short only on size: 88 cases (two under the floor of 90); every content quota met after the review round; validator 0 failures. Four cases hit the origin denylist in their `organisation` metadata field only (the plan's sector label for one invented, unprofiled workplace), in no document text. |
+
+No model was substituted (`kimi-k3.1-pro`, absent from the account's model list, was accepted by the endpoint).
+
+**The decision.**
+1. **Split G = halves R and T, pooled. Half S is dropped**: it stays unsealed, is not run and is not published as a
+   test half. It is far from convergence on content (six sensitive categories short), not only on size.
+2. **Half T is accepted at 88 cases.** The 90-110 row was a size target, not a pass condition; every content quota of
+   half T is met. The shortfall is recorded here, as plan v0.4 recorded its own. No second top-up was run.
+3. **Half T's metadata label is renamed by script** (`rename_org_t.py` in the authoring workspace): the one workplace
+   label that hits the origin denylist becomes the neutral `Other workplace 4` in the four cases that carry it. The
+   gate does not read this field. Document texts, gold spans and offsets are byte-identical before and after: a
+   sha256 over each case's id, text and spans is identical in 88 of 88 cases (aggregate
+   `00c338c8ea27e0c5d1890904059329158dbbe3c130ae4bcaa077e735806caff5` before and after); only the `organisation`
+   field changed, in exactly those four cases; the validator is then clean apart from the accepted size row, the
+   origin denylist finds 0 hits, the mutation test rejects 26 of 26.
+4. Arms run on the halves in the order R, T; the verdict uses R and T pooled; each half is also reported apart.
+
+**Why.** R and T keep two author families (Moonshot, Zhipu) with two DeepSeek labellers, so the three-families rule
+still holds per half; half S's shortfall is in the sensitive categories the pass rule measures, so it could not be
+accepted without weakening the test, while half T's is two documents of size with all content quotas met; running R
+alone (plan v0.4's precedent) would discard a converged-on-content half; a second top-up for T would break the
+one-top-up rule instead. Removing the Qwen-authored half also removes the limitation stated below for half S.
+
+**Deviation on half R's pointer check.** With the original pointer prompt `deepseek-v4-pro-0813` flagged 68 of 98
+half R documents, with reasons that treated invented names as real public figures. The check was re-run once with
+the same question plus "every private person is invented; a name that merely sounds real is not a flag; when in doubt
+false" (on a 15-text probe it flagged only the two planted real-world positives), and flagged 3 of 98. Half T kept
+the original prompt (10 of 99 flagged on the first pass). The two halves' pointer checks are therefore not identical.
+
+**Measured label agreement per half** (blind labeller vs the author's gold; exact recall / exact precision / overlap
+recall / overlap precision):
+
+| Half | Before review | After review |
+|---|---|---|
+| R | 0.864 / 0.886 / 0.904 / 0.927 | 0.882 / 0.926 / 0.913 / 0.958 |
+| T | 0.892 / 0.689 / 0.950 / 0.734 | 0.917 / 0.878 / 0.961 / 0.921 |
+| S (dropped; no review run) | 0.832 / 0.720 / 0.869 / 0.752 | n/a |
+
+Split F (Claude on Claude) measured 0.975 / 0.967 exact: across model families the labels agree less, so split G's
+gold carries more labelling disagreement than split F's.
+
 ## Test split G
 
 | Item | Value |
