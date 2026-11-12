@@ -49,6 +49,29 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
   sensitive spans, nor the sentence around each, reads as a general rule. Measured by replay as development evidence
   only (written from split G's three documents): split G friction 0.246 -> 0.200 (GR-083, GT-083 and GR-034
   released), over-redaction 615 -> 611, every safety measure unchanged.
+### Indirect and negative sensitive statements (split G's sensitive misses)
+
+- `indirect-statements` (new default switch): a sensitive statement that does not name its category, in the
+  taxonomy's own examples, is a statement of it: `did eighteen months inside`, `"doing time inside"`, `is on` or
+  `completed a community corrections order`, `is on parole`, `was granted bail`, `sees his parole officer`
+  (CRIMINAL); `leaves early on Fridays for Shabbat`, `observes the Sabbath`, `keeps kosher`, `eats halal`, `his halal
+  meal` (RELIGION); `carries the delegate's card for the wharf crews`, `I am the delegate contact for outdoor staff`
+  (UNION). Each needs a person: a singular or personal verb form, or (for time inside, Shabbat and halal or kosher) a
+  personal pronoun in its clause; a modal, `if` or `any applicant` before it (policy: "staff on a community corrections
+  order may apply", "the canteen offers halal options"), a sentence about an organisation and a document that presents
+  itself as fiction never match. The span is the predicate phrase, cut before a following `and`, `but` or `because`.
+- `negative-statements` (no new switch) also reads `has never been the subject of any police check` (CRIMINAL), `does
+  not have any other court orders` (FAMILY_VIOLENCE near a protection or intervention order, otherwise CRIMINAL; never
+  in a paragraph about a company), `has no family violence indicators on file`, and a whole `Yes` or `No` after a form
+  line that ends with `:` and speaks of a person (`4.4 I do not identify as Aboriginal or Torres Strait Islander: No`;
+  never a requirement line such as `Police check required: Yes`).
+- Fixed vocabulary from the taxonomy's wording, never a learned list. Over every evaluation set (split G adjudicated)
+  the new vocabulary makes 105 spans (dev 5, test 5, C 3, D-q 10, D-c 24, E 13, F 18, G 27), none over a hard negative
+  or in a clean document, each on a gold span of its own category but one (GR-097 quotes the statement whose
+  restatement is gold; recorded in the guard). Left to the finders, as no rule reads them safely: split G's Japanese
+  family-violence statement, "home before sundown", an address kept off letters, "his partner" and a fees deduction.
+  Measured by replay as development evidence only (written from split G): split G sensitive R_any 0.939 -> 0.967
+  (308 -> 317 of 328), R_any 0.9915 -> 0.9948, R_full 0.954 -> 0.957; friction, over-redaction and decisions unchanged.
 
 ## 0.4.0 (12/11/2026)
 

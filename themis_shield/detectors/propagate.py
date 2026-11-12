@@ -715,8 +715,11 @@ def _propagate_text(
         base = union_findings(base, table_identifier_spans(text, tier))
     if fix_on("location-columns"):
         base = union_findings(base, table_location_spans(text, tier))
-    if fix_on("sensitive-columns") or fix_on("union-roles") or fix_on("negative-statements"):
-        from .statements import negative_statement_spans, table_statement_spans, union_role_spans
+    if (fix_on("sensitive-columns") or fix_on("union-roles") or fix_on("negative-statements")
+            or fix_on("indirect-statements")):
+        from .statements import (
+            indirect_statement_spans, negative_statement_spans, table_statement_spans, union_role_spans,
+        )
 
         if fix_on("sensitive-columns"):
             base = union_findings(base, table_statement_spans(text, tier))
@@ -724,6 +727,8 @@ def _propagate_text(
             base = union_findings(base, union_role_spans(text, tier))
         if fix_on("negative-statements"):
             base = union_findings(base, negative_statement_spans(text, tier))
+        if fix_on("indirect-statements"):
+            base = union_findings(base, indirect_statement_spans(text, tier))
     if fix_on("unique-roles"):
         base = union_findings(base, unique_role_spans(text, tier))
     if fix_on("quasi-cells"):

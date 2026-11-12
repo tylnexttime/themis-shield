@@ -136,6 +136,18 @@ v0.5 detection fixes (from split F, now development data):
   (no he/she/I/you, no name or PERSON finding, no ``the only``/``sole``/``one``, no ``a staff member at ...``, no
   ``asked``/``said``). A finding across sentences, a sensitive-column cell and a finding with another label are kept;
   no other finding changes. See ``drop_policy_statements`` in ``detectors/policy_statements.py``.
+- ``indirect-statements`` (from split G): a sensitive statement that does not name its category, in the taxonomy's
+  own examples, is a statement of it: ``did eighteen months inside``, ``is on a community corrections order``,
+  ``completed a community corrections order``, ``is on parole``, ``sees his parole officer`` (CRIMINAL); ``leaves early
+  on Fridays for Shabbat``, ``keeps kosher``, ``needs halal`` (RELIGION); ``carries the delegate's card``, ``I am the
+  delegate contact for outdoor staff`` (UNION). Each needs a person: a singular or personal verb form, or (for "did
+  time inside", Shabbat and halal) a personal pronoun before it in its clause; a modal, "if" or "any applicant" before
+  it (a policy sentence) never matches. The span is the clause, from the pronoun when there is one. Split G also
+  added to ``negative-statements``: ``has never been the subject of any police check``, ``does not have any other
+  court orders`` (FAMILY_VIOLENCE near a protection or intervention order, otherwise CRIMINAL), ``has no family
+  violence indicators on file``, and a ``Yes`` or ``No`` after a form line that ends with ":" and speaks of a person
+  (``I do not identify as Aboriginal or Torres Strait Islander: No``). See ``indirect_statement_spans`` and
+  ``negative_statement_spans`` in ``detectors/statements.py``.
 """
 
 from __future__ import annotations
@@ -167,6 +179,8 @@ DETECTION_FIXES = (
     "negative-statements", "unique-roles", "quasi-cells",
     # v0.5, from split G's friction (detectors/policy_statements.py).
     "policy-statements",
+    # From split G's sensitive misses (development data; detectors/statements.py).
+    "indirect-statements",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",

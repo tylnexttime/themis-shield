@@ -209,6 +209,24 @@ _NEGATIVE_PATTERNS = (
     (Label.UNION, re.compile(
         r"(?ix)\b(?:is|am|was|i'm)\s+(?:not|no\s+longer)\s+(?:a\s+)?member\s+of\s+(?:any|a)\s+(?:trade\s+)?union\b")),
 )
+# From split G (development data): a police check a person was never the subject of, and a file with no family
+# violence indicators, flags or history on it.
+_NEGATIVE_RECORDS = (
+    (Label.CRIMINAL, re.compile(
+        r"(?ix)\b(?:has|have|had)\s+never\s+been\s+(?:the\s+)?subject\s+(?:of|to)\s+(?:a|any)\s+police\s+checks?\b")),
+    (Label.FAMILY_VIOLENCE, re.compile(
+        r"(?ix)\b(?:has|have|had)\s+no\s+(?:(?:known|recorded|current)\s+)?(?:family|domestic|family\s+(?:and|or)\s+domestic)"
+        r"\s+violence\s+(?:indicators?|flags?|history)\b")),
+)
+# "does not have any (other) court orders": a family violence statement when its paragraph speaks of a protection or
+# intervention order or of family violence, otherwise a criminal one; never in a paragraph about a company.
+_COURT_ORDERS = re.compile(
+    r"(?ix)\b(?:does\s+not|doesn't|do\s+not|don't|did\s+not|didn't)\s+(?:currently\s+)?have\s+any\s+"
+    r"(?:(?:other|further|current)\s+)?court\s+orders?\b"
+    r"|\b(?:has|have)\s+no\s+(?:(?:other|further|current)\s+)?court\s+orders?\b")
+_FAMILY_VIOLENCE_CONTEXT = re.compile(
+    r"(?i)\b(?:intervention|protection|apprehended\s+violence|domestic\s+violence)\s+orders?\b|\bavo\b|\bdvo\b"
+    r"|\b(?:family|domestic)\s+violence\b")
 _MATTERS = re.compile(
     r"(?ix)\bno\s+(?:(?:new|further|other|disclosable)\s+)*matters\s+(?:declared|disclosed|recorded|listed|on\s+file)\b"
     r"|\b(?:check|certificate|clearance)\b[\w '-]{0,40}?\b(?:shows?|showed|returned|returns|came\s+back\s+with|lists?"
@@ -231,6 +249,14 @@ _QUESTION_CATEGORIES = (
 )
 _ANSWERED_QUESTION = re.compile(
     r"(?im)^[^\n?]{0,200}\?[ \t]*(yes|no|nil|none|unknown|declined|not\s+stated|prefer\s+not\s+to\s+say)[ \t]*[.;]?[ \t]*$")
+# The same written as a form line that ends with ":" ("4.4 I do not identify as Aboriginal or Torres Strait Islander:
+# No"): only a whole "Yes" or "No", and only when the line speaks of a person ("I", "you", "the applicant"), so a
+# requirement line ("Police check required: Yes") or a heading is not one.
+_ANSWERED_FORM_LINE = re.compile(r"(?im)^([^\n?:]{0,200}):[ \t]*(yes|no)[ \t]*[.;]?[ \t]*$")
+_FORM_PERSON = re.compile(
+    r"(?i)\b(?:i|you|he|she|my|your|his|her|applicant|client|patient|employee|worker|candidate)\b")
+_FORM_REQUIREMENT = re.compile(
+    r"(?i)\b(?:required|requirement|needed|mandatory|essential|necessary|must|should|may|will|shall)\b")
 
 
 def _sentence_clause(text: str, start: int, end: int) -> tuple[int, int]:
@@ -255,15 +281,21 @@ def _sentence_clause(text: str, start: int, end: int) -> tuple[int, int]:
 
 def negative_statement_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
     out = []
-    found = [(label, m.start(), m.end()) for label, pattern in _NEGATIVE_PATTERNS for m in pattern.finditer(text)]
+    found = [(label, m.start(), m.end()) for label, pattern in _NEGATIVE_PATTERNS + _NEGATIVE_RECORDS
+             for m in pattern.finditer(text)]
     found += [
         (Label.CRIMINAL, m.start(), m.end()) for m in _MATTERS.finditer(text)
         if _CRIMINAL_CONTEXT.search(text, max(0, m.start() - CRIMINAL_CONTEXT_CHARS), m.end())
     ]
+    found += [
+        (Label.FAMILY_VIOLENCE if _FAMILY_VIOLENCE_CONTEXT.search(
+            text, max(0, m.start() - CRIMINAL_CONTEXT_CHARS), m.end()) else Label.CRIMINAL, m.start(), m.end())
+        for m in _COURT_ORDERS.finditer(text)
+    ]
     for label, a, b in found:
         while a < b and text[a].isspace():
             a += 1
-        if label is Label.CRIMINAL:
+        if label is Label.CRIMINAL or label is Label.FAMILY_VIOLENCE and _COURT_ORDERS.match(text, a, b):
             line_end = text.find("\n", b)
             if _COMPANY.search(text, text.rfind("\n", 0, a) + 1, len(text) if line_end < 0 else line_end):
                 continue
@@ -276,4 +308,89 @@ def negative_statement_spans(text: str, tier: int = 1) -> tuple[DetectionFinding
             if pattern.search(question):
                 out.append(_statement(m.start(1), m.end(1), label, NEGATIVE_STATEMENT_STAGE, tier))
                 break
+    for m in _ANSWERED_FORM_LINE.finditer(text):
+        question = m.group(1)
+        if not _FORM_PERSON.search(question) or _FORM_REQUIREMENT.search(question):
+            continue
+        for label, pattern in _QUESTION_CATEGORIES:
+            if pattern.search(question):
+                out.append(_statement(m.start(2), m.end(2), label, NEGATIVE_STATEMENT_STAGE, tier))
+                break
+    return tuple(out)
+
+
+# v0.5 fix "indirect-statements" (from split G, development data): a sensitive statement that does not name its
+# category, in the taxonomy's own examples: "did two years inside", "is on a community corrections order", "is on
+# parole" (CRIMINAL); "leaves early on Fridays for Shabbat", "keeps kosher" (RELIGION); "carries the delegate's card",
+# "I am the delegate contact for outdoor staff" (UNION). Fixed vocabulary only. Each pattern needs a person: a
+# singular or personal verb form in it, or (where the words alone could be anyone's or a kitchen's: "did time inside",
+# "for Shabbat", "keeps kosher") a personal pronoun in its clause, up to the end of the match ("he", "my", "his halal
+# meal"); a modal, "if" or "any applicant" before it (policy: "staff on a community corrections order may apply",
+# "the canteen offers halal options") never matches, and neither does a
+# document that presents itself as fiction (the taxonomy's fiction_statement: "Short story: ...", "CHAPTER SEVEN").
+# The span is the predicate phrase (the taxonomy's span rule): from the match to the end of its clause, cut before a
+# following "and", "but" or "because", so a role title, site or committee around it stays out.
+INDIRECT_STATEMENT_STAGE = "indirect-statements"
+_PRONOUN = re.compile(r"(?i)\b(?:i|i'm|i've|he|she|he's|she's|him|his|her|me|my|himself|herself|myself)\b")
+_TIME = (r"(?:time|a\s+(?:long\s+|short\s+)?stretch"
+         r"|(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|eighteen|twenty|a\s+few"
+         r"|several|\d{1,2})\s+(?:and\s+a\s+half\s+)?(?:months?|years?|weeks?)(?:\s+and\s+a\s+half)?)")
+_INDIRECT_PATTERNS = (
+    # (label, pattern, needs a personal pronoun in its clause, up to the end of the match)
+    (Label.CRIMINAL, re.compile(
+        r"(?ix)\b(?:did|does|doing|done|served|serving|serves)\s+" + _TIME + r"\s+inside\b"
+        r"(?!\s+(?:the|a|an|his|her|its|our|their|this|that)\b)"
+        r"|\b(?:spent|spending|spends)\s+(?!time\b)" + _TIME + r"\s+inside\b"
+        r"(?!\s+(?:the|a|an|his|her|its|our|their|this|that)\b)"), True),
+    (Label.CRIMINAL, re.compile(
+        r"(?ix)\b(?:is|was|am|i'm|he's|she's|been)\s+(?:(?:currently|still|now|already)\s+)?on\s+a\s+"
+        r"community\s+corrections\s+order\b"
+        r"|\b(?:completed|finished|finishes|finishing|serving|serves|served)\s+(?:a|an|his|her|my)\s+"
+        r"(?:[\w-]+\s+)?community\s+corrections\s+order\b"
+        r"|\b(?:is|was|am|i'm|he's|she's|been)\s+(?:(?:currently|still|now|out)\s+)*on\s+(?:parole|bail)\b"
+        r"|\b(?:was|been|got)\s+(?:granted|refused|released\s+on)\s+(?:parole|bail)\b"
+        r"|\b(?:sees|seeing|saw|reports\s+to|reporting\s+to|reported\s+to|meets\s+with|met\s+with)\s+(?:his|her|my)\s+"
+        r"parole\s+officer\b"
+        r"|\b(?:breached|breaching|breaches)\s+(?:his|her|my)\s+(?:parole|bail)\b"), False),
+    (Label.RELIGION, re.compile(
+        r"(?ix)\b(?:leaves|left|finishes|finished|goes\s+home|went\s+home|heads\s+home|is\s+off|takes\s+off)\s+"
+        r"(?:[\w':]+\s+){0,5}?for\s+(?:the\s+)?(?:shabbat|shabbos|sabbath)\b"
+        r"|\b(?:observes|observed|keeps|kept)\s+(?:the\s+)?(?:shabbat|shabbos|sabbath)\b"
+        r"|\b(?:i\s+(?:only\s+)?(?:eat|need|keep)|eats|needs|requires|keeps|kept)\s+(?:(?:only|strictly)\s+)?"
+        r"(?:halal|kosher)\b"
+        r"|\b(?:his|her|my)\s+(?:halal|kosher)\s+(?:meals?|diet|food|options?)\b"), True),
+    (Label.UNION, re.compile(
+        r"(?ix)\b(?:carries|carried|holds|held|has|had)\s+(?:the|a|his|her|my)\s+(?:union\s+)?"
+        r"delegate(?:'s|’s)\s+card\b"
+        r"|\b(?:i\s+am|i'm|is|was|am|has\s+been|have\s+been|became)\s+(?:the|a|our)\s+delegate\s+contact\s+for\s+"
+        r"(?:the\s+)?(?:[\w'-]+\s+){0,3}?(?:crews?|workers|staff|shifts?|members|team)\b"), False),
+)
+_POLICY_BEFORE = re.compile(
+    r"(?i)\b(?:may|must|can|cannot|could|should|shall|will|would|if|unless|whether|anyone|everyone"
+    r"|any\s+(?:applicant|worker|employee|staff|person|candidate)s?)\b")
+_FICTION = re.compile(
+    r"(?im)^[ \t#*]*chapter\s+[\w-]+|\b(?:short\s+story|flash\s+fiction|works?\s+of\s+fiction|fictional|the\s+narrator"
+    r"|the\s+characters\s+are\s+(?:invented|fictional))\b")
+_PREDICATE_END = re.compile(r"(?i)\s+(?:and|but|because)\s")
+
+
+def indirect_statement_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
+    # A document that presents itself as fiction switches off only this added vocabulary (fiction statements are hard
+    # negatives, taxonomy section 4); the finders still read it as before, so a document cannot lower its protection
+    # below 0.4.0's by calling itself a story.
+    if _FICTION.search(text):
+        return ()
+    out = []
+    for label, pattern, needs_pronoun in _INDIRECT_PATTERNS:
+        for m in pattern.finditer(text):
+            start, end = _sentence_clause(text, m.start(), m.end())
+            before = text[start:m.start()]
+            if _POLICY_BEFORE.search(before) or needs_pronoun and not _PRONOUN.search(text, start, m.end()):
+                continue
+            start = m.start()
+            cut = _PREDICATE_END.search(text, m.end(), end)
+            if cut is not None:
+                end = cut.start()
+            if start < end:
+                out.append(_statement(start, end, label, INDIRECT_STATEMENT_STAGE, tier))
     return tuple(out)
