@@ -15,6 +15,26 @@ half T `glm-5.3` / `deepseek-v4.1-flash`, 180 cases pooled); a third half was dr
 accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`eval/cases/test-g-r.jsonl`,
 `test-g-t.jsonl`, pipeline under `eval/generator_g/`) is published and is now development data. No code changed.
 
+### Secret-manager references in clean configuration files (split G friction)
+
+- `secret-config-lookalikes` (no new switch): on split G, six of the 65 clean documents were configuration files BLOCKed
+  for `secret` although every secret-looking value in them is a reference to a secret manager. Three more reference
+  forms are no longer read as secrets (from any detector): a `${NAME:path}` lookup (`"${SECRET_MANAGER:prod/app/db/password}"`),
+  a template lookup written with a colon (`{{ vault:kv/app#password }}`, quoted or not), and a URI of a non-web scheme
+  made only of lower-case words under a key whose last word names a credential (`broker_password: "sm://org/prod/broker-password"`;
+  before, only under a key that says it is a reference, such as `credentialRef`). So are the pieces the finders cut out
+  of such a reference: a fragment wholly inside it (`prod/app/db/password}"`, `:org/prod`, `vault:kv/x#password`) and the
+  key of the assignment with its quotes and `:` or `=` (`finance_api_key:`). Written as narrowly as the existing forms:
+  a path of lower-case words (at least three after a `${NAME:`, so a two-word Spring default such as `admin/admin`
+  stays a literal; at least two otherwise), no user, password, query, host with dots or letters
+  run into digits, and a web scheme never counts. A literal after the same keys, `user:pass@`, an `https://` URI, a path
+  with a high-entropy segment, a literal beside a reference on the same line or on another line, a literal in a trailing
+  comment, a value-less key line and a lone padded base64 key still BLOCK (COR-001), and no gold SECRET span in
+  `eval/cases` passes the rule. `--detection-fixes` without the switch restores the previous behaviour byte for byte.
+  Measured by replay as development evidence only (written from split G's six documents): split G friction
+  0.308 -> 0.246 (four of the six released; GR-083 is now held only for a sensitive finding and GR-098 still for
+  fourteen `code:` values PII-Tracer alone reads as secrets and for its injection signal), every safety measure unchanged.
+
 ## 0.4.0 (12/11/2026)
 
 **Preview, like every release before it.** Split F, the frozen test of this release's candidate (0.3.4 plus

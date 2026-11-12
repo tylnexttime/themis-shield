@@ -90,7 +90,11 @@ v0.5 detection fixes (from split F, now development data):
   for a credential and that a rule can tell apart with certainty. Two extend ``secret-references`` and act only with it
   on: a template call to a secret manager that names a path and at most a field (``"{{ vault 'kv/app/db#password' }}"``,
   ``"{{ vault('kv/app/db', 'password') }}"``), and a URI of a non-web scheme made only of lower-case words under a key
-  that says it is a reference (``credentialRef: "keyhold://kv-prod/edge/syd#admin"``). Two are about the span itself: a
+  that says it is a reference (``credentialRef: "keyhold://kv-prod/edge/syd#admin"``); split G's clean files added a
+  ``${NAME:path}`` lookup (``"${SECRET_MANAGER:prod/app/db/password}"``), a template lookup written with a colon
+  (``{{ vault:kv/app#password }}``), the same URI under a key whose last word names a credential
+  (``broker_password: "sm://org/prod/broker-password"``), and the pieces a finder cuts out of such a reference (a
+  fragment, or the key with its quotes and separator, ``finance_api_key:``). Two are about the span itself: a
   path of lower-case words that is a directory (it ends in ``/``) or a configuration file (a file extension such as
   ``.yaml``, ``.json`` or ``.tf`` follows it), and the key of an assignment that is a camel-case identifier of three or
   more words (``targetCPUUtilizationPercentage: 65``). The same shape as a value (``password: correctHorseBatteryStaple``),

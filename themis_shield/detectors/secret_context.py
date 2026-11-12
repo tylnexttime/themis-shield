@@ -280,6 +280,23 @@ REF_KEY = re.compile(r"(?:[a-z0-9](?:Ref|Reference)|(?i:(?:^|[_\-.])(?:ref|refer
 REF_URI = re.compile(
     r"(?!(?:https?|ftps?|wss?)://)[a-z][a-z0-9+.\-]{1,20}://" + _WORD + r"(?:/" + _WORD + r")+(?:#" + _WORD + r")?"
 )
+# Split G's clean configuration files (development data), the same narrowness: a path of at least two lower-case words.
+# - "${SECRET_MANAGER:prod/app/db/password}": an upper-case name, a colon, a path (after one word the colon is Spring's
+#   default value, "${DB_PASSWORD:hunter22}", a literal, and so is a two-word default such as "admin/admin": the path
+#   has at least three words); no space, no query, no second colon;
+# - "{{ vault:kv/app#password }}": the template call of the secret managers above, written with a colon, quoted or not;
+# - a URI of words (REF_URI) under a key whose last word names a credential ("broker_password", "signing_key"), not only
+#   under a key that says it is a reference.
+_PATH_WORDS = _WORD + r"(?:/" + _WORD + r")+"
+BRACE_LOOKUP = re.compile(r"\$\{[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*:" + _WORD + r"(?:/" + _WORD + r"){2,}\}")
+TEMPLATE_COLON_LOOKUP = re.compile(
+    r"\{\{-?\s*(?:vault|hashi_vault|secret|secrets|secretsmanager|ssm|kv|keyvault|op):"
+    + _PATH_WORDS + r"(?:#" + _WORD + r")?\s*-?\}\}"
+)
+SECRET_KEY = re.compile(
+    r"(?:[a-z0-9](?:Password|Passwd|Pwd|Passphrase|Passcode|Secret|Token|Key|Credentials?)"
+    r"|(?i:(?:^|[_\-.])(?:password|passwd|pwd|passphrase|passcode|secret|token|key|apikey|credentials?)))$"
+)
 
 
 def _reference(value: str, key: str = "", lookalikes: bool = False) -> bool:
@@ -290,13 +307,19 @@ def _reference(value: str, key: str = "", lookalikes: bool = False) -> bool:
         return True  # a key with no value carries no secret
     if ENV_REFERENCE.fullmatch(value) or PLACEHOLDER.fullmatch(value):
         return True
-    if lookalikes and (TEMPLATE_LOOKUP.fullmatch(value) or (REF_KEY.search(key) and REF_URI.fullmatch(value))):
+    if lookalikes and (
+        TEMPLATE_LOOKUP.fullmatch(value) or BRACE_LOOKUP.fullmatch(value) or TEMPLATE_COLON_LOOKUP.fullmatch(value)
+        or ((REF_KEY.search(key) or SECRET_KEY.search(key)) and REF_URI.fullmatch(value))
+    ):
         return True
     url = _URL_PASSWORD.match(value)
     return bool(url) and _reference(url.group("password"), "", lookalikes)
 
 
-def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
+_KEY_END = re.compile(r"""["']?(?::|=)?""")  # what follows a key with no space between: its closing quote, its separator
+
+
+def _in_reference(assignment: re.Match, start: int, end: int, lookalikes: bool = False) -> bool:
     """True when the span ``[start, end)`` of the line does not leave the assignment's reference for something else.
 
     A span that reaches into a trailing comment ("... # old: sk_live_...") holds text no reference test has read. A
@@ -307,6 +330,9 @@ def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
     in "DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}"). The name of a variable is not a secret value, and the key is a plain
     identifier by ``_ASSIGNMENT`` (letters, digits, underscore, hyphen, dot). The caller has already tested the value as
     a reference, so this never reaches a literal value, and an empty value is answered above.
+
+    With ``lookalikes`` (split G, development data) the key's own quotes and its separator, when nothing separates them
+    from the key, belong to it: a finder cuts out ``finance_api_key:``, and ``"api_key":`` with its quotes.
     """
     if start >= end:
         return True  # the span only touches this line at its line break
@@ -320,6 +346,11 @@ def _in_reference(assignment: re.Match, start: int, end: int) -> bool:
     key_start, key_end = assignment.span("key")
     if key_start <= start and end <= key_end:
         return True  # the name of a variable that holds a reference
+    if lookalikes:
+        line = assignment.string
+        opening = 1 if key_start and line[key_start - 1] in "\"'" else 0
+        if key_start - opening <= start and end <= _KEY_END.match(line, key_end).end():
+            return True  # the name with its quotes and separator, the line's value not touched
     return end > value_start
 
 
@@ -344,7 +375,7 @@ def references_only(text: str, start: int, end: int, lookalikes: bool = True) ->
         assignment = _ASSIGNMENT.match(line)
         if assignment:
             if not _reference(assignment.group("value"), assignment.group("key"), lookalikes) or not _in_reference(
-                assignment, max(start - offset, 0), min(end - offset, len(line))
+                assignment, max(start - offset, 0), min(end - offset, len(line)), lookalikes
             ):
                 return False
             continue
