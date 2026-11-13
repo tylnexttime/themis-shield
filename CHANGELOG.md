@@ -52,6 +52,28 @@ false and may be on together. `enabled` is deprecated: read only when neither to
 - Test helpers: the synthetic Operator (`MemoryRegister.approve`, `operator_decides` in the live-cloud tests) now
   settles open points as "not personal" before approving, as the console requires.
 
+### Operator console: trip-wire rounds, re-approve after a flag, undo a point (development, unmeasured)
+
+- **Trip-wire rounds in the job's card.** With the cloud trip-wire on, the Operator console now shows inside each
+  job's card what every correction round (`before_human`) found and added: counts per category, the placeholder ids
+  it added, known-miss proposal ids and each finding (never a value), with NOT CONVERGED shown as a warning. The
+  placeholders the loop added are highlighted in the text with their round and listed as settled by the trip-wire
+  (new point reason `REPLACED_BY_TRIPWIRE`); they are not new open points. A finding the loop did not replace is
+  highlighted only when its place in the text is exact, otherwise listed. After an Operator replacement made the loop
+  run again, earlier loops are folded below the current one.
+- **Check after approval, from the console.** A package the `after_human` check sent back (`TRIPWIRE_FLAGGED`) now
+  appears in the Operator queue with its findings, and the card offers "Re-approve this package" (sent unchanged,
+  without another check) and "Refuse the job": the same verdicts as `themis tripwire review --reapprove` /
+  `--refuse` (new routes `POST /api/operator/{job}/tripwire/reapprove` and `/refuse`).
+- **Undo a mis-clicked point.** Until stage two of the package is approved, an Operator may undo a point's "Not
+  personal" or "Replace it" (`POST /api/operator/{job}/points/{point}/undo`, an Undo button in the console). The undo
+  is recorded (who, when; new append-only tables `review_undos` and `review_undo_actors`; `review_resolutions` gains an
+  `attempt` column) and the point is open again. Undoing a replacement removes its placeholder from the job's codebook
+  so the next package rebuild excludes it. A stop is never undone; a replacement made before a restart, or whose
+  placeholder is already in use elsewhere, cannot be undone. `themis operator stats` counts undone settlements.
+- With the trip-wire's correction loop on, the Operator review is built from the loop's final package (the merge of
+  the two features passes the review draft through every real package build). Not measured on any split.
+
 ### Split G result (eval-kit-v0.6-frozen): 0.4.0 as released fails its frozen rule
 
 0.4.0 as released **fails** its frozen rule on split G ([results](eval/RESULTS-v0.6.md)), the first fresh split to

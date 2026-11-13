@@ -298,6 +298,44 @@ credential; the client token and the chat session are refused.
   own category changes nothing.
 - *Stop the document.* The job is refused at once (`STOPPED_BY_OPERATOR`); nothing is sent.
 
+**Undo a mis-click.** Until stage two of the package is approved, the Operator may undo a point's "Not personal" or
+"Replace it" (`POST /api/operator/{job}/points/{point}/undo`; the console shows an Undo button beside a settled point).
+Nothing is erased: the settlement row stays, the undo is a row of its own (`review_undos` and `review_undo_actors`:
+who and when, append-only like the rest), and the point is open again, so no stage is approved until it is settled
+anew (a new settlement row, numbered by `attempt`). The console lists each undone settlement under its point. Undoing
+a replacement that added a placeholder removes that placeholder from the job's codebook (its mapping and its
+`de-identified-by-operator` mark), drops it from the placeholders the rebuilt package must contain, and sends a ready
+package back to "building" (audited `PACKAGE_REOPENED`), so the next send rebuilds the package without it. Three
+limits: a stop is never undone (the job is refused); what a replacement added is kept in memory only, like the review
+text, so a replacement made before the gate restarted cannot be undone (`UNDO_UNAVAILABLE`); and a placeholder that is
+already part of what was sent, or of another job's package, is kept and its replacement cannot be undone
+(`PLACEHOLDER_IN_USE`). Only a placeholder marked as the Operator's can be removed this way
+(`Vault.forget_operator_placeholder`); the gate's own placeholders go only with their conversation.
+
+**The cloud trip-wire in the console.** When the trip-wire is on (see "Cloud trip-wire" below), the job's card has a
+"Cloud trip-wire" section built from the register (`review.tripwire_view`; value-free: categories, counts, character
+spans in the checked package, placeholder ids and proposal ids, never a value):
+
+- *Correction loop (`before_human`).* Each round: what it found (count per category), whether it corrected the
+  package, came back clean or was the last round still flagged (NOT CONVERGED, shown as a warning), the placeholder ids
+  it added and its known-miss proposals, with each finding listed. The placeholders the loop added are highlighted in
+  the text (marked "T" and the round) and listed among the settled placeholders as the trip-wire's
+  (`REPLACED_BY_TRIPWIRE` in `review_points`). **They are not new open points**: the loop already replaced them, and
+  the gate's own hold points stay the only ones an Operator must settle. A gate hold point that falls on such a
+  placeholder stays an open point. When an Operator replacement makes the package run the loop again, the card shows
+  the loop on the current package and, folded below it, the earlier loops of the job.
+- *Findings the loop did not replace* (the last round of a NOT CONVERGED package) are not open points either: the
+  Operator approves or refuses the package as before. Each is highlighted in the text only when its place is exact:
+  its span must lie inside one JSON string value of the checked package, that value must be exactly the text of one
+  content surface of the review, and decoding it must give the same text (`review.flag_span`). Otherwise it is listed
+  only, never highlighted at a guessed place.
+- *Check after approval (`after_human`).* A package it sent back (Held, `TRIPWIRE_FLAGGED`) now appears in the
+  Operator queue with every finding listed, and highlighted where exact as above. The card offers "Re-approve this
+  package" (`POST /api/operator/{job}/tripwire/reapprove`: the same package is sent unchanged, without another check)
+  and "Refuse the job" (`.../tripwire/refuse`). These are the console's path to `themis tripwire review JOB
+  --reapprove` / `--refuse` and record the same verdicts; they answer only while such a flag is pending
+  (`TRIPWIRE_NOT_PENDING` otherwise).
+
 **The release rule.** While a held point of the current package is unsettled, no stage is approved: the register
 refuses it on every path (`_decide_stage`, and `_stages_valid` for an earlier approval), and the console disables the
 approval buttons. The two-stage approval, refusal and escalation are otherwise unchanged. A job whose decision was
@@ -480,8 +518,9 @@ becomes a pending known-miss proposal in both modes (below), and both fail close
      same way at once, because asking again about an unchanged package would only repeat the round. The cap also
      bounds a document whose injected instruction makes the trip-wire flag everything.
   5. Then the usual human steps. The response that holds the job for confirmation or approval lists each round
-     (categories, counts, placeholder ids added and proposal ids; never an original value), and so does `themis
-     tripwire list`. The automatic pilot approval fixture never approves a NOT CONVERGED package.
+     (categories, counts, placeholder ids added and proposal ids; never an original value), and so do `themis
+     tripwire list` and the job's card in the Operator console ("Operator review, point by point" above). The
+     automatic pilot approval fixture never approves a NOT CONVERGED package.
 #### `after_human`: the check of the approved package
 
 - **When.** After both approval stages, after the exact-value check, just before the task turn; once per approved
@@ -493,7 +532,8 @@ becomes a pending known-miss proposal in both modes (below), and both fail close
   audited `TRIPWIRE_FLAGGED`) with every finding listed (category, character span or placeholder id, proposal id;
   never a value). `themis tripwire review JOB --reapprove` (alias `--reject`: a false flag) returns the job to
   Approved, and the same package is sent unchanged without a second check; `--refuse` (alias `--confirm`: a real
-  residual) refuses the job, and the work is re-submitted as a new job.
+  residual) refuses the job, and the work is re-submitted as a new job. The Operator console offers the same two
+  verdicts in the job's card.
 
 #### Both modes
 
