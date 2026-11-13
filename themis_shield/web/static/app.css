@@ -2,14 +2,14 @@
   color-scheme: light dark;
   --bg:#f3f5f7; --surface:#fff; --text:#19232d; --muted:#536170; --line:#ccd4dc;
   --accent:#075ba5; --accent-text:#fff; --soft:#e9f2fb; --danger:#a01422;
-  --danger-bg:#fff0f1; --green:#17603a; --radius:.65rem;
+  --danger-bg:#fff0f1; --green:#17603a; --radius:.65rem; --mark:#ffe08a; --mark-text:#19232d;
   font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:15px;
 }
 @media (prefers-color-scheme:dark) {
   :root {
     --bg:#13191f; --surface:#1d2630; --text:#eef2f6; --muted:#b3c0ce; --line:#4a5969;
     --accent:#90caff; --accent-text:#09243e; --soft:#253c50; --danger:#ffb4bd;
-    --danger-bg:#461d26; --green:#8be0b0;
+    --danger-bg:#461d26; --green:#8be0b0; --mark:#6a5410; --mark-text:#fff6d8;
   }
 }
 * { box-sizing:border-box; }
@@ -116,3 +116,17 @@ dialog::backdrop { background:rgb(0 0 0/.45); }
   .model-controls label,.drop-zone { flex-wrap:wrap; }
 }
 @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+/* Operator review: highlighted hold points, one-line reasons, per-point actions. */
+.review { margin-top:.8rem; border-top:1px solid var(--line); padding-top:.6rem; }
+.review h4 { margin:.2rem 0 .5rem; }
+.review-text mark { background:var(--mark); color:var(--mark-text); border-radius:.2rem; padding:0 .15rem; }
+.review-text mark.settled { background:var(--soft); color:var(--text); }
+.review-text mark sup { font-size:.7em; margin-left:.15rem; font-weight:600; }
+.review-points { padding-left:1.4rem; display:grid; gap:.7rem; }
+.review-point p { margin:.2rem 0; }
+.review-point .original { background:var(--danger-bg); color:var(--danger); padding:.4rem .6rem; border-radius:.4rem; overflow-wrap:anywhere; }
+.settled-note { color:var(--green); }
+.replace-form { display:flex; flex-wrap:wrap; gap:.6rem; align-items:end; margin-top:.5rem; }
+.replace-form label { display:grid; gap:.2rem; font-size:.9rem; }
+.replace-form input[type=number] { width:7.5rem; }
+.replace-form p { flex-basis:100%; margin:0; overflow-wrap:anywhere; }

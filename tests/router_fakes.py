@@ -53,10 +53,18 @@ class MemoryRegister(SqliteRegister):
         return self.current_approval(identifier, NOW)
 
     def approve(self, identifier):
+        """The synthetic Operator: settle every held point of the current package as "not personal" (the per-point
+        review the Operator console asks for since the Operator review feature; without it no stage is approved),
+        then approve both stages. Tests of the review itself call the register's own commands instead."""
+        self.settle_points(identifier)
         return super().approve(
             identifier, "operator", "ROUTINE_APPROVED", NOW,
             approver_identity="synthetic-operator",
         )
+
+    def settle_points(self, identifier, actor="synthetic-operator"):
+        for point in self.unresolved_points(identifier):
+            self.resolve_point(identifier, point, "not-personal", actor_identity=actor, now=NOW)
 
 
 

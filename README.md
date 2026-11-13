@@ -118,7 +118,10 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
   `themis serve --open-operator`); the gate token and the chat session opened with `--open` are refused there, so an
   API client or agent that holds only the gate token cannot approve its own job. Both files sit in the same user's
   profile, so a process running as that user can read both: this separates credentials, it does not prove that a
-  second human approved. The app also serves OpenAI-compatible `/v1/chat/completions` and
+  second human approved. For a held job, the Operator tab shows the de-identified text with each hold highlighted
+  and a one-line reason beside it; the Operator settles each point (not personal, replace it, or stop the document)
+  and may reveal one point's original on screen, never recorded. Approval needs every point settled. The app also
+  serves OpenAI-compatible `/v1/chat/completions` and
   `/v1/models` endpoints on loopback, so tools like [Kilo Code](examples/kilo.example.json) can use it as their
   provider.
 - **Use any OpenAI-compatible cloud endpoint** (OpenAI, Azure OpenAI, or a compatible gateway), or Anthropic's native

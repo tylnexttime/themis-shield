@@ -31,6 +31,27 @@ false and may be on together. `enabled` is deprecated: read only when neither to
 `before_human` only (in 0.3 and 0.4 it meant the check after approval: set `after_human = true` for that).
 `tripwire_records` gains a `stage` column (older rows default to `after_human`); `themis tripwire list` shows it.
 
+### Operator review, point by point
+
+- **Show the triggers.** For a held (ASK) job the Operator console shows the de-identified text with each hold
+  trigger highlighted, a one-line plain-English reason beside it (from a fixed catalogue, for example "a statement
+  about someone's health" or "the detectors disagreed on whether this is a name") and its place (paragraph, line).
+  The points are built on the server from the decision evidence (`review.py`) and recorded value-free in the
+  register (`register/review_records.py`: positions, categories, decisions and who; append-only).
+- **Originals, carefully.** For a highlighted point the signed-in Operator (Operator credential only) may reveal the
+  original. It is returned to that request only and shown on that screen; never written to the register, audit
+  records or logs, and not kept by the page.
+- **Three actions per point:** "Not personal: leave it", "Replace it" (the span becomes a placeholder in the job's
+  codebook marked `de-identified-by-operator`; the package is rebuilt on the next send and must contain it) and
+  "Stop the document" (the job is refused). No stage is approved while a point is unsettled; the register enforces
+  this on every approval path. Two-stage approval, refusal and escalation are otherwise unchanged.
+- **End states.** Jobs report `end_state`: `stopped`, `de-identified-and-released` or `released-as-is` (`null` while
+  open).
+- **No learning by itself.** Replacements stay in their job's codebook. "Not personal" verdicts are counted per hold
+  reason (`themis operator stats`); nothing promotes them to the false-positive catalogue automatically.
+- Test helpers: the synthetic Operator (`MemoryRegister.approve`, `operator_decides` in the live-cloud tests) now
+  settles open points as "not personal" before approving, as the console requires.
+
 ### Split G result (eval-kit-v0.6-frozen): 0.4.0 as released fails its frozen rule
 
 0.4.0 as released **fails** its frozen rule on split G ([results](eval/RESULTS-v0.6.md)), the first fresh split to

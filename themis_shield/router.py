@@ -173,6 +173,9 @@ class Router:
         self._retry, self._jobs, self._payloads = {}, {}, {}
         self._active_jobs = set()
         self._job_activity = {}
+        # Operator review (review.py): per held job, the de-identified text and its points, in memory only; and the
+        # placeholders an Operator added to each job's codebook, checked to be in the rebuilt package.
+        self._reviews, self._operator_tokens = {}, {}
         self._detection_status = "not-yet-tested"
         # v0.3 detector canary (themis_shield.canary); None means no canary gating. Set from [canary] by integration.
         self.canary = None
@@ -218,6 +221,9 @@ class Router:
                     self.vault.wipe(identifier)
                     self.history.wipe(identifier)
                     del self._conversations[identifier]
+                    for job_id, review in tuple(self._reviews.items()):
+                        if review.conversation_id == identifier:
+                            del self._reviews[job_id]
                     for key in tuple(self._retry):
                         if key[0] == identifier:
                             del self._retry[key]
@@ -298,8 +304,10 @@ class Router:
                 working.append(deepcopy(message))
         return working, matched_indices
 
-    def _protect(self, boundary, conversation_id, matched_indices):
-        return self._protect_package(boundary, conversation_id, matched_indices, self._scan_package(boundary))
+    def _protect(self, boundary, conversation_id, matched_indices, *, review=None):
+        return self._protect_package(
+            boundary, conversation_id, matched_indices, self._scan_package(boundary), review=review,
+        )
 
     def _scan_package(self, boundary):
         """Detection for cloud-bound work: the detector canary's checks around one scan of every surface."""
@@ -317,11 +325,14 @@ class Router:
                 raise GateFailure(blocked, 200)
         return evidence
 
-    def _protect_package(self, boundary, conversation_id, matched_indices, evidence, *, vault=None, sweep=True):
+    def _protect_package(
+        self, boundary, conversation_id, matched_indices, evidence, *, vault=None, sweep=True, review=None,
+    ):
         """Decide and substitute from one scan's evidence; ``_protect`` is exactly scan, then this.
 
         The cloud trip-wire's correction rounds call it again with the same evidence (no second scan): with
-        ``vault`` set to a trial overlay and ``sweep`` off while trying a value, then on the real vault.
+        ``vault`` set to a trial overlay and ``sweep`` off while trying a value, then on the real vault. ``review``,
+        when given, receives the Operator review draft of this build (``review.py``); a later build overwrites it.
         """
         starts, position = [], 0
         for surface in boundary.surfaces:
@@ -337,6 +348,7 @@ class Router:
         previous = allocator.mapping()
         sent, counts = set(), Counter()
         labels_by_token: dict[str, set] = {}  # placeholders first allocated in this request: their evidence labels
+        results = []  # per surface: its SubstitutionResult, or None when its text goes out as it is (review draft)
         for start, surface in zip(starts, boundary.surfaces):
             end = start + len(surface.text)
             findings = []
@@ -356,6 +368,7 @@ class Router:
                 if findings:
                     raise GateFailure("CANONICAL_HISTORY_NEEDS_REASSESSMENT", 200)
                 sent.update(token for token in previous if token in surface.text)
+                results.append(None)
                 continue
             for token, original in previous.items():
                 category = parse_strict_token(token).token_class.value
@@ -366,8 +379,10 @@ class Router:
             if not surface.mutable:
                 if findings:
                     raise GateFailure("PII_IN_PROTOCOL_FIELD", 200)
+                results.append(None)
                 continue
             protected = substitute(surface.text, findings, allocator)
+            results.append(protected)
             assign(boundary.body, surface.path, protected.tokenised_text)
             sent.update(protected.authorised_tokens)
             counts.update(protected.redaction_summary)
@@ -393,6 +408,10 @@ class Router:
         # v0.3: the known-miss final sweep on the exact outbound JSON (a no-op unless enabled).
         if sweep:
             result = final_sweep(self, raw, result)
+        if review is not None:
+            # Operator review: where each hold came from, in the de-identified text (value-free; see review.py).
+            from .review import draft
+            review.update(draft(scanned, starts, boundary.surfaces, results, evidence, result))
         return raw, scoped, sent, originals, result, timings, dict(counts)
 
     def handle(self, request, headers=None, *, source_document_count=1):

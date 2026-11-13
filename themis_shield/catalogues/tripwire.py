@@ -453,7 +453,7 @@ class LoopOutcome:
         return "\n".join(lines)
 
 
-def protect(router, job, working, identifier, matched, marking):
+def protect(router, job, working, identifier, matched, marking, *, review=None):
     """The router's ``_protect`` with the trip-wire on: scan once, substitute, then (while the package is still being
     built) run the correction loop. Returns ``(package, boundary, outcome)``; ``outcome`` is None only when a ready
     package no longer matches (the router then refuses it as changed).
@@ -469,11 +469,11 @@ def protect(router, job, working, identifier, matched, marking):
 
     boundary = fresh()
     evidence = router._scan_package(boundary)
-    package = router._protect_package(boundary, identifier, matched, evidence)
+    package = router._protect_package(boundary, identifier, matched, evidence, review=review)
     digest = hashlib.sha256(package[0]).hexdigest()
     row = router._register_call("get_details", job.job_id)
     if row["package"] == "building":
-        return _loop(router, job, fresh, identifier, matched, evidence, package, boundary, marking)
+        return _loop(router, job, fresh, identifier, matched, evidence, package, boundary, marking, review)
     if row["package"] == "ready" and row["manifest_hash"] != digest:
         return package, boundary, None
     record = router._register_call("tripwire_loop", job.job_id, digest)
@@ -520,7 +520,7 @@ def _ask(router, job, text, originals, marking, digest, number):
             stream.close()
 
 
-def _correct(router, fresh, identifier, matched, evidence, package, text, flags):
+def _correct(router, fresh, identifier, matched, evidence, package, text, flags, review=None):
     """Replace each finding's values with placeholders of the reported category.
 
     Each value is tried on a vault overlay: it is kept only if the whole package still builds (substitution, the
@@ -558,10 +558,10 @@ def _correct(router, fresh, identifier, matched, evidence, package, text, flags)
     for token, value in overlay.pending.items():
         router.vault.put(identifier, token, value)
     boundary = fresh()
-    return router._protect_package(boundary, identifier, matched, evidence), boundary, corrections
+    return router._protect_package(boundary, identifier, matched, evidence, review=review), boundary, corrections
 
 
-def _loop(router, job, fresh, identifier, matched, evidence, package, boundary, marking):
+def _loop(router, job, fresh, identifier, matched, evidence, package, boundary, marking, review=None):
     """Check the whole package, correct every finding, check again; at most ``max_rounds`` rounds."""
     from ..router import GateFailure
 
@@ -588,7 +588,7 @@ def _loop(router, job, fresh, identifier, matched, evidence, package, boundary, 
             corrections, progress = [(flag, candidates(text, flag), ()) for flag in flags], False
         else:
             updated, rebuilt, corrections = _correct(
-                router, fresh, identifier, matched, evidence, package, text, flags,
+                router, fresh, identifier, matched, evidence, package, text, flags, review,
             )
             progress = rebuilt is not None
         last = secret or not progress or number == config.max_rounds

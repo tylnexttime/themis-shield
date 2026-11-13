@@ -133,3 +133,90 @@ def test_findings_single_scroll_column_and_polish(width, height):
             assert '"documents"' not in text and '["VOLUME"' not in text
         finally:
             browser.close()
+
+
+def test_operator_review_highlights_points_and_reveals_one_original_only_on_request():
+    """The Operator queue renders each held point highlighted in the de-identified text with its reason and place;
+    approval stays disabled while a point is open; "Show original" asks the server for that one point and the
+    original is shown in that point only, never in storage."""
+    playwright = pytest.importorskip("playwright.sync_api")
+    root = Path(__file__).parents[1] / "themis_shield" / "web" / "static"
+    text = "A synthetic note.\n\n⟦P:abcdef⟧ will ship the widget."
+    point = {
+        "id": "pt-0123456789ab", "number": 1, "reason": "ASK:disagreement-empty-llm", "label": "PERSON",
+        "kind": "placeholder", "start": 19, "end": 29, "location": "paragraph 2, line 3",
+        "why": "the detectors disagreed on whether this is a name", "placeholder": "⟦P:abcdef⟧",
+        "category": "person", "resolution": None,
+    }
+    job = {
+        "job_id": "JOB-2026-0003", "route": "cloud-tokenised", "marking_class": "NONE", "status": "Awaiting-Operator",
+        "stage1": "requested", "package": "ready", "stage2": "pending", "due": None, "expiry": None,
+        "counts": {"PERSON": 1}, "timings": {}, "summary": "A synthetic note.", "size": {"documents": 1, "words": 9},
+        "major_flags": [], "review": {
+            "job_id": "JOB-2026-0003", "package": "ready", "text": text, "text_available": True,
+            "points": [point], "gate_settled": [], "unresolved": 1, "total": 1, "stopped": False,
+            "categories": ["person", "contact", "address", "identifier", "date", "statement", "quasi-identifier"],
+        },
+    }
+    revealed = []
+    with playwright.sync_playwright() as manager:
+        browser = None
+        for options in ({}, {"channel": "chrome"}):
+            try:
+                browser = manager.chromium.launch(**options)
+                break
+            except playwright.Error:
+                continue
+        if browser is None:
+            pytest.skip("Neither Playwright Chromium nor an installed Google Chrome can be launched")
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+
+            def serve(route):
+                path = route.request.url.split("8742", 1)[-1].split("?", 1)[0]
+                responses = {
+                    "/api/reasons": {"reasons": catalogue()},
+                    "/api/settings": {"local_target": "laptop", "default_local_model": "gemma4-e4b",
+                                      "default_cloud_model": "themis/cloud:example", "operator_console_enabled": True},
+                    "/api/models": {"local": [], "cloud": []},
+                    "/api/runtime": {"loaded_models": [], "queue": 0, "resources": {}},
+                    "/api/capacity": {"tiers": [], "end_to_end_input_tokens_per_hour": None, "reference_job": {}},
+                    "/api/canary": {"enabled": False, "cloud_blocked": False, "detectors": {}},
+                    "/api/operator/queue": {"jobs": [job]},
+                }
+                if path == f"/api/operator/{job['job_id']}/points/{point['id']}/reveal":
+                    revealed.append(route.request.method)
+                    route.fulfill(content_type="application/json",
+                                  body=json.dumps({"point_id": point["id"], "original": "Synthetic Blake"}))
+                elif path in responses:
+                    route.fulfill(content_type="application/json", body=json.dumps(responses[path]))
+                else:
+                    file = root / ("index.html" if path == "/" else path.lstrip("/"))
+                    kind = "text/html" if file.suffix == ".html" else "text/css" if file.suffix == ".css" else "text/javascript"
+                    route.fulfill(content_type=kind, body=file.read_text(encoding="utf-8"))
+
+            page.route("http://127.0.0.1:8742/**", serve)
+            page.goto("http://127.0.0.1:8742/")
+            page.locator('[data-screen="operator"]').click()
+            page.locator(".review-point").wait_for()
+            mark = page.locator(".review-text mark")
+            assert mark.count() == 1 and mark.inner_text().startswith("⟦P:abcdef⟧")
+            item = page.locator(".review-point").inner_text()
+            assert "paragraph 2, line 3: The detectors disagreed on whether this is a name." in item
+            assert page.get_by_role("button", name="Approve stage 1").is_disabled()
+            assert "Synthetic Blake" not in page.content() and revealed == []
+            page.get_by_role("button", name="Show original").click()
+            page.locator(".original").wait_for(state="visible")
+            assert revealed == ["POST"] and "Synthetic Blake" in page.locator(".original").inner_text()
+            page.get_by_role("button", name="Hide original").click()
+            assert "Synthetic Blake" not in page.content()
+            assert page.evaluate("localStorage.length + sessionStorage.length") == 0
+            page.get_by_role("button", name="Replace it").click()
+            form = page.locator(".replace-form")
+            form.get_by_role("button", name="Extend to the next word").click()
+            assert "⟦P:abcdef⟧ will" in form.locator(".muted").inner_text()
+            assert errors == []
+        finally:
+            browser.close()
