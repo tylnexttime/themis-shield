@@ -9,6 +9,7 @@ from themis_shield.detectors.escalation import (
 from themis_shield.register.models import REASONS, MARKING_REASONS
 from themis_shield.register.two_stage import STAGE_REASONS
 from themis_shield.register.gate_records import GATE_RECORD_REASONS
+from themis_shield.register.review_records import GATE_REASON, REVIEW_REASONS
 from themis_shield.routing import RouteReasonCode
 from themis_shield.types import ReasonCode
 
@@ -104,6 +105,17 @@ FIXED = {
     "TRIPWIRE_UNAVAILABLE": "The cloud trip-wire could not be completed; the job stopped (fail closed).",
     "TRIPWIRE_FLAGGED": "The cloud trip-wire flagged possible residual personal information; the job stopped for an Operator.",
     "TRIPWIRE_REVIEW_REQUIRED": "An Operator must review the trip-wire flag before this job can continue.",
+    "REVIEW_UNAVAILABLE": (
+        "The highlighted text of this job is not in this gate's memory (the gate restarted or the conversation "
+        "expired); the requester sends again to rebuild it."
+    ),
+    "INVALID_REVIEW_ACTION": "The review action is invalid.",
+    "INVALID_REPLACEMENT_SPAN": (
+        "The chosen span must cover the point, keep whole placeholders and not be empty or blank."
+    ),
+    "OPERATOR_REPLACEMENT_NOT_APPLIED": (
+        "A placeholder the Operator added did not appear in the rebuilt package; the job stopped (fail closed)."
+    ),
 }
 POLICY = {
     "STAGE_FAILED": "A required detection stage failed.",
@@ -126,8 +138,62 @@ POLICY = {
 }
 
 
+# Operator review: one plain-English line per held point, from the hold reason and a label. Fixed text only; the
+# point's value is never part of it.
+TOPICS = {
+    "HEALTH": "someone's health", "DISABILITY": "someone's disability",
+    "INDIGENOUS": "whether someone is Aboriginal or Torres Strait Islander",
+    "SEXUALITY": "someone's sexuality", "RELIGION": "someone's religion",
+    "CRIMINAL": "someone's criminal record or offending", "FAMILY_VIOLENCE": "family violence involving someone",
+    "ETHNICITY": "someone's ethnicity", "UNION": "someone's trade union membership",
+}
+VALUE_KINDS = {
+    "PERSON": "a name", "EMAIL": "an email address", "PHONE": "a phone number", "ADDRESS": "an address",
+    "DATE_OF_BIRTH": "a date of birth", "OTHER_DATE": "a date", "URL_PERSONAL": "a personal web address",
+    "USERNAME": "a username", "QUASI_ID": "a detail that could single someone out",
+    "PAYMENT_CARD": "a payment card number", "BANK_ACCOUNT": "a bank account number",
+}
+POINT_REASONS = {
+    "ASK:quasi-identifier": "a detail that could single someone out without naming them",
+    "ASK:disagreement-few-persons": (
+        "the detectors disagreed on whether this is a name (one found far more people than the others)"
+    ),
+    "ASK:injection-signal": "words that look like instructions to the AI model",
+    "ASK:typed-indirect": "a sentence that may reveal a sensitive fact about someone",
+    "ASK:unmatched-llm-values": (
+        "a finder reported values that are not in the text word for word: read the whole text"
+    ),
+    "ASK:known-miss-hit": "the text matches an entry in the known-miss register",
+    "ASK:known-miss-stale": "the known-miss register snapshot is out of date: read the whole text",
+    "ASK:known-miss-deadline": "the known-miss check did not finish in time: read the whole text",
+    "ASK:ambiguous-entity": "the gate could not tell which person or thing this refers to",
+}
+
+
+def value_kind(label):
+    if label in TOPICS:
+        return "a statement about " + TOPICS[label]
+    if label in VALUE_KINDS:
+        return VALUE_KINDS[label]
+    return "an identifier" if label else "personal information"
+
+
+def point_reason(reason, label):
+    """The one-line reason shown beside a highlighted point (category and why), from fixed text only."""
+    if reason == "ASK:sensitive":
+        return "a statement about " + TOPICS.get(label, "a sensitive matter concerning someone")
+    if reason == "ASK:disagreement-empty-llm":
+        return "the detectors disagreed on whether this is " + VALUE_KINDS.get(label, "personal information")
+    if reason == GATE_REASON:
+        return value_kind(label) + ", replaced by the gate"
+    if reason in POINT_REASONS:
+        return POINT_REASONS[reason]
+    item = next((code for code in ReasonCode if code.value == reason), None)
+    return POLICY.get(item.name, "a technical hold") if item is not None else "a technical hold"
+
+
 def catalogue():
-    result = {**FIXED, **REASONS, **STAGE_REASONS, **GATE_RECORD_REASONS}
+    result = {**FIXED, **REASONS, **STAGE_REASONS, **GATE_RECORD_REASONS, **REVIEW_REASONS}
     result.update({
         PII_FOUND: "Tier-1 personal findings require both finder tiers.",
         DOCUMENT_SENSITIVE: "The document sensitivity score requires both finder tiers.",

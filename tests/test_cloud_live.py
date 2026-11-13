@@ -608,13 +608,16 @@ def reset_process_state():
 # Driving a request the way the web app does: send, confirm what was found (ASK), let the Operator decide, re-send.
 # ---------------------------------------------------------------------------------------------------------------------
 def operator_decides(gate: Gate, job_id: str, steps: list[str]):
-    """What the Operator console does: stage 1, then stage 2 bound to the package hash. A job holding a sensitive
+    """What the Operator console does: settle each highlighted point, stage 1, then stage 2 bound to the package hash. A job holding a sensitive
     statement is a major job: the Operator's first decision escalates it, and the review board decides."""
     register = gate.register
 
     def now():
         return datetime.now(timezone.utc)
 
+    # The Operator settles each highlighted point first (here: "not personal", leave the text as shown).
+    for point in register.unresolved_points(job_id):
+        register.resolve_point(job_id, point, "not-personal", actor_identity=OPERATOR, now=now())
     row = register.get_details(job_id)
     register.approve_stage(
         job_id, 1, "operator", "ROUTINE_APPROVED", approver_identity=OPERATOR,

@@ -34,6 +34,7 @@ from .models import (
 from .reporting import build_report
 from .two_stage import TwoStageCommands, STAGE_REASONS
 from .gate_records import GateRecords
+from .review_records import ReviewRecords
 
 
 REASONS.update(STAGE_REASONS)
@@ -1420,13 +1421,15 @@ class _SqliteRegisterCore:
         return len(rows)
 
 
-class SqliteRegister(GateRecords, TwoStageCommands, _SqliteRegisterCore):
+class SqliteRegister(ReviewRecords, GateRecords, TwoStageCommands, _SqliteRegisterCore):
     """Authoritative synthetic register with cooperative two-stage commands.
 
     Required MRO:
-        SqliteRegister -> GateRecords -> TwoStageCommands -> _SqliteRegisterCore -> object
+        SqliteRegister -> ReviewRecords -> GateRecords -> TwoStageCommands -> _SqliteRegisterCore -> object
 
     ``GateRecords`` (v0.3) only adds append-only decision and trip-wire record tables and commands.
+    ``ReviewRecords`` adds the Operator's per-point review (value-free points and resolutions) and the rule that no
+    stage is approved while a held point of the current package is unsettled.
 
     The minimal JobRecord/JobRegisterClient return contract is unchanged.
     Extended API fields are obtained from safe register row projections.

@@ -30,6 +30,9 @@ AES_DATA_KEY_BITS = 256
 DEFAULT_IDLE_EXPIRY_SECONDS = 4 * 60 * 60
 PROPOSED_MAX_RETENTION_DAYS = 14
 VERSION = 1
+# How a stored placeholder was made, when it was not made by the gate itself (value-free marks).
+OPERATOR_SOURCE = "de-identified-by-operator"
+SOURCES = frozenset({OPERATOR_SOURCE})
 
 
 class VaultError(RuntimeError):
@@ -128,6 +131,12 @@ class Vault:
                     ciphertext BLOB NOT NULL,
                     created_utc TEXT NOT NULL,
                     version INTEGER NOT NULL CHECK(version = 1),
+                    PRIMARY KEY(conversation_id, token)
+                );
+                CREATE TABLE IF NOT EXISTS mapping_sources (
+                    conversation_id TEXT NOT NULL,
+                    token TEXT NOT NULL,
+                    source TEXT NOT NULL,
                     PRIMARY KEY(conversation_id, token)
                 );
             """)
@@ -286,6 +295,32 @@ class Vault:
                 for token, nonce, ciphertext, version in rows
             }
 
+    def mark_source(self, conversation_id: str, token: str, source: str) -> None:
+        """Mark how a stored placeholder was made (value-free: the token and a fixed source name only).
+
+        Used for ``de-identified-by-operator``: a placeholder an Operator added during review. It is restored like any
+        other placeholder; the mark only says where it came from. The token must already be stored.
+        """
+        _validate(conversation_id, token)
+        if source not in SOURCES:
+            raise ValueError("unknown placeholder source")
+        with self.allocation_lock, self._transaction():
+            if self._db.execute(
+                "SELECT 1 FROM mappings WHERE conversation_id=? AND token=?", (conversation_id, token),
+            ).fetchone() is None:
+                raise KeyError("placeholder not stored")
+            self._db.execute(
+                "INSERT OR REPLACE INTO mapping_sources VALUES (?, ?, ?)", (conversation_id, token, source),
+            )
+
+    def sources(self, conversation_id: str) -> dict[str, str]:
+        _validate(conversation_id)
+        with self.allocation_lock, self._transaction():
+            return dict(self._db.execute(
+                "SELECT token, source FROM mapping_sources WHERE conversation_id=? ORDER BY token",
+                (conversation_id,),
+            ).fetchall())
+
     def wipe(self, conversation_id: str) -> None:
         _validate(conversation_id)
         with self.allocation_lock:
@@ -300,6 +335,9 @@ class Vault:
                 self._db.execute(
                     "DELETE FROM mappings WHERE conversation_id=?", (conversation_id,)
                 )
+                self._db.execute(
+                    "DELETE FROM mapping_sources WHERE conversation_id=?", (conversation_id,)
+                )
 
     def wipe_all(self) -> None:
         with self.allocation_lock:
@@ -307,6 +345,7 @@ class Vault:
                 self._db.execute("DELETE FROM conversation_keys")
             with self._transaction():
                 self._db.execute("DELETE FROM mappings")
+                self._db.execute("DELETE FROM mapping_sources")
 
     def purge_expired(self, now: datetime) -> tuple[str, ...]:
         now = _utc(now)
@@ -355,6 +394,7 @@ class InMemoryVault:
         self._clock = clock
         self._idle = timedelta(seconds=idle_expiry_seconds)
         self._values: dict[str, dict[str, str]] = {}
+        self._sources: dict[str, dict[str, str]] = {}
         self._last_used: dict[str, datetime] = {}
         self._closed = False
 
@@ -399,16 +439,32 @@ class InMemoryVault:
                 return {}
             return dict(self._values[conversation_id])
 
+    def mark_source(self, conversation_id: str, token: str, source: str) -> None:
+        _validate(conversation_id, token)
+        if source not in SOURCES:
+            raise ValueError("unknown placeholder source")
+        with self.allocation_lock:
+            if token not in self._values.get(conversation_id, {}):
+                raise KeyError("placeholder not stored")
+            self._sources.setdefault(conversation_id, {})[token] = source
+
+    def sources(self, conversation_id: str) -> dict[str, str]:
+        _validate(conversation_id)
+        with self.allocation_lock:
+            return dict(self._sources.get(conversation_id, {}))
+
     def wipe(self, conversation_id: str) -> None:
         _validate(conversation_id)
         with self.allocation_lock:
             self._last_used.pop(conversation_id, None)
             self._values.pop(conversation_id, None)
+            self._sources.pop(conversation_id, None)
 
     def wipe_all(self) -> None:
         with self.allocation_lock:
             self._last_used.clear()
             self._values.clear()
+            self._sources.clear()
 
     def purge_expired(self, now: datetime) -> tuple[str, ...]:
         now = _utc(now)

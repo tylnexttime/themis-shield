@@ -319,3 +319,36 @@ def tripwire_main(argv=None, *, register=None) -> int:
         return 0
     except (ValueError, PermissionError, KeyError, OSError, sqlite3.Error) as error:
         return _refused(error)
+
+
+# -- themis operator ----------------------------------------------------------------------------------------------
+
+
+def operator_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="themis operator",
+        description=(
+            "Operator review statistics (value-free): per hold reason, how many points were held and how Operators "
+            "settled them. A reason with many 'not personal' verdicts wastes checks; promoting it to the "
+            "false-positive catalogue is a separate, deliberate step (themis fpc propose)."
+        ),
+    )
+    parser.add_argument("--config", default=None)
+    parser.add_argument("--register-db", type=Path, default=None, help="job register (default: from config)")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("stats", help="points held and settled, per hold reason")
+    return parser
+
+
+def operator_main(argv=None, *, register=None) -> int:
+    args = operator_parser().parse_args(argv)
+    try:
+        if register is None:
+            from ..register.sqlite_store import SqliteRegister
+            config = _config(args.config)
+            path = args.register_db or (config.get("register") or {}).get("path") or None
+            register = SqliteRegister(Path(path).expanduser() if path else None)
+        print(json.dumps(register.operator_review_stats(), indent=2, sort_keys=True))
+        return 0
+    except (ValueError, PermissionError, KeyError, OSError, sqlite3.Error) as error:
+        return _refused(error)

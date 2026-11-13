@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from themis_shield import app_services as services
+from themis_shield import review as reviews
 from themis_shield.cloud.openai_compat import canonical, strict_json
 from themis_shield.router import GateFailure
 from themis_shield.runtime.calibration import CalibrationStore, calibrate
@@ -464,6 +465,8 @@ def create_app(
                 **services.job_view(row), "summary": row["problem_summary_deid"],
                 "size": {"documents": row["source_document_count"], "words": row["source_word_count"]},
                 "major_flags": json.loads(row["major_reason_codes_json"]),
+                # Value-free: the de-identified text, each hold point with its reason and place, how it was settled.
+                "review": reviews.view(router, row["job_id"]),
             } for row in router.register.list_jobs()
                 if row["route"] == "CLOUD"
                 and row["status"] in {"Logged", "Awaiting-Operator", "Escalated-Review"}
@@ -480,6 +483,9 @@ def create_app(
 
         def act():
             row, actor, now = router.register.get_details(job_id), router.operator_identity, router.clock()
+            if action == "approve" and router.register.unresolved_points(job_id):
+                # Release needs every highlighted point settled; the register refuses it for every approval path too.
+                raise GateFailure("REVIEW_POINTS_UNRESOLVED", 409)
             if action == "approve":
                 router.register.approve_stage(
                     job_id, value["stage"], "operator", value["reason"],
@@ -504,6 +510,49 @@ def create_app(
     @app.post("/api/operator/{job_id}/escalate")
     async def escalate(job_id: str, request: Request):
         return await operator_action(job_id, request, "escalate")
+
+    # -- Operator review, point by point (review.py). Every route here is under /api/operator/, so the boundary
+    # already refuses anything but the Operator credential (the client token and client session get 403).
+
+    @app.get("/api/operator/{job_id}/review")
+    async def operator_review(job_id: str):
+        if not operator_enabled():
+            return error("OPERATOR_CONSOLE_DISABLED", 404)
+        return await operation(reviews.view, router, job_id)
+
+    async def point_action(job_id, point_id, request, kind):
+        if not operator_enabled():
+            return error("OPERATOR_CONSOLE_DISABLED", 404)
+        try:
+            value = await body(request, {"start", "end", "category"} if kind == "replace" else set())
+        except Exception:
+            return error("INVALID_REVIEW_ACTION", 400)
+        actor = router.operator_identity
+        if kind == "reveal":
+            # The original is returned to this response only (no-store): never written to the register or a log.
+            return await operation(reviews.reveal, router, job_id, point_id)
+        if kind == "replace":
+            return await operation(
+                reviews.replace, router, job_id, point_id, value["start"], value["end"], value["category"],
+                actor=actor,
+            )
+        return await operation(getattr(reviews, kind), router, job_id, point_id, actor=actor)
+
+    @app.post("/api/operator/{job_id}/points/{point_id}/reveal")
+    async def point_reveal(job_id: str, point_id: str, request: Request):
+        return await point_action(job_id, point_id, request, "reveal")
+
+    @app.post("/api/operator/{job_id}/points/{point_id}/not-personal")
+    async def point_not_personal(job_id: str, point_id: str, request: Request):
+        return await point_action(job_id, point_id, request, "not_personal")
+
+    @app.post("/api/operator/{job_id}/points/{point_id}/replace")
+    async def point_replace(job_id: str, point_id: str, request: Request):
+        return await point_action(job_id, point_id, request, "replace")
+
+    @app.post("/api/operator/{job_id}/points/{point_id}/stop")
+    async def point_stop(job_id: str, point_id: str, request: Request):
+        return await point_action(job_id, point_id, request, "stop")
 
     @app.post("/api/handover")
     async def handover(request: Request):

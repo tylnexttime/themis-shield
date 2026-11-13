@@ -28,6 +28,13 @@ from .summary import TOKEN_PATTERN
 from .types import Decision
 
 
+def end_state(row):
+    """Three end states (ASK is only a waypoint): stopped, de-identified-and-released, released-as-is; None while
+    the job is open."""
+    from .review import end_state as state
+    return state(row)
+
+
 def job_view(row):
     local = row["route"] == Route.LOCAL_ONLY.value
     return {
@@ -39,6 +46,7 @@ def job_view(row):
         "stage2": None if local else row["stage2"],
         "due": row["due_utc"], "expiry": row["expiry_utc"],
         "tier": row["tier"], "timings": json.loads(row["timings_json"]),
+        "end_state": end_state(row),
     }
 
 

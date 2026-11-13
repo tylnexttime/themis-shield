@@ -133,6 +133,19 @@ def local_due(value):
         return "not available"
 
 
+def record_review(router, job, conversation_id, digest, review):
+    """Operator review: record the bound package's points (value-free) and keep its text in memory only."""
+    from .review import ReviewState
+    row = router._register_call("get_details", job.job_id)
+    if not review or row["manifest_hash"] != digest or row["package"] != "ready":
+        return
+    router._register_call("record_review_points", job.job_id, digest, review["points"], now=router.clock())
+    with router._state_lock:
+        router._reviews[job.job_id] = ReviewState(
+            conversation_id, digest, review["text"], review["points"], review["tokens"],
+        )
+
+
 def held(router, job, reason, timings):
     row = router._register_call("get_details", job.job_id)
     return router._response(
@@ -243,10 +256,16 @@ def handle(router, request, headers=None, *, source_document_count=1):
         working = deepcopy(request)
         working["messages"] = messages
         boundary = ChatBoundary(working, router.allowed_tools, router.cloud_model)
+        review = {}
         raw, mapping, sent, originals, policy, timings, counts = router._protect(
-            boundary, identifier, matched,
+            boundary, identifier, matched, review=review,
         )
         digest = hashlib.sha256(raw).hexdigest()
+        with router._state_lock:
+            added = set(router._operator_tokens.get(job.job_id, ()))
+        if added - set(sent):
+            # A placeholder the Operator added to this job's codebook must be in the rebuilt package (fail closed).
+            raise GateFailure("OPERATOR_REPLACEMENT_NOT_APPLIED", 200)
         row = router._register_call("get_details", job.job_id)
         if row["package"] == "ready" and row["manifest_hash"] != digest:
             raise GateFailure("PACKAGE_CHANGED", 200)
@@ -281,6 +300,7 @@ def handle(router, request, headers=None, *, source_document_count=1):
             with router._state_lock:
                 router._payloads[job.job_id] = raw
         job = refresh(router, job.job_id)
+        record_review(router, job, identifier, digest, review)
         if isinstance(policy, GateDecision):
             # v0.3 decision record: model output and catalogue override kept apart, with the register version.
             router._register_call(
