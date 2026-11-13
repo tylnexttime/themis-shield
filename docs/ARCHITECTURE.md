@@ -305,7 +305,10 @@ who and when, append-only like the rest), and the point is open again, so no sta
 anew (a new settlement row, numbered by `attempt`). The console lists each undone settlement under its point. Undoing
 a replacement that added a placeholder removes that placeholder from the job's codebook (its mapping and its
 `de-identified-by-operator` mark), drops it from the placeholders the rebuilt package must contain, and sends a ready
-package back to "building" (audited `PACKAGE_REOPENED`), so the next send rebuilds the package without it. Three
+package back to "building" (audited `PACKAGE_REOPENED`), so the next send rebuilds the package without it. Until
+that send the review text (which still shows the removed placeholder) is dropped and no point of the job can be
+settled (`REVIEW_REBUILD_REQUIRED`, FAB-03): otherwise a second "Replace it" on the stale placeholder would read as
+confirming it and the value would go out in clear. Three
 limits: a stop is never undone (the job is refused); what a replacement added is kept in memory only, like the review
 text, so a replacement made before the gate restarted cannot be undone (`UNDO_UNAVAILABLE`); and a placeholder that is
 already part of what was sent, or of another job's package, is kept and its replacement cannot be undone

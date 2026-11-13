@@ -177,6 +177,9 @@ class Router:
         # placeholders an Operator added to each job's codebook, checked to be in the rebuilt package; and per job and
         # point what an Operator replacement added (token, whether it created it, conversation), so it can be undone.
         self._reviews, self._operator_tokens, self._operator_points = {}, {}, {}
+        # FAB-03: jobs whose review text was dropped by an undo that removed a placeholder; no point of such a job is
+        # settled until the requester re-sends and the package is rebuilt.
+        self._review_stale = set()
         self._detection_status = "not-yet-tested"
         # v0.3 detector canary (themis_shield.canary); None means no canary gating. Set from [canary] by integration.
         self.canary = None

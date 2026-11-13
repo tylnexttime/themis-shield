@@ -152,6 +152,7 @@ def record_review(router, job, conversation_id, digest, review, raw=None, loop=N
     if raw is not None and getattr(router, "tripwire", None) is not None:
         document = tripwire.document(raw)
     with router._state_lock:
+        getattr(router, "_review_stale", set()).discard(job.job_id)
         router._reviews[job.job_id] = ReviewState(
             conversation_id, digest, review["text"], review["points"], review["tokens"],
             tuple(review.get("surfaces", ())), document,

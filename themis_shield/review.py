@@ -268,8 +268,19 @@ def _state(router, job_id):
     state = getattr(router, "_reviews", {}).get(job_id)
     if state is None:
         from .router import GateFailure
+        _not_stale(router, job_id)
         raise GateFailure("REVIEW_UNAVAILABLE", 404)
     return state
+
+
+def _not_stale(router, job_id):
+    """FAB-03: after an undo removed a placeholder, the review text on record is that of a package that no longer
+    exists; nothing is settled on it until the requester re-sends and the package is rebuilt."""
+    from .router import GateFailure
+    with router._state_lock:
+        stale = job_id in getattr(router, "_review_stale", ())
+    if stale:
+        raise GateFailure("REVIEW_REBUILD_REQUIRED", 409)
 
 
 def view(router, job_id):
@@ -559,6 +570,9 @@ def replace(router, job_id, point_id, start, end, category, *, actor):
     token_class = CATEGORY_CLASS[category]
     segment = state.text[start:end]
     whole = TOKEN.fullmatch(segment)
+    if whole is not None and segment not in router.vault.mapping(state.conversation_id):
+        # FAB-03: a placeholder that is no longer in the codebook (an undo removed it) is never "confirmed as it is".
+        raise GateFailure("REVIEW_REBUILD_REQUIRED", 409)
     if whole is not None and parse_strict_token(segment).token_class == token_class:
         reopen, added = False, (None, False, state.conversation_id)
     else:
@@ -630,6 +644,11 @@ def undo(router, job_id, point_id, *, actor):
         if token is not None and not any(item[0] == token for item in points.values()):
             router._operator_tokens.get(job_id, set()).discard(token)
     if created:
+        with router._state_lock:
+            # FAB-03: the review text and points are those of the package that held the removed placeholder. Drop
+            # them, so that no action is taken on stale text, until the requester re-sends and the package is rebuilt.
+            router._reviews.pop(job_id, None)
+            router.__dict__.setdefault("_review_stale", set()).add(job_id)
         try:
             router.vault.forget_operator_placeholder(conversation, token)
         except KeyError:
@@ -639,7 +658,9 @@ def undo(router, job_id, point_id, *, actor):
 
 def not_personal(router, job_id, point_id, *, actor):
     """"Not personal: leave it": the text stays as shown (a placeholder the gate already put in stays a placeholder;
-    this never sends an original). Recorded and counted per hold reason; never promoted automatically."""
+    this never sends an original). Recorded and counted per hold reason; never promoted automatically. Refused while
+    the review text is stale after an undo (FAB-03): the text the Operator would be confirming no longer exists."""
+    _not_stale(router, job_id)
     router.register.resolve_point(job_id, point_id, "not-personal", actor_identity=actor, now=router.clock())
     return view(router, job_id)
 

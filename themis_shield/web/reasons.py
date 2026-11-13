@@ -120,6 +120,10 @@ FIXED = {
         "The highlighted text of this job is not in this gate's memory (the gate restarted or the conversation "
         "expired); the requester sends again to rebuild it."
     ),
+    "REVIEW_REBUILD_REQUIRED": (
+        "An undo removed a placeholder from this job's package, so the highlighted text shown was out of date. The "
+        "requester sends again to rebuild the package; then settle the point on the new text."
+    ),
     "INVALID_REVIEW_ACTION": "The review action is invalid.",
     "INVALID_REPLACEMENT_SPAN": (
         "The chosen span must cover the point, keep whole placeholders and not be empty or blank."
