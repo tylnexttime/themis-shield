@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 import hashlib
 import json
 import re
+from threading import RLock
 
 from .detectors.escalation import INJECTION
 from .placeholders import (
@@ -271,6 +272,21 @@ def _state(router, job_id):
         _not_stale(router, job_id)
         raise GateFailure("REVIEW_UNAVAILABLE", 404)
     return state
+
+
+def _job_lock(router, job_id):
+    """RC-04 (second review): the lock that makes undo, replace and not-personal of one job run one at a time.
+
+    Handlers run in a thread pool (two Operator tabs, or two people on the one Operator credential), and an undo is
+    several steps: the register write, the token bookkeeping, the drop of the stale review text, the vault. Without it
+    a replace of the placeholder that lands between the first and the third step passes both FAB-03 guards and is
+    taken as "confirm as it is", and the value later goes out in clear."""
+    with router._state_lock:
+        locks = router.__dict__.setdefault("_review_locks", {})
+        lock = locks.get(job_id)
+        if lock is None:
+            lock = locks[job_id] = RLock()
+        return lock
 
 
 def _not_stale(router, job_id):
@@ -562,7 +578,12 @@ def replace(router, job_id, point_id, start, end, category, *, actor):
     """"Replace it": the span (confirmed or adjusted) becomes a placeholder in this job's codebook, marked
     ``de-identified-by-operator``. The clean package is rebuilt and re-bound on the next send; until then no stage
     two approval is possible. A span that is exactly the gate's own placeholder of the same category is confirmed
-    as it is (nothing changes)."""
+    as it is (nothing changes). Never runs inside an undo of the same job (RC-04)."""
+    with _job_lock(router, job_id):
+        return _replace(router, job_id, point_id, start, end, category, actor=actor)
+
+
+def _replace(router, job_id, point_id, start, end, category, *, actor):
     from .router import GateFailure
     from .vault import OPERATOR_SOURCE
     state = _state(router, job_id)
@@ -628,7 +649,16 @@ def undo(router, job_id, point_id, *, actor):
     replacement that added a placeholder removes it from the job's codebook (the conversation vault) and from the
     placeholders the rebuilt package must contain, and sends a ready package back to building, so the next send
     rebuilds it without that placeholder. A replacement made before the gate restarted cannot be undone (what it added
-    was kept in memory only), nor one whose placeholder was already sent or is in another job's package."""
+    was kept in memory only), nor one whose placeholder was already sent or is in another job's package.
+
+    Atomic with respect to replace and not-personal of the same job (RC-04): it holds the job's lock throughout, and
+    an undo that removes a placeholder marks the review text stale before it writes the register (restored if the
+    write fails), so no step of it leaves the stale text and the placeholder both usable."""
+    with _job_lock(router, job_id):
+        return _undo(router, job_id, point_id, actor=actor)
+
+
+def _undo(router, job_id, point_id, *, actor):
     from .router import GateFailure
     recorded = router.register.review_state(job_id)
     point = next(
@@ -658,18 +688,31 @@ def undo(router, job_id, point_id, *, actor):
                 raise GateFailure("PLACEHOLDER_SHARED", 409)
         if created and _in_use(router, job_id, conversation, token):
             raise GateFailure("PLACEHOLDER_IN_USE", 409)
-    router.register.undo_point(job_id, point_id, actor_identity=actor, reopen=created, now=router.clock())
+    saved, was_stale = None, False
+    if created:
+        with router._state_lock:
+            # FAB-03 / RC-04: the review text and points are those of the package that held the placeholder about to
+            # be removed. Drop them first, so that no action is taken on stale text at any step of this undo.
+            saved = router._reviews.pop(job_id, None)
+            stale = router.__dict__.setdefault("_review_stale", set())
+            was_stale = job_id in stale
+            stale.add(job_id)
+    try:
+        router.register.undo_point(job_id, point_id, actor_identity=actor, reopen=created, now=router.clock())
+    except BaseException:
+        if created:
+            with router._state_lock:
+                if saved is not None:
+                    router._reviews.setdefault(job_id, saved)
+                if not was_stale:
+                    router._review_stale.discard(job_id)
+        raise
     with router._state_lock:
         points = router._operator_points.get(job_id, {})
         points.pop(point_id, None)
         if token is not None and not any(item[0] == token for item in points.values()):
             router._operator_tokens.get(job_id, set()).discard(token)
     if created:
-        with router._state_lock:
-            # FAB-03: the review text and points are those of the package that held the removed placeholder. Drop
-            # them, so that no action is taken on stale text, until the requester re-sends and the package is rebuilt.
-            router._reviews.pop(job_id, None)
-            router.__dict__.setdefault("_review_stale", set()).add(job_id)
         try:
             router.vault.forget_operator_placeholder(conversation, token)
         except KeyError:
@@ -680,10 +723,12 @@ def undo(router, job_id, point_id, *, actor):
 def not_personal(router, job_id, point_id, *, actor):
     """"Not personal: leave it": the text stays as shown (a placeholder the gate already put in stays a placeholder;
     this never sends an original). Recorded and counted per hold reason; never promoted automatically. Refused while
-    the review text is stale after an undo (FAB-03): the text the Operator would be confirming no longer exists."""
-    _not_stale(router, job_id)
-    router.register.resolve_point(job_id, point_id, "not-personal", actor_identity=actor, now=router.clock())
-    return view(router, job_id)
+    the review text is stale after an undo (FAB-03): the text the Operator would be confirming no longer exists.
+    Never runs inside an undo of the same job (RC-04)."""
+    with _job_lock(router, job_id):
+        _not_stale(router, job_id)
+        router.register.resolve_point(job_id, point_id, "not-personal", actor_identity=actor, now=router.clock())
+        return view(router, job_id)
 
 
 def stop(router, job_id, point_id, *, actor):

@@ -26,6 +26,11 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   (sensitive) under the default switches, as in 0.4.0. The same file records, per opt-in configuration, which of them
   the switches still release (all but the one with a found name, for RC-01 with `policy-statements`); that table is a
   record, not a target.
+- **RC-04** the Operator's Undo is atomic with respect to "Replace it" and "Not personal": one lock per job covers the
+  three, and an undo that removes a placeholder marks the review text stale before it writes the register (restored if
+  the write fails). A replace from a second tab that arrived inside the undo was taken as "confirm as it is" and the
+  value later went out in clear; it now waits for the undo and is refused (`REVIEW_REBUILD_REQUIRED`). Tested with a
+  forced interleave from another thread and inside the register write.
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 

@@ -180,6 +180,9 @@ class Router:
         # FAB-03: jobs whose review text was dropped by an undo that removed a placeholder; no point of such a job is
         # settled until the requester re-sends and the package is rebuilt.
         self._review_stale = set()
+        # RC-04 (second review): one lock per job held across undo, replace and not-personal, so that no point action
+        # lands inside an undo (between its register write and its drop of the stale review text).
+        self._review_locks = {}
         self._detection_status = "not-yet-tested"
         # v0.3 detector canary (themis_shield.canary); None means no canary gating. Set from [canary] by integration.
         self.canary = None

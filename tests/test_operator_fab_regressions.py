@@ -1,4 +1,4 @@
-"""Operator console regressions from the independent review of candidate 0.5 (FAB-03, FAB-07).
+"""Operator console regressions from the independent reviews of candidate 0.5 (FAB-03, FAB-07, RC-04, RC-05).
 
 FAB-03: Replace, rebuild, Undo, Replace again sent the replaced value to the cloud in clear while the point read
 "replaced": after the undo the review text still showed the removed placeholder, and replacing "it" again was taken as
@@ -112,5 +112,144 @@ def test_fab_10_reveal_is_refused_once_the_job_is_closed(tmp_path):
         refused = await operator.post(f"{base}/reveal", json={})
         assert refused.status_code == 409 and refused.json()["error"]["code"] == "REVIEW_CLOSED"
         assert "original" not in refused.json()
+
+    _run(h, exercise)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# RC-04 (second review): the undo was not atomic. Between its register write and its drop of the stale review text, a
+# "Replace it" on the placeholder (a second Operator tab) passed both FAB-03 guards and was taken as "confirm as it
+# is", and the value later went out in clear. Now one lock per job covers undo, replace and not-personal, and an undo
+# that removes a placeholder marks the text stale before it writes the register. The interleave is forced by wrapping
+# ``register.undo_point``, as in the reviewer's reproduction.
+async def _replaced_and_rebuilt(h, client, operator):
+    job, view = await _held(client, operator)
+    point = view["points"][0]
+    base = f"/api/operator/{job}/points/{point['id']}"
+    replaced = await operator.post(
+        f"{base}/replace", json={"start": 0, "end": view["text"].index(" ships"), "category": "person"})
+    assert replaced.status_code == 200
+    await client.post("/v1/chat/completions", json=request(TEXT), headers={"X-Themis-Confirm": job})
+    (token,) = TOKEN.findall((await _review(operator, job))["text"])
+    return job, point["id"], base, token
+
+
+async def _never_sent_in_clear(h, client, operator, job):
+    """Re-send: the point is open on fresh text, approval is refused, and nothing with the value goes out."""
+    headers = {"X-Themis-Confirm": job}
+    await client.post("/v1/chat/completions", json=request(TEXT), headers=headers)
+    view = await _review(operator, job)
+    assert view["text"] is not None and view["unresolved"] == 1
+    assert view["points"][0]["resolution"] is None
+    refused = await operator.post(f"/api/operator/{job}/approve", json={"stage": 1, "reason": "ROUTINE_APPROVED"})
+    assert refused.status_code != 200
+    await client.post("/v1/chat/completions", json=request(TEXT), headers=headers)
+    assert all("Morrison" not in json.dumps(sent, ensure_ascii=False) for sent in h.fake.requests)
+
+
+def test_rc_04_a_replace_from_another_thread_waits_for_the_undo_and_is_then_refused(tmp_path):
+    import threading
+
+    from themis_shield import review as reviews
+
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, point_id, base, token = await _replaced_and_rebuilt(h, client, operator)
+        real = h.router.register.undo_point
+        seen = {}
+
+        def other_tab(action):
+            try:
+                if action == "replace":
+                    reviews.replace(h.router, job, point_id, 0, len(token), "person", actor="synthetic-operator")
+                else:
+                    reviews.not_personal(h.router, job, point_id, actor="synthetic-operator")
+                seen[action] = "accepted"
+            except Exception as failure:  # noqa: BLE001 - the code is what is asserted
+                seen[action] = getattr(failure, "code", repr(failure))
+
+        threads = []
+
+        def undo_point(*args, **kwargs):
+            for action in ("replace", "not-personal"):
+                thread = threading.Thread(target=other_tab, args=(action,), daemon=True)
+                thread.start()
+                threads.append(thread)
+            for thread in threads:
+                thread.join(0.3)
+                assert thread.is_alive(), "a point action ran inside the undo"  # blocked on the job's lock
+            return real(*args, **kwargs)
+
+        h.router.register.undo_point = undo_point
+        try:
+            undone = await operator.post(f"{base}/undo", json={})
+        finally:
+            h.router.register.undo_point = real
+        assert undone.status_code == 200, undone.text
+        for thread in threads:
+            thread.join(5)
+            assert not thread.is_alive()
+        assert seen == {"replace": "REVIEW_REBUILD_REQUIRED", "not-personal": "REVIEW_REBUILD_REQUIRED"}
+        await _never_sent_in_clear(h, client, operator, job)
+
+    _run(h, exercise)
+
+
+def test_rc_04_the_reviewers_interleave_inside_the_undo_is_refused(tmp_path):
+    """The reviewer's ``test_c``: the replace lands inside ``undo_point`` itself (same thread, so the lock is
+    re-entered); the review text is already stale there, so it is refused."""
+    from themis_shield import review as reviews
+
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, point_id, base, token = await _replaced_and_rebuilt(h, client, operator)
+        real = h.router.register.undo_point
+        seen = {}
+
+        def undo_point(*args, **kwargs):
+            for when in ("before", "after"):
+                if when == "after":
+                    out = real(*args, **kwargs)
+                try:
+                    reviews.replace(h.router, job, point_id, 0, len(token), "person", actor="synthetic-operator")
+                    seen[when] = "accepted"
+                except Exception as failure:  # noqa: BLE001
+                    seen[when] = getattr(failure, "code", repr(failure))
+            return out
+
+        h.router.register.undo_point = undo_point
+        try:
+            undone = await operator.post(f"{base}/undo", json={})
+        finally:
+            h.router.register.undo_point = real
+        assert undone.status_code == 200, undone.text
+        assert seen == {"before": "REVIEW_REBUILD_REQUIRED", "after": "REVIEW_REBUILD_REQUIRED"}
+        await _never_sent_in_clear(h, client, operator, job)
+
+    _run(h, exercise)
+
+
+def test_rc_04_a_failed_undo_leaves_the_review_as_it_was(tmp_path):
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, point_id, base, token = await _replaced_and_rebuilt(h, client, operator)
+        real = h.router.register.undo_point
+
+        def undo_point(*args, **kwargs):
+            raise RuntimeError("synthetic register failure")
+
+        h.router.register.undo_point = undo_point
+        try:
+            failed = await operator.post(f"{base}/undo", json={})
+        finally:
+            h.router.register.undo_point = real
+        assert failed.status_code != 200
+        view = await _review(operator, job)
+        assert view["text"] is not None and token in view["text"]  # not stale: the undo did not happen
+        assert view["points"][0]["resolution"]["action"] == "replaced"
+        assert (await operator.post(f"{base}/undo", json={})).status_code == 200  # and it can be retried
 
     _run(h, exercise)
