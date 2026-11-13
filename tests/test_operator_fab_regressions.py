@@ -99,3 +99,18 @@ def test_fab_07b_undoing_the_first_of_two_same_value_replacements_is_refused_at_
         assert h.register.get_details(job)["status"] != "Refused"
 
     _run(h, exercise)
+
+
+def test_fab_10_reveal_is_refused_once_the_job_is_closed(tmp_path):
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, view = await _held(client, operator)
+        base = f"/api/operator/{job}/points/{view['points'][0]['id']}"
+        assert (await operator.post(f"{base}/reveal", json={})).status_code == 200  # open: allowed
+        assert (await operator.post(f"{base}/stop", json={})).status_code == 200
+        refused = await operator.post(f"{base}/reveal", json={})
+        assert refused.status_code == 409 and refused.json()["error"]["code"] == "REVIEW_CLOSED"
+        assert "original" not in refused.json()
+
+    _run(h, exercise)

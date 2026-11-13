@@ -527,8 +527,13 @@ def reveal(router, job_id, point_id):
     Read from the vault on request and returned to this request only: no register row, audit row or log line is
     written, and the response is marked no-store by the app.
     """
+    from .router import GateFailure
     state = _state(router, job_id)
-    if state.manifest_hash != router.register.get_details(job_id)["manifest_hash"]:
+    row = router.register.get_details(job_id)
+    if end_state(row) is not None:
+        # FAB-10: a stopped, refused or completed job is closed; its originals are no longer shown.
+        raise GateFailure("REVIEW_CLOSED", 409)
+    if state.manifest_hash != row["manifest_hash"]:
         raise KeyError("the clean package changed")
     point = _held(state, point_id)
     if point["kind"] == "document":

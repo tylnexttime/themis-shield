@@ -140,6 +140,7 @@ FIXED = {
         "The placeholder this replacement added is already part of what was sent, or of another job's package, so "
         "it is kept and the replacement cannot be undone."
     ),
+    "REVIEW_CLOSED": "This job is closed (stopped, refused or completed), so its originals are no longer shown.",
     "PLACEHOLDER_SHARED": (
         "Another replacement in this job reuses the placeholder this one added (the same value was replaced there "
         "too). Undo that replacement first, then this one."

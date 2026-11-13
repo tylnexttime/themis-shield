@@ -283,7 +283,8 @@ expires, the requester sends again to rebuild it.
 (`POST /api/operator/{job}/points/{point}/reveal`), because some points can only be judged that way (is "Blake" a
 person or a product?). The value is read from the vault for that request, returned in that response only (no-store),
 and shown inside that point on the page; re-rendering the queue, reloading or leaving the page drops it. No register
-row, audit row or log line is written by a reveal. Like every `/api/operator/*` route it needs the Operator
+row, audit row or log line is written by a reveal. A reveal is refused once the job is closed (stopped, refused or completed:
+`REVIEW_CLOSED`, FAB-10). Like every `/api/operator/*` route it needs the Operator
 credential; the client token and the chat session are refused.
 
 **Three actions per point.** (With the cloud trip-wire's `before_human` mode on, the cloud model has read the
