@@ -1,0 +1,80 @@
+{
+ "written_utc": "2026-11-13T09:02:20+00:00",
+ "identity": {
+  "model": "gemma4-26b-a4b",
+  "file": "gemma-4-26B-A4B-it-UD-IQ3_XXS.gguf",
+  "args": [
+   "-ngl",
+   "99",
+   "-ncmoe",
+   "18",
+   "-c",
+   "16384"
+  ],
+  "ctx": 16384,
+  "recipe": "typed-prefill-v1"
+ },
+ "label_ids": {
+  "A": [
+   562,
+   236776
+  ],
+  "B": [
+   603,
+   236799
+  ],
+  "C": [
+   565,
+   236780
+  ],
+  "D": [
+   622,
+   236796
+  ],
+  "E": [
+   645,
+   236788
+  ],
+  "F": [
+   633,
+   236811
+  ],
+  "G": [
+   667,
+   236823
+  ],
+  "H": [
+   640,
+   236814
+  ]
+ },
+ "typed_settings": {
+  "enabled": true,
+  "families": [],
+  "subject_lift": [
+   "general",
+   "fiction"
+  ],
+  "subject_margin": 0.5,
+  "subject_capture": true,
+  "max_document_chars": 4000,
+  "temperatures": {
+   "Q-S": 3.03,
+   "Q-M": 1.0,
+   "Q-N": 1.0,
+   "Q-P": 1.0,
+   "Q-I": 3.03,
+   "Q-D": 3.03,
+   "Q-G": 3.03
+  },
+  "margin": 0.2,
+  "min_label_mass": 0.9,
+  "mixed_families": false,
+  "indirect_substitute": true,
+  "ask_all": false,
+  "max_state_chars": 1100,
+  "model_role": "gemma4-26b-a4b",
+  "recipe": "typed-prefill-v1"
+ },
+ "probe": "subject-check"
+}

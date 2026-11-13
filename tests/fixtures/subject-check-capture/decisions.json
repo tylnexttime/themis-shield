@@ -1,0 +1,1182 @@
+[
+ {
+  "id": "rc01-1",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 58,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.986333,
+     "fiction": 0.004033,
+     "policy_or_guidance": 0.004005,
+     "technical": 0.002372,
+     "unclear": 0.003257
+    },
+    "label_mass": 1.0,
+    "margin": 0.982301,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 58,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.995134,
+     "general_rule": 0.001804,
+     "fiction_or_example": 0.001799,
+     "unclear": 0.001264
+    },
+    "label_mass": 1.0,
+    "margin": 0.99333,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc01-2",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:unsure"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 66,
+    "choice": "policy_or_guidance",
+    "unsure": true,
+    "probabilities": {
+     "about_real_people": 0.455523,
+     "fiction": 0.00826,
+     "policy_or_guidance": 0.521912,
+     "technical": 0.004479,
+     "unclear": 0.009827
+    },
+    "label_mass": 0.999999,
+    "margin": 0.066389,
+    "order_agree": false,
+    "reason": "order-disagree"
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 66,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.994651,
+     "general_rule": 0.002402,
+     "fiction_or_example": 0.001951,
+     "unclear": 0.000996
+    },
+    "label_mass": 1.0,
+    "margin": 0.992249,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc01-3",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 56,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.998418,
+     "fiction": 0.00067,
+     "policy_or_guidance": 0.000205,
+     "technical": 0.000336,
+     "unclear": 0.00037
+    },
+    "label_mass": 1.0,
+    "margin": 0.997713,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 56,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.99837,
+     "general_rule": 0.000799,
+     "fiction_or_example": 0.000522,
+     "unclear": 0.000308
+    },
+    "label_mass": 1.0,
+    "margin": 0.997571,
+    "order_agree": true,
+    "reason": null,
+    "guard": "pronoun"
+   }
+  ]
+ },
+ {
+  "id": "rc01-4",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 74,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.996567,
+     "fiction": 0.001553,
+     "policy_or_guidance": 0.000564,
+     "technical": 0.000627,
+     "unclear": 0.000689
+    },
+    "label_mass": 1.0,
+    "margin": 0.995014,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 74,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.996746,
+     "general_rule": 0.001459,
+     "fiction_or_example": 0.001424,
+     "unclear": 0.00037
+    },
+    "label_mass": 1.0,
+    "margin": 0.995287,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc01-5",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 43,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.987163,
+     "fiction": 0.004773,
+     "policy_or_guidance": 0.003459,
+     "technical": 0.00138,
+     "unclear": 0.003225
+    },
+    "label_mass": 1.0,
+    "margin": 0.98239,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 43,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.988234,
+     "general_rule": 0.003124,
+     "fiction_or_example": 0.003543,
+     "unclear": 0.005099
+    },
+    "label_mass": 1.0,
+    "margin": 0.983135,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc01-6",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:unsure"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 58,
+    "choice": "policy_or_guidance",
+    "unsure": true,
+    "probabilities": {
+     "about_real_people": 0.279028,
+     "fiction": 0.008763,
+     "policy_or_guidance": 0.696722,
+     "technical": 0.005128,
+     "unclear": 0.010358
+    },
+    "label_mass": 0.999999,
+    "margin": 0.417694,
+    "order_agree": true,
+    "reason": "margin"
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 58,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.992547,
+     "general_rule": 0.003171,
+     "fiction_or_example": 0.002134,
+     "unclear": 0.002147
+    },
+    "label_mass": 1.0,
+    "margin": 0.989377,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc01-7",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 68,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.867833,
+     "fiction": 0.024289,
+     "policy_or_guidance": 0.080065,
+     "technical": 0.00867,
+     "unclear": 0.019143
+    },
+    "label_mass": 0.999997,
+    "margin": 0.787768,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 68,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.987721,
+     "general_rule": 0.003424,
+     "fiction_or_example": 0.005294,
+     "unclear": 0.003561
+    },
+    "label_mass": 1.0,
+    "margin": 0.982427,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc01-8",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:guard"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 69,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.001151,
+     "fiction": 0.000978,
+     "policy_or_guidance": 0.995899,
+     "technical": 0.001135,
+     "unclear": 0.000837
+    },
+    "label_mass": 1.0,
+    "margin": 0.994749,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 69,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.934526,
+     "general_rule": 0.038571,
+     "fiction_or_example": 0.011903,
+     "unclear": 0.015001
+    },
+    "label_mass": 0.999998,
+    "margin": 0.895955,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc01-9",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 60,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.997089,
+     "fiction": 0.001061,
+     "policy_or_guidance": 0.000673,
+     "technical": 0.000721,
+     "unclear": 0.000456
+    },
+    "label_mass": 1.0,
+    "margin": 0.996028,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 60,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.998454,
+     "general_rule": 0.000995,
+     "fiction_or_example": 0.00055,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.997459,
+    "order_agree": true,
+    "reason": null,
+    "guard": "name"
+   }
+  ]
+ },
+ {
+  "id": "rc01-10",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 60,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.996758,
+     "fiction": 0.001126,
+     "policy_or_guidance": 0.000767,
+     "technical": 0.00081,
+     "unclear": 0.000538
+    },
+    "label_mass": 1.0,
+    "margin": 0.995632,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 60,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.998454,
+     "general_rule": 0.000995,
+     "fiction_or_example": 0.00055,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.997459,
+    "order_agree": true,
+    "reason": null,
+    "guard": "finding"
+   }
+  ]
+ },
+ {
+  "id": "rc02-1",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 77,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.996392,
+     "fiction": 0.001977,
+     "policy_or_guidance": 0.000487,
+     "technical": 0.00058,
+     "unclear": 0.000563
+    },
+    "label_mass": 1.0,
+    "margin": 0.994415,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 77,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.98796,
+     "general_rule": 0.003279,
+     "fiction_or_example": 0.005082,
+     "unclear": 0.003679
+    },
+    "label_mass": 1.0,
+    "margin": 0.982879,
+    "order_agree": true,
+    "reason": null,
+    "guard": "name"
+   }
+  ]
+ },
+ {
+  "id": "rc02-2",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 77,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.996542,
+     "fiction": 0.001903,
+     "policy_or_guidance": 0.000442,
+     "technical": 0.000578,
+     "unclear": 0.000534
+    },
+    "label_mass": 1.0,
+    "margin": 0.994639,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 77,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.98796,
+     "general_rule": 0.003279,
+     "fiction_or_example": 0.005082,
+     "unclear": 0.003679
+    },
+    "label_mass": 1.0,
+    "margin": 0.982879,
+    "order_agree": true,
+    "reason": null,
+    "guard": "finding"
+   }
+  ]
+ },
+ {
+  "id": "rc02-3",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:guard"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 67,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.071451,
+     "fiction": 0.009773,
+     "policy_or_guidance": 0.902508,
+     "technical": 0.006588,
+     "unclear": 0.009681
+    },
+    "label_mass": 0.999999,
+    "margin": 0.831056,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 67,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.023908,
+     "general_rule": 0.966201,
+     "fiction_or_example": 0.006727,
+     "unclear": 0.003164
+    },
+    "label_mass": 1.0,
+    "margin": 0.942292,
+    "order_agree": true,
+    "reason": null,
+    "guard": "name"
+   }
+  ]
+ },
+ {
+  "id": "rc02-4",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:guard"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 58,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.000253,
+     "fiction": 0.000596,
+     "policy_or_guidance": 0.998203,
+     "technical": 0.000537,
+     "unclear": 0.000411
+    },
+    "label_mass": 1.0,
+    "margin": 0.997607,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 58,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.000796,
+     "general_rule": 0.997793,
+     "fiction_or_example": 0.000973,
+     "unclear": 0.000438
+    },
+    "label_mass": 1.0,
+    "margin": 0.99682,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "rc02-5",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:guard"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 63,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.0,
+     "fiction": 0.000267,
+     "policy_or_guidance": 0.999055,
+     "technical": 0.000415,
+     "unclear": 0.000262
+    },
+    "label_mass": 1.0,
+    "margin": 0.99864,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 0,
+    "end": 63,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.000274,
+     "general_rule": 0.999174,
+     "fiction_or_example": 0.000551,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.998623,
+    "order_agree": true,
+    "reason": null,
+    "guard": "definite"
+   }
+  ]
+ },
+ {
+  "id": "policy-faq",
+  "decision": "RELEASE",
+  "reasons": [],
+  "typed": [
+   "lifted:ASK:sensitive:Q-D+Q-G:general"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 160,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.0,
+     "fiction": 0.0,
+     "policy_or_guidance": 1.0,
+     "technical": 0.0,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.999573,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 60,
+    "end": 122,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.000683,
+     "general_rule": 0.998392,
+     "fiction_or_example": 0.000925,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.997467,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "policy-yaml",
+  "decision": "RELEASE",
+  "reasons": [],
+  "typed": [
+   "lifted:ASK:sensitive:Q-D+Q-G:general"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 204,
+    "choice": "technical",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.000324,
+     "fiction": 0.00046,
+     "policy_or_guidance": 0.000747,
+     "technical": 0.997967,
+     "unclear": 0.000501
+    },
+    "label_mass": 1.0,
+    "margin": 0.99722,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 76,
+    "end": 158,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.0014,
+     "general_rule": 0.996949,
+     "fiction_or_example": 0.001227,
+     "unclear": 0.000423
+    },
+    "label_mass": 1.0,
+    "margin": 0.995549,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "policy-log",
+  "decision": "RELEASE",
+  "reasons": [],
+  "typed": [
+   "lifted:ASK:sensitive:Q-D+Q-G:general"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 255,
+    "choice": "technical",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.011673,
+     "fiction": 0.009599,
+     "policy_or_guidance": 0.05743,
+     "technical": 0.905117,
+     "unclear": 0.016181
+    },
+    "label_mass": 0.999989,
+    "margin": 0.847687,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 69,
+    "end": 203,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.00019,
+     "general_rule": 0.999523,
+     "fiction_or_example": 0.000287,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.999194,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "policy-union",
+  "decision": "RELEASE",
+  "reasons": [],
+  "typed": [
+   "lifted:ASK:sensitive:Q-D+Q-G:general"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 327,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.0,
+     "fiction": 0.0,
+     "policy_or_guidance": 1.0,
+     "technical": 0.0,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.999629,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 135,
+    "end": 253,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.0,
+     "general_rule": 0.999435,
+     "fiction_or_example": 0.000565,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.99887,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "policy-checks",
+  "decision": "RELEASE",
+  "reasons": [],
+  "typed": [
+   "lifted:ASK:sensitive:Q-D+Q-G:general"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 296,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.0,
+     "fiction": 0.000202,
+     "policy_or_guidance": 0.999798,
+     "technical": 0.0,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.999455,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 106,
+    "end": 212,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.000233,
+     "general_rule": 0.999189,
+     "fiction_or_example": 0.000578,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.99861,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "specific-team",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 131,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.866864,
+     "fiction": 0.010078,
+     "policy_or_guidance": 0.014127,
+     "technical": 0.00334,
+     "unclear": 0.105591
+    },
+    "label_mass": 0.999997,
+    "margin": 0.761273,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 31,
+    "end": 100,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.997176,
+     "general_rule": 0.001513,
+     "fiction_or_example": 0.000895,
+     "unclear": 0.000417
+    },
+    "label_mass": 1.0,
+    "margin": 0.995663,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "specific-site",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 133,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.995053,
+     "fiction": 0.001912,
+     "policy_or_guidance": 0.00069,
+     "technical": 0.00092,
+     "unclear": 0.001424
+    },
+    "label_mass": 1.0,
+    "margin": 0.993141,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 21,
+    "end": 99,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.993551,
+     "general_rule": 0.003166,
+     "fiction_or_example": 0.001656,
+     "unclear": 0.001627
+    },
+    "label_mass": 1.0,
+    "margin": 0.990385,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "specific-shift",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:unsure"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 144,
+    "choice": "about_real_people",
+    "unsure": true,
+    "probabilities": {
+     "about_real_people": 0.588028,
+     "fiction": 0.011706,
+     "policy_or_guidance": 0.373048,
+     "technical": 0.005538,
+     "unclear": 0.02168
+    },
+    "label_mass": 0.999998,
+    "margin": 0.21498,
+    "order_agree": false,
+    "reason": "order-disagree"
+   },
+   {
+    "family": "Q-G",
+    "start": 30,
+    "end": 121,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.95925,
+     "general_rule": 0.027986,
+     "fiction_or_example": 0.00603,
+     "unclear": 0.006734
+    },
+    "label_mass": 0.999999,
+    "margin": 0.931264,
+    "order_agree": true,
+    "reason": null
+   }
+  ]
+ },
+ {
+  "id": "fiction-story",
+  "decision": "RELEASE",
+  "reasons": [],
+  "typed": [
+   "lifted:ASK:sensitive:Q-D+Q-G:fiction"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 124,
+    "choice": "fiction",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.000265,
+     "fiction": 0.999164,
+     "policy_or_guidance": 0.0,
+     "technical": 0.000321,
+     "unclear": 0.00025
+    },
+    "label_mass": 1.0,
+    "margin": 0.998714,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 17,
+    "end": 87,
+    "choice": "fiction_or_example",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.016402,
+     "general_rule": 0.002743,
+     "fiction_or_example": 0.977172,
+     "unclear": 0.003683
+    },
+    "label_mass": 1.0,
+    "margin": 0.96077,
+    "order_agree": true,
+    "reason": null,
+    "guard": "no-class"
+   }
+  ]
+ },
+ {
+  "id": "real-as-story",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 145,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.999292,
+     "fiction": 0.000531,
+     "policy_or_guidance": 0.0,
+     "technical": 0.000177,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.998618,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 31,
+    "end": 117,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.998942,
+     "general_rule": 0.000722,
+     "fiction_or_example": 0.000336,
+     "unclear": 0.0
+    },
+    "label_mass": 1.0,
+    "margin": 0.99822,
+    "order_agree": true,
+    "reason": null,
+    "guard": "no-class"
+   }
+  ]
+ }
+]

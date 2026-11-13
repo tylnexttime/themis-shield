@@ -550,3 +550,91 @@ def test_runner_reads_the_subject_settings(tmp_path, monkeypatch):
     path.write_text(json.dumps({"subject_everything": True}), encoding="utf-8")
     with pytest.raises(SystemExit):
         run_eval.configure_typed_args(Args)
+
+
+CAPTURE = ROOT / "tests" / "fixtures" / "subject-check-capture"
+
+
+class _Refused(SystemExit):
+    pass
+
+
+def _with_recorded_answers(monkeypatch, **settings):
+    """Every probe document decided with the real model's recorded answers (a replay: no model, no GPU)."""
+    monkeypatch.syspath_prepend(str(ROOT / "eval"))
+    import typed_capture
+
+    manifest = json.loads((CAPTURE / "manifest.json").read_text(encoding="utf-8"))
+    configure_typed(**{**PROBE_SETTINGS, **settings})
+    replay = typed_capture.ReplayTypedRuntime(CAPTURE, manifest["identity"], lambda: [], None, _Refused)
+    return {case_id: run(text, replay, entities) for case_id, text, entities in probe_documents()}
+
+
+def _held(result):
+    return result.decision == Decision.ASK and ReasonCode.SENSITIVE in result.reasons
+
+
+def test_the_capture_is_value_free():
+    # Prompt keys, the model identity and log-probabilities only: no document text in the fixture.
+    lines = (CAPTURE / "typed.jsonl").read_text(encoding="utf-8").splitlines()
+    assert lines
+    for line in lines:
+        record = json.loads(line)
+        assert set(record) <= {"key", "case_id", "family", "order", "model_identity", "outcome", "top", "timings"}
+        assert record["outcome"] == "ok" and record["family"] in SUBJECT_FAMILIES
+    blob = (CAPTURE / "typed.jsonl").read_text(encoding="utf-8") + (CAPTURE / "decisions.json").read_text("utf-8")
+    for _, text, _ in probe_documents():
+        assert text.splitlines()[-1] not in blob
+
+
+@pytest.mark.parametrize("paths", [["general"], ["general", "fiction"]])
+def test_reviewer_sentences_stay_held_with_the_real_models_answers(monkeypatch, paths):
+    results = _with_recorded_answers(monkeypatch, subject_lift=paths)
+    reviewer = {case_id: result for case_id, result in results.items() if case_id.startswith("rc")}
+    assert len(reviewer) == 15
+    assert [case_id for case_id, result in reviewer.items() if not _held(result)] == []
+
+
+# What the recorded answers lead to for every probe document, both paths on (the honest record of one live run of
+# the 26B on 13/11/2026, not a target: if the wording or the model changes, record again and update this table).
+KNOWN_WITH_THE_REAL_MODEL = {
+    **{f"rc01-{n}": "held" for n in range(1, 11)}, **{f"rc02-{n}": "held" for n in range(1, 6)},
+    "policy-faq": "general", "policy-yaml": "general", "policy-log": "general", "policy-union": "general",
+    "policy-checks": "general",
+    # Particular people in sentences the wording veto does not catch: here the model's answers held all three.
+    "specific-team": "held", "specific-site": "held", "specific-shift": "held",
+    "fiction-story": "fiction", "real-as-story": "held",
+}
+# The model alone is not enough: for these reviewer sentences it answered "a policy text" and "a general rule" with
+# a clear margin under both orders. Only the deterministic veto kept them held ("the placement", "the open ward",
+# "14 Wattle Street").
+THE_MODEL_ALONE_WOULD_RELEASE = {"rc02-3", "rc02-4", "rc02-5"}
+
+
+def test_what_the_real_models_answers_lead_to(monkeypatch):
+    results = _with_recorded_answers(monkeypatch)
+    observed = {}
+    for case_id, result in results.items():
+        lifted = [note.rsplit(":", 1)[-1] for note in result.policy_result.typed if note.startswith("lifted:")]
+        observed[case_id] = lifted[0] if result.decision == Decision.RELEASE and lifted else "held"
+        assert result.decision == Decision.RELEASE or _held(result)
+    assert observed == KNOWN_WITH_THE_REAL_MODEL
+    # With only the general path on, the story is held as well.
+    general = _with_recorded_answers(monkeypatch, subject_lift=["general"])
+    assert _held(general["fiction-story"]) and general["policy-union"].decision == Decision.RELEASE
+
+
+def test_the_model_alone_would_release_three_reviewer_sentences():
+    from themis_shield.detectors.typed import SUBJECT_CHOICES, SUBJECT_KINDS
+
+    rows = json.loads((CAPTURE / "decisions.json").read_text(encoding="utf-8"))
+    alone = set()
+    for row in rows:
+        document = next(a for a in row["answers"] if a["family"] == "Q-D")
+        path = None if document["unsure"] else SUBJECT_KINDS.get(document["choice"])
+        sentences_ = [a for a in row["answers"] if a["family"] == "Q-G"]
+        if path and all(not a["unsure"] and a["choice"] == SUBJECT_CHOICES[path] for a in sentences_):
+            if row["id"].startswith("rc"):
+                alone.add(row["id"])
+                assert all(a.get("guard") for a in sentences_) and row["decision"] == "ASK"
+    assert alone == THE_MODEL_ALONE_WOULD_RELEASE

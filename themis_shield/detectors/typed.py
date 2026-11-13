@@ -116,12 +116,13 @@ FAMILIES: dict[str, dict[str, Any]] = {
         "qid": "q_g",
         "instructions": "Who is the flagged sentence between [[ and ]] about: \"{target}\"?",
         "options": (
-            ("particular_person", "a particular person or particular people: someone named, described by a role or "
+            ("particular_person", "a particular real person or real people: someone named, described by a role or "
                                   "relation (the cook, our receptionist, her brother), written as I, you, he, she or "
                                   "they, or the people in one particular case, team, household or place"),
             ("general_rule", "no one in particular: a general rule, policy, entitlement or public information about "
                              "a whole class of people"),
-            ("fiction_or_example", "an invented character in a story, or a made-up example, template or hypothetical"),
+            ("fiction_or_example", "nobody real: a character in a story the text is telling, or a made-up example, "
+                                   "template or hypothetical"),
             ("unclear", "the text does not show which"),
         ),
     },
