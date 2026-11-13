@@ -27,7 +27,10 @@ both option orders and the document-level answer (see ``policy.py``).
   ask"): "Staff in payroll have been diagnosed with depression." names a class and states a fact about the people in
   it;
 - ``located``: a class of people narrowed to one place or time ("staff on nights", "any employee in room 4", "tenants
-  in unit 12"): the people there, not everyone of that kind ("at any stage", "in all departments" are not places).
+  in unit 12", "staff with a record in the finance team"): the people there, not everyone of that kind ("at any
+  stage", "in all departments", "in the workplace" are not places);
+- ``dated``: a point in time ("last week", "yesterday", "this morning", "recently", "since March"): a rule is not
+  about last week.
 """
 
 from __future__ import annotations
@@ -116,6 +119,18 @@ _LOCATING = frozenset(("in", "on", "at", "from", "near", "inside", "outside"))
 _NOT_A_PLACE = frozenset((
     "any all every each either both general particular principle practice employment writing advance addition "
     "accordance line full part time need good work").split())
+# A locating word and a definite phrase anywhere in the sentence ("in the finance team", "at this depot", "on the night
+# roster") is one place, unless the phrase is the whole organisation or an abstract thing ("in the workplace", "at the
+# time", "in the same way").
+_DEFINITE_PLACE = re.compile(r"(?i)\b(?:in|on|at|from|within|inside|outside|near)\s+(?:the|this|that|these|those)\b")
+_WHOLE_ORGANISATION = frozenset((
+    "organisation organization company college university school institute council authority agency business "
+    "workplace employer government sector industry law act legislation policy award agreement code").split())
+# A point in time. Lower case for the bare words; a rule has no "last week".
+_DATED = re.compile(
+    r"\b(?:last\s+(?:week|month|year|night|shift|term|friday|monday|tuesday|wednesday|thursday|saturday|sunday)"
+    r"|yesterday|today|tonight|tomorrow|recently|currently|this\s+(?:morning|afternoon|evening|week|month|year|term)"
+    r"|at\s+present|so\s+far|since\s+(?:[A-Z][a-z]+|\d{4})|\d+\s+(?:days?|weeks?|months?|years?)\s+ago)\b")
 _JOINERS = frozenset(("and", "of", "for", "&"))
 _OPENING = "\"'“‘([{:*•>#|–—"
 
@@ -206,7 +221,15 @@ def wording_veto(text: str, start: int, end: int) -> str | None:
         return "someone"
     if _REPORTED.search(sentence):
         return "reported"
+    if _DATED.search(sentence):
+        return "dated"
     tokens = [(m.start(), m.end(), m.group()) for m in _WORD.finditer(text, start, end)]
+    for match in _DEFINITE_PLACE.finditer(sentence):
+        after = next((k for k, token in enumerate(tokens) if token[0] >= start + match.end()), None)
+        phrase = [] if after is None else _phrase(text, tokens, after)
+        words = [tokens[k][2].casefold() for k in phrase]
+        if not any(word in HARMLESS_HEADS or word in _WHOLE_ORGANISATION for word in words):
+            return "located"
     for at, (_, _, word) in enumerate(tokens):
         low = word.casefold()
         if not (_class_word(low, listed=True) or low in ROLE_WORDS):
@@ -214,7 +237,10 @@ def wording_veto(text: str, start: int, end: int) -> str | None:
         for k in range(at + 1, min(at + 4, len(tokens) - 1)):
             if re.search(r"[^\s\w'’-]", text[tokens[k - 1][1]:tokens[k][0]]):
                 break  # punctuation ends the phrase
-            if tokens[k][2].casefold() in _LOCATING and tokens[k + 1][2].casefold() not in _NOT_A_PLACE:
+            following = tokens[k + 1][2].casefold()
+            if following in _THE or following in _DEMONSTRATIVE:
+                break  # a definite phrase: read above, where the whole organisation is not a place
+            if tokens[k][2].casefold() in _LOCATING and following not in _NOT_A_PLACE:
                 return "located"
     excused: set[int] = set()
     for at, (_, _, word) in enumerate(tokens):

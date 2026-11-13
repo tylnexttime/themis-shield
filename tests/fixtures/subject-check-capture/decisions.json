@@ -987,7 +987,8 @@
     "label_mass": 1.0,
     "margin": 0.995663,
     "order_agree": true,
-    "reason": null
+    "reason": null,
+    "guard": "no-rule"
    }
   ]
  },
@@ -1034,7 +1035,8 @@
     "label_mass": 1.0,
     "margin": 0.990385,
     "order_agree": true,
-    "reason": null
+    "reason": null,
+    "guard": "no-rule"
    }
   ]
  },
@@ -1081,7 +1083,8 @@
     "label_mass": 0.999999,
     "margin": 0.931264,
     "order_agree": true,
-    "reason": null
+    "reason": null,
+    "guard": "located"
    }
   ]
  },
@@ -1176,6 +1179,195 @@
     "order_agree": true,
     "reason": null,
     "guard": "no-class"
+   }
+  ]
+ },
+ {
+  "id": "mixed-handover",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:answered-keep"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 111,
+    "choice": "about_real_people",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.949001,
+     "fiction": 0.014653,
+     "policy_or_guidance": 0.013262,
+     "technical": 0.003393,
+     "unclear": 0.019691
+    },
+    "label_mass": 0.999998,
+    "margin": 0.92931,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 15,
+    "end": 84,
+    "choice": "particular_person",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.96372,
+     "general_rule": 0.014658,
+     "fiction_or_example": 0.007544,
+     "unclear": 0.014078
+    },
+    "label_mass": 0.999999,
+    "margin": 0.949061,
+    "order_agree": true,
+    "reason": null,
+    "guard": "dated"
+   }
+  ]
+ },
+ {
+  "id": "mixed-team",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:guard"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 130,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.012009,
+     "fiction": 0.004126,
+     "policy_or_guidance": 0.976326,
+     "technical": 0.00365,
+     "unclear": 0.003889
+    },
+    "label_mass": 1.0,
+    "margin": 0.964317,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 21,
+    "end": 91,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.111402,
+     "general_rule": 0.881299,
+     "fiction_or_example": 0.004653,
+     "unclear": 0.002646
+    },
+    "label_mass": 0.999999,
+    "margin": 0.769896,
+    "order_agree": true,
+    "reason": null,
+    "guard": "located"
+   }
+  ]
+ },
+ {
+  "id": "mixed-as-policy",
+  "decision": "ASK",
+  "reasons": [
+   "ASK:sensitive"
+  ],
+  "typed": [
+   "kept:ASK:sensitive:guard"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 115,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.010235,
+     "fiction": 0.003195,
+     "policy_or_guidance": 0.980104,
+     "technical": 0.00292,
+     "unclear": 0.003546
+    },
+    "label_mass": 1.0,
+    "margin": 0.969869,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 45,
+    "end": 114,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.089054,
+     "general_rule": 0.892238,
+     "fiction_or_example": 0.010948,
+     "unclear": 0.00776
+    },
+    "label_mass": 0.999999,
+    "margin": 0.803184,
+    "order_agree": true,
+    "reason": null,
+    "guard": "dated"
+   }
+  ]
+ },
+ {
+  "id": "policy-parole",
+  "decision": "RELEASE",
+  "reasons": [],
+  "typed": [
+   "lifted:ASK:sensitive:Q-D+Q-G:general"
+  ],
+  "answers": [
+   {
+    "family": "Q-D",
+    "start": 0,
+    "end": 122,
+    "choice": "policy_or_guidance",
+    "unsure": false,
+    "probabilities": {
+     "about_real_people": 0.000184,
+     "fiction": 0.000275,
+     "policy_or_guidance": 0.998779,
+     "technical": 0.000465,
+     "unclear": 0.000297
+    },
+    "label_mass": 1.0,
+    "margin": 0.998314,
+    "order_agree": true,
+    "reason": null
+   },
+   {
+    "family": "Q-G",
+    "start": 26,
+    "end": 121,
+    "choice": "general_rule",
+    "unsure": false,
+    "probabilities": {
+     "particular_person": 0.000829,
+     "general_rule": 0.998189,
+     "fiction_or_example": 0.000719,
+     "unclear": 0.000262
+    },
+    "label_mass": 1.0,
+    "margin": 0.997361,
+    "order_agree": true,
+    "reason": null
    }
   ]
  }

@@ -112,13 +112,15 @@ GENERAL_RULES = [
     "Reasonable adjustments are available to any employee with a disability.",
     "Staff should note that adjustments are available to anyone with a disability.",
     "Employees in all departments may ask for a prayer room.",
+    "Staff with a disability at the Institute can request adjustments.",
+    "Employees in the workplace with a disability can request adjustments.",
     "Staff with a disability can request reasonable adjustments at any stage of employment.",
 ]
-# Known to pass the vetoes although they speak of particular people (a fact and a rule in one sentence, no place right
-# after the class): here only the model's two answers keep the hold. Recorded so nobody reads the vetoes as complete.
+# Known to pass the vetoes although they speak of particular people (a fact and a rule in one sentence, no place and
+# no date): here only the model's two answers keep the hold. Recorded so nobody reads the vetoes as complete.
 PASSES_THE_VETO_BUT_IS_SPECIFIC = [
-    "Staff who started last week are on parole and must report on Fridays.",
-    "Staff with a criminal record in the finance team must not handle cash.",
+    "Staff who joined as apprentices have convictions and must report weekly.",
+    "Carers with two foster children have been charged before and must be supervised.",
 ]
 VETOED = [
     ("Dana has epilepsy.", "no-class"),
@@ -137,6 +139,11 @@ VETOED = [
     ("Any employee in room 4 has epilepsy and should not be left alone.", "located"),
     ("Tenants in unit 12 must not be contacted because of a history of family violence.", "located"),
     ("Volunteers on Saturday mornings are recovering from surgery and cannot lift anything heavy.", "located"),
+    ("Staff with a criminal record in the finance team must not handle cash.", "located"),
+    ("Any employee at this depot has epilepsy and should not be left alone.", "located"),
+    # A point in time: a rule is not about last week.
+    ("Staff who started last week are on parole and must report on Fridays.", "dated"),
+    ("Applicants interviewed yesterday have a disability and may need the ramp.", "dated"),
     ("Staff must remember that Mum has dementia.", "definite"),
     ("Staff are expected to remember that the cook has epilepsy.", "definite"),
     ("Carers who have never been charged may keep the placement.", "definite"),
@@ -543,6 +550,21 @@ SPECIFIC_SHIFT = ("Quick note before the shift.\n\nVolunteers on Saturday mornin
 REAL_AS_STORY = ("Story idea for the newsletter\n\nOur storeman Corin Vale did two years in a northern gaol before he "
                  "joined us in March. He agreed we can print it.\n")
 
+# A fact about particular people and a rule in one sentence: once in a handover note, once in a team update, and once
+# under a heading that claims to be general guidance. When the model was first asked, no veto caught these sentences,
+# and its answers alone decided: it held the handover note and LIFTED the other two (the heading was enough to make it
+# call the note a policy text). The "dated" and definite-place vetoes were written from that result and now hold all
+# three; the model's own answers are kept in the record below. The last document is a rule of the same shape about
+# nobody, which should be (and is) lifted.
+MIXED_HANDOVER = ("Handover note\n\nStaff who started last week are on parole and must report on Fridays. Keep the "
+                  "roster as it is.\n")
+MIXED_TEAM = ("Finance team update\n\nStaff with a criminal record in the finance team must not handle cash. Petty "
+              "cash moves to the front office.\n")
+MIXED_AS_POLICY = ("POLICY NOTE: general guidance for all sites\n\nStaff who started last week are on parole and must "
+                   "report on Fridays.\n")
+POLICY_PAROLE = ("Working here: conditions\n\nStaff with a parole order must give notice of reporting days, and rosters "
+                 "are arranged to suit.\n")
+
 
 def probe_documents():
     """(id, text, stubbed finder entities) for every document the real model was asked about."""
@@ -560,6 +582,10 @@ def probe_documents():
     yield "specific-shift", SPECIFIC_SHIFT, [("HEALTH", "Volunteers on Saturday mornings are recovering from surgery")]
     yield "fiction-story", STORY, [("CRIMINAL", "had done two years in a northern gaol")]
     yield "real-as-story", REAL_AS_STORY, [("CRIMINAL", "did two years in a northern gaol")]
+    yield "mixed-handover", MIXED_HANDOVER, [("CRIMINAL", "are on parole")]
+    yield "mixed-team", MIXED_TEAM, [("CRIMINAL", "Staff with a criminal record in the finance team")]
+    yield "mixed-as-policy", MIXED_AS_POLICY, [("CRIMINAL", "are on parole")]
+    yield "policy-parole", POLICY_PAROLE, [("CRIMINAL", "Staff with a parole order")]
 
 
 def test_runner_reads_the_subject_settings(tmp_path, monkeypatch):
@@ -631,11 +657,16 @@ KNOWN_WITH_THE_REAL_MODEL = {
     # Particular people named only as a class: the model's answers held all three (and the vetoes now do too).
     "specific-team": "held", "specific-site": "held", "specific-shift": "held",
     "fiction-story": "fiction", "real-as-story": "held",
+    # A fact about particular people and a rule in one sentence: held (two of them by the vetoes alone, see below).
+    "mixed-handover": "held", "mixed-team": "held", "mixed-as-policy": "held",
+    "policy-parole": "general",
 }
-# The model alone is not enough: for these reviewer sentences it answered "a policy text" and "a general rule" with
-# a clear margin under both orders. Only the deterministic veto kept them held ("the placement", "the open ward",
-# "14 Wattle Street").
-THE_MODEL_ALONE_WOULD_RELEASE = {"rc02-3", "rc02-4", "rc02-5"}
+# The model alone is not enough: for these documents it answered "a policy text" and "a general rule" with a clear
+# margin under both orders, and only a deterministic veto kept them held. Three are reviewer sentences ("the
+# placement", "the open ward", "14 Wattle Street"). Two are the probes above: a team update ("Staff with a criminal
+# record in the finance team ...") and a statement about last week's starters under a heading that calls itself
+# general guidance. A heading was enough to move the model: that is why this check is not a default.
+THE_MODEL_ALONE_WOULD_RELEASE = {"rc02-3", "rc02-4", "rc02-5", "mixed-team", "mixed-as-policy"}
 
 
 def test_what_the_real_models_answers_lead_to(monkeypatch):
@@ -651,7 +682,7 @@ def test_what_the_real_models_answers_lead_to(monkeypatch):
     assert _held(general["fiction-story"]) and general["policy-union"].decision == Decision.RELEASE
 
 
-def test_the_model_alone_would_release_three_reviewer_sentences():
+def test_the_model_alone_would_release_documents_the_vetoes_hold():
     from themis_shield.detectors.typed import SUBJECT_CHOICES, SUBJECT_KINDS
 
     rows = json.loads((CAPTURE / "decisions.json").read_text(encoding="utf-8"))
@@ -661,7 +692,7 @@ def test_the_model_alone_would_release_three_reviewer_sentences():
         path = None if document["unsure"] else SUBJECT_KINDS.get(document["choice"])
         sentences_ = [a for a in row["answers"] if a["family"] == "Q-G"]
         if path and all(not a["unsure"] and a["choice"] == SUBJECT_CHOICES[path] for a in sentences_):
-            if row["id"].startswith("rc"):
+            if row["decision"] == "ASK":  # the model's answers would lift it; something else kept the hold
                 alone.add(row["id"])
-                assert all(a.get("guard") for a in sentences_) and row["decision"] == "ASK"
+                assert path == "general" and all(a.get("guard") for a in sentences_)
     assert alone == THE_MODEL_ALONE_WOULD_RELEASE
