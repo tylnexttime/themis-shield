@@ -25,6 +25,40 @@ of this has met a fresh split.
   on these sets ever had both finders silent, so the hold it relaxes has not yet caught a real double miss either.
   The two public-figure news items of split C (a name is the tracer's only finding) stay held: a name both finders
   missed is the case the hold is for.
+- **The subject check (`[typed] subject_lift`, new, off by default): a model-based replacement for
+  `policy-statements` and `negative-statements-general-exemption`** (DD-32, DD-33), with abstain-to-hold. Every
+  finding is still substituted; what changes is which evidence may hold a document. An `ASK:sensitive` hold that is
+  the document's only hold and rests on one detector's word (no second detector on the same or an overlapping span,
+  not a sensitive-column cell) may be lifted when the local model says, with a clear margin under both option
+  orders, what kind of text the whole document is (Q-D, asked once with the document in view) and that each
+  sentence holding a sensitive finding is about no one in particular (Q-G). *General path:* a policy, guidance or
+  technical text, "a general rule" for every such sentence, and no deterministic veto on any of them (another
+  finding in the sentence, a pronoun, a definite phrase such as "the cook" or "the placement", a name, narration, a
+  non-Latin script, no class of people named, no rule verb, a class narrowed to one place such as "tenants in unit
+  12"; `detectors/subject_guard.py`). The vetoes only ever keep a hold, and they are a backstop, not the decision:
+  a sentence that mixes a fact with a rule can pass them, and there the model's two answers are what keeps the hold.
+  *Fiction path* (its own switch): fiction, "a character in a story" for every such sentence, and no contact,
+  identifier or quasi-identifier finding anywhere in the document.
+  - **The reviewer's fifteen sentences (RC-01, RC-02) stay ASK** with the real model's answers (recorded once on
+    the Gemma 4 26B and replayed by the suite) and when a stand-in model calls everything a general rule with full
+    confidence. The model alone would not have been enough: for three of them ("... may keep the placement.", "...
+    may be moved to the open ward.", "... can stay at 14 Wattle Street.") it answered "a policy text" and "a general
+    rule" with a clear margin, and only the veto kept the hold. Guard: on its wording alone the veto holds every
+    gold sensitive statement of `eval/cases` (3,250).
+  - **Measured** (one live capture of the model's answers on the 214 documents the check applies to, about 1,290 calls,
+    then replays): on the 180 of them that hold personal information the document question answered "about real
+    people" every time (179 clearly, 1 unsure), so no document with personal information was lifted on any set by
+    either path, and released leaks, R_any, R_full, sensitive and quasi-identifier recall and over-redaction are
+    identical on all seven sets. Clean documents no longer held, on top of `empty-finder-substitute`: general path
+    7 (split D half Q 4 -> 1 of 63, split G 15 -> 11 of 65); fiction path a further 17 (split C 12 -> 7, half Q 1 ->
+    0, split E 4 -> 3, split F 11 -> 5, split G 11 -> 7 of 65, 0.108). Fiction that stays held: a second detector
+    agrees (7 documents), an email address in the document (6), an unsure sentence answer (2), another hold beside
+    it (1).
+  - **Why it is off by default.** The numbers meet the adoption rule, but they are in-sample (the questions and
+    the vetoes were written after reading these sets, and split G's four policy documents are what the general path
+    was shaped on); with it on, every entry point needs a typed runtime, every replay needs a typed capture, and a
+    vetting record would quote a baseline that never included it (DD-36). It is ready to be an arm of the next
+    frozen plan: `[typed] enabled = true`, `families = []`, `subject_lift = ["general"]` or `["general", "fiction"]`.
 
 ### Steward's decision after the second review (RC-01 to RC-08, 13/11/2026)
 

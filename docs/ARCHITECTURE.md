@@ -671,9 +671,9 @@ reading the whole document and then each sentence, says with a clear margin that
   document must instead hold no finding but names, dates, places and the statements themselves (a contact, an
   identifier or a quasi-identifier makes it a record, not a story). It rests on the model's two answers more than
   the general path does, which is why it is switched separately.
-- **What a lift does.** `RELEASE` of the substituted text: the statements stay substituted, so a wrong answer does
-  not put the statement itself in front of the cloud; the cost of a wrong lift is whatever else in that document
-  nobody found. The policy records `lifted:ASK:sensitive:Q-D+Q-G:<path>` or `kept:ASK:sensitive:<why>`, and each Q-G
+- **What a lift does.** `RELEASE` of the substituted text: every finding stays substituted, so a wrong answer does
+  not put what the detector marked in front of the cloud; the cost of a wrong lift is whatever nobody marked (the
+  rest of a statement a finder cut short, or anything else in that document that was missed). The policy records `lifted:ASK:sensitive:Q-D+Q-G:<path>` or `kept:ASK:sensitive:<why>`, and each Q-G
   answer carries its veto code.
 - **Evaluation.** `--typed-settings` takes `subject_lift`, `subject_margin` and `subject_capture` (ask every subject
   question of a candidate document, for a capture; no decision changes). `eval/subject_probe.py` records the real
