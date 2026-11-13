@@ -133,16 +133,28 @@ def local_due(value):
         return "not available"
 
 
-def record_review(router, job, conversation_id, digest, review):
-    """Operator review: record the bound package's points (value-free) and keep its text in memory only."""
-    from .review import ReviewState
+def record_review(router, job, conversation_id, digest, review, raw=None, loop=None):
+    """Operator review: record the bound package's points (value-free) and keep its text in memory only.
+
+    With the trip-wire's correction loop, the placeholders it added are points it settled (never open points), and
+    the package as the trip-wire read it is kept beside the text so that a finding can be placed exactly."""
+    from .review import ReviewState, mark_tripwire
     row = router._register_call("get_details", job.job_id)
     if not review or row["manifest_hash"] != digest or row["package"] != "ready":
         return
+    if loop is not None:
+        # Every round of every loop this job ran: a placeholder an earlier loop added stays the trip-wire's after an
+        # Operator replacement made the package run the loop again.
+        rounds = [item for record in router._register_call("tripwire_loops", job.job_id) for item in record["rounds"]]
+        review = mark_tripwire(review, [*rounds, *loop.rounds])
     router._register_call("record_review_points", job.job_id, digest, review["points"], now=router.clock())
+    document = None
+    if raw is not None and getattr(router, "tripwire", None) is not None:
+        document = tripwire.document(raw)
     with router._state_lock:
         router._reviews[job.job_id] = ReviewState(
             conversation_id, digest, review["text"], review["points"], review["tokens"],
+            tuple(review.get("surfaces", ())), document,
         )
 
 
@@ -309,7 +321,7 @@ def handle(router, request, headers=None, *, source_document_count=1):
             with router._state_lock:
                 router._payloads[job.job_id] = raw
         job = refresh(router, job.job_id)
-        record_review(router, job, identifier, digest, review)
+        record_review(router, job, identifier, digest, review, raw, loop)
         if isinstance(policy, GateDecision):
             # v0.3 decision record: model output and catalogue override kept apart, with the register version.
             router._register_call(

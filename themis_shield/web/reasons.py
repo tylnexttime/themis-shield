@@ -9,7 +9,7 @@ from themis_shield.detectors.escalation import (
 from themis_shield.register.models import REASONS, MARKING_REASONS
 from themis_shield.register.two_stage import STAGE_REASONS
 from themis_shield.register.gate_records import GATE_RECORD_REASONS
-from themis_shield.register.review_records import GATE_REASON, REVIEW_REASONS
+from themis_shield.register.review_records import GATE_REASON, REVIEW_REASONS, TRIPWIRE_REASON
 from themis_shield.routing import RouteReasonCode
 from themis_shield.types import ReasonCode
 
@@ -127,6 +127,19 @@ FIXED = {
     "OPERATOR_REPLACEMENT_NOT_APPLIED": (
         "A placeholder the Operator added did not appear in the rebuilt package; the job stopped (fail closed)."
     ),
+    "POINT_NOT_SETTLED": "This point is not settled, so there is nothing to undo.",
+    "UNDO_UNAVAILABLE": (
+        "This replacement was made before the gate restarted, so the placeholder it added can no longer be "
+        "identified and it cannot be undone. Stop the document, or approve it as it stands."
+    ),
+    "PLACEHOLDER_IN_USE": (
+        "The placeholder this replacement added is already part of what was sent, or of another job's package, so "
+        "it is kept and the replacement cannot be undone."
+    ),
+    "TRIPWIRE_NOT_PENDING": (
+        "Nothing is waiting for a trip-wire decision on this job: re-approve and refuse apply only to a package the "
+        "check after approval sent back."
+    ),
 }
 POLICY = {
     "STAGE_FAILED": "A required detection stage failed.",
@@ -197,6 +210,8 @@ def point_reason(reason, label):
         return "the detectors disagreed on whether this is " + VALUE_KINDS.get(label, "personal information")
     if reason == GATE_REASON:
         return value_kind(label) + ", replaced by the gate"
+    if reason == TRIPWIRE_REASON:
+        return value_kind(label) + ", replaced by the cloud trip-wire's correction loop"
     if reason in POINT_REASONS:
         return POINT_REASONS[reason]
     item = next((code for code in ReasonCode if code.value == reason), None)

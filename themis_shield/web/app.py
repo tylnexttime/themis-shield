@@ -468,9 +468,12 @@ def create_app(
                 # Value-free: the de-identified text, each hold point with its reason and place, how it was settled.
                 "review": reviews.view(router, row["job_id"]),
             } for row in router.register.list_jobs()
-                if row["route"] == "CLOUD"
-                and row["status"] in {"Logged", "Awaiting-Operator", "Escalated-Review"}
-                and (row["stage1"] == "requested" or row["stage2"] == "pending")],
+                if row["route"] == "CLOUD" and (
+                    row["status"] in {"Logged", "Awaiting-Operator", "Escalated-Review"}
+                    and (row["stage1"] == "requested" or row["stage2"] == "pending")
+                    # A package the trip-wire's check after approval sent back waits for re-approve or refuse.
+                    or row["status"] == "Held-Offline" and reviews.tripwire_pending(router, row["job_id"])
+                )],
         })
 
     async def operator_action(job_id, request, action):
@@ -553,6 +556,29 @@ def create_app(
     @app.post("/api/operator/{job_id}/points/{point_id}/stop")
     async def point_stop(job_id: str, point_id: str, request: Request):
         return await point_action(job_id, point_id, request, "stop")
+
+    @app.post("/api/operator/{job_id}/points/{point_id}/undo")
+    async def point_undo(job_id: str, point_id: str, request: Request):
+        # Undo a mis-clicked "Not personal" or "Replace it" until stage two is approved (recorded: who, when).
+        return await point_action(job_id, point_id, request, "undo")
+
+    async def tripwire_action(job_id, request, verdict):
+        if not operator_enabled():
+            return error("OPERATOR_CONSOLE_DISABLED", 404)
+        try:
+            await body(request, set())
+        except Exception:
+            return error("INVALID_REVIEW_ACTION", 400)
+        return await operation(reviews.tripwire_verdict, router, job_id, verdict, actor=router.operator_identity)
+
+    @app.post("/api/operator/{job_id}/tripwire/reapprove")
+    async def tripwire_reapprove(job_id: str, request: Request):
+        # The check after approval flagged this package: send exactly it, unchanged and without another check.
+        return await tripwire_action(job_id, request, "reapprove")
+
+    @app.post("/api/operator/{job_id}/tripwire/refuse")
+    async def tripwire_refuse(job_id: str, request: Request):
+        return await tripwire_action(job_id, request, "refuse")
 
     @app.post("/api/handover")
     async def handover(request: Request):

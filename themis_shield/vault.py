@@ -321,6 +321,23 @@ class Vault:
                 (conversation_id,),
             ).fetchall())
 
+    def forget_operator_placeholder(self, conversation_id: str, token: str) -> None:
+        """Remove one placeholder an Operator added (an undone "Replace it"): its mapping and its mark.
+
+        Only a placeholder marked ``de-identified-by-operator`` can be removed this way; the gate's own placeholders
+        are never forgotten one by one (they go with the conversation)."""
+        _validate(conversation_id, token)
+        with self.allocation_lock, self._transaction():
+            row = self._db.execute(
+                "SELECT source FROM mapping_sources WHERE conversation_id=? AND token=?", (conversation_id, token),
+            ).fetchone()
+            if row is None or row[0] != OPERATOR_SOURCE:
+                raise KeyError("not an Operator placeholder")
+            self._db.execute("DELETE FROM mappings WHERE conversation_id=? AND token=?", (conversation_id, token))
+            self._db.execute(
+                "DELETE FROM mapping_sources WHERE conversation_id=? AND token=?", (conversation_id, token),
+            )
+
     def wipe(self, conversation_id: str) -> None:
         _validate(conversation_id)
         with self.allocation_lock:
@@ -452,6 +469,14 @@ class InMemoryVault:
         _validate(conversation_id)
         with self.allocation_lock:
             return dict(self._sources.get(conversation_id, {}))
+
+    def forget_operator_placeholder(self, conversation_id: str, token: str) -> None:
+        _validate(conversation_id, token)
+        with self.allocation_lock:
+            if self._sources.get(conversation_id, {}).get(token) != OPERATOR_SOURCE:
+                raise KeyError("not an Operator placeholder")
+            self._values.get(conversation_id, {}).pop(token, None)
+            self._sources[conversation_id].pop(token, None)
 
     def wipe(self, conversation_id: str) -> None:
         _validate(conversation_id)

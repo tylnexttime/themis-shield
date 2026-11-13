@@ -528,19 +528,49 @@ function settledText(resolution) {
     ? ` (${REVIEW_CATEGORIES[resolution.category] || resolution.category})` : "";
   return `${SETTLED[resolution.action] || "Settled"}${category}, by ${resolution.by || "the Operator"}, ${date(resolution.at)}`;
 }
+/* The trip-wire's places in the review text: placeholders its correction loop added (settled, "T<round>") and
+   findings it did not replace whose place is exact ("T<round>" for the loop's last round, "A" after approval). */
+function tripwireMarks(review) {
+  const marks = [];
+  for (const item of review.gate_settled || []) {
+    if (item.source !== "tripwire" || !Number.isInteger(item.start) || !Number.isInteger(item.end)) continue;
+    marks.push({ start: item.start, end: item.end, className: "tripwire", label: `T${item.round ?? ""}`,
+      title: `Added by the cloud trip-wire${item.round ? ` in round ${item.round}` : ""}: ${item.why}` });
+  }
+  const flagged = (items, label, title) => {
+    for (const item of items || []) {
+      if (!Number.isInteger(item.review_start) || !Number.isInteger(item.review_end)) continue;
+      marks.push({ start: item.review_start, end: item.review_end, className: "tripwire-flag", label,
+        title: `${title}: ${item.category || "OTHER"}` });
+    }
+  };
+  for (const round of review.tripwire?.before_human?.rounds || []) {
+    flagged(round.items, `T${round.round}`, `Flagged by the cloud trip-wire in round ${round.round} and not replaced`);
+  }
+  flagged(review.tripwire?.after_human?.items, "A", "Flagged by the cloud trip-wire's check after approval");
+  return marks;
+}
 function reviewText(review) {
   const block = node("pre", null, "review-text");
-  const located = review.points.filter(point => point.kind !== "document" && Number.isInteger(point.start)
-    && Number.isInteger(point.end)).sort((a, b) => a.start - b.start);
+  const points = review.points.filter(point => point.kind !== "document" && Number.isInteger(point.start)
+    && Number.isInteger(point.end)).map(point => ({
+    start: point.start, end: point.end, className: point.resolution ? "settled" : "", label: String(point.number),
+    title: `Point ${point.number}: ${point.why}`
+  }));
+  const located = [], taken = [];
+  for (const mark of [...points, ...tripwireMarks(review)]) {
+    if (taken.some(([a, b]) => mark.start < b && mark.end > a)) continue;
+    taken.push([mark.start, mark.end]); located.push(mark);
+  }
+  located.sort((a, b) => a.start - b.start);
   let cursor = 0;
-  for (const point of located) {
-    if (point.start < cursor) continue;
-    block.append(document.createTextNode(review.text.slice(cursor, point.start)));
-    const mark = node("mark", review.text.slice(point.start, point.end), point.resolution ? "settled" : "");
-    mark.title = `Point ${point.number}: ${point.why}`;
-    mark.append(node("sup", String(point.number)));
+  for (const item of located) {
+    block.append(document.createTextNode(review.text.slice(cursor, item.start)));
+    const mark = node("mark", review.text.slice(item.start, item.end), item.className);
+    mark.title = item.title;
+    mark.append(node("sup", item.label));
     block.append(mark);
-    cursor = point.end;
+    cursor = item.end;
   }
   block.append(document.createTextNode(review.text.slice(cursor)));
   return block;
@@ -591,11 +621,30 @@ function replaceForm(review, point, base) {
   form.append(startLabel, endLabel, widen, categoryLabel, preview, confirm);
   return form;
 }
+function undoneText(entry) {
+  return `Undone: ${(SETTLED[entry.action] || "Settled").toLowerCase()}, by ${entry.by || "the Operator"}, ${date(entry.at)}; `
+    + `undone by ${entry.undone_by || "the Operator"}, ${date(entry.undone_at)}`;
+}
 function reviewPoint(id, review, point) {
   const item = node("li", null, "review-point");
   item.append(node("p", `${point.location}: ${sentence(point.why)}`));
-  if (point.resolution) { item.append(node("p", settledText(point.resolution), "settled-note")); return item; }
+  for (const entry of point.undone || []) item.append(node("p", undoneText(entry), "muted"));
   const base = `/api/operator/${idPath(id)}/points/${idPath(point.id)}`;
+  if (point.resolution) {
+    item.append(node("p", settledText(point.resolution), "settled-note"));
+    if (point.undo) {
+      const actions = node("div", null, "actions");
+      actions.append(button("Undo", () => action(async () => {
+        await api(`${base}/undo`, { method: "POST", body: {} });
+        notice(point.resolution.action === "replaced"
+          ? "Undone. The placeholder was removed from this job's codebook; the clean package is rebuilt without it when the requester sends again. The point is open again."
+          : "Undone. The point is open again.");
+        await loadOperator();
+      })));
+      item.append(actions);
+    }
+    return item;
+  }
   const original = node("p", "", "original");
   original.hidden = true;
   const reveal = button("Show original", () => action(async () => {
@@ -623,6 +672,85 @@ function reviewPoint(id, review, point) {
   item.append(actions, original, form);
   return item;
 }
+const TRIPWIRE_OUTCOMES = { clear: "nothing found", corrected: "corrected", not_converged: "still flagged (last round)" };
+function tripwireFinding(item) {
+  const where = Number.isInteger(item.start) ? `characters ${item.start}-${item.end} of the checked package` : null;
+  const near = item.placeholder ? `next to ${item.placeholder}` : null;
+  const parts = [`${item.category || "OTHER"}: ${[where, near].filter(Boolean).join(", ") || "no place given"}`];
+  if (item.added?.length) parts.push(`replaced by ${item.added.join(", ")}`);
+  else parts.push("not replaced");
+  if (Number.isInteger(item.review_start)) parts.push("highlighted in the text");
+  if (item.proposal) parts.push(`known-miss proposal ${item.proposal}`);
+  return parts.join("; ");
+}
+function tripwireSection(id, review) {
+  const trip = review?.tripwire;
+  const section = node("section", null, "review tripwire");
+  if (!trip || (!trip.before_human && !trip.after_human)) return section;
+  section.append(node("h4", "Cloud trip-wire"));
+  const rounds = loop => {
+    const list = node("ol", null, "tripwire-rounds");
+    for (const round of loop.rounds) {
+      const entry = node("li");
+      const categories = Object.entries(round.categories || {}).map(([name, count]) => `${name} ${count}`).join(", ");
+      entry.append(node("p", round.outcome === "clear" ? `Round ${round.round}: nothing found.`
+        : `Round ${round.round}: ${round.findings} finding${round.findings === 1 ? "" : "s"} (${categories}), `
+          + `${TRIPWIRE_OUTCOMES[round.outcome] || round.outcome}; added ${round.added.length ? round.added.join(", ") : "no placeholder"}.`));
+      if (round.items?.length) {
+        const items = node("ul");
+        for (const item of round.items) items.append(node("li", tripwireFinding(item)));
+        entry.append(items);
+      }
+      list.append(entry);
+    }
+    return list;
+  };
+  const loop = trip.before_human;
+  if (loop) {
+    section.append(node("p", loop.converged
+      ? `Correction loop: the package came back clean in round ${loop.rounds.at(-1)?.round}.`
+      : "Correction loop: NOT CONVERGED. The last round still reported personal information. Check the package before approving it.",
+    loop.converged ? "settled-note" : "warning"));
+    if (!loop.current) section.append(node("p", "These rounds checked an earlier version of the package.", "muted"));
+    section.append(rounds(loop));
+    if (loop.earlier?.length) {
+      const details = node("details");
+      details.append(node("summary", `Earlier correction loop${loop.earlier.length === 1 ? "" : "s"} on this job (before an Operator replacement changed the package): ${loop.earlier.length}`));
+      for (const earlier of loop.earlier) details.append(rounds(earlier));
+      section.append(details);
+    }
+  }
+  const after = trip.after_human;
+  if (after) {
+    section.append(node("p", after.outcome === "flagged"
+      ? `Check after approval: ${after.items.length} finding${after.items.length === 1 ? "" : "s"} in the approved package. Nothing was replaced and the task was not sent; the flagged text has already been read by the cloud model once.`
+      : `Check after approval: ${after.outcome}.`, after.pending ? "warning" : "muted"));
+    if (after.items.length) {
+      const list = node("ul");
+      for (const item of after.items) list.append(node("li", tripwireFinding(item)));
+      section.append(list);
+    }
+    if (after.verdict) section.append(node("p", after.verdict === "rejected"
+      ? "Re-approved by an Operator: the same package is sent unchanged." : "Refused by an Operator.", "settled-note"));
+    if (after.pending) {
+      const actions = node("div", null, "actions");
+      actions.append(
+        button("Re-approve this package", () => action(async () => {
+          await api(`/api/operator/${idPath(id)}/tripwire/reapprove`, { method: "POST", body: {} });
+          notice("Re-approved. The requester's next send delivers exactly this package, without another check.");
+          await loadOperator();
+        }), { primary: true }),
+        button("Refuse the job", () => action(async () => {
+          if (!window.confirm("Refuse this job? Nothing is sent.")) return;
+          await api(`/api/operator/${idPath(id)}/tripwire/refuse`, { method: "POST", body: {} });
+          notice("Refused. Nothing was sent.");
+          await loadOperator();
+        })));
+      section.append(actions);
+    }
+  }
+  return section;
+}
 function reviewSection(id, review) {
   const section = node("section", null, "review");
   if (!review) return section;
@@ -640,10 +768,13 @@ function reviewSection(id, review) {
   }
   if (review.gate_settled?.length) {
     const details = node("details"), list = node("ul"), count = review.gate_settled.length;
-    details.append(node("summary", `Settled by the gate: ${count} placeholder${count === 1 ? "" : "s"}`));
-    for (const item of review.gate_settled) list.append(node("li", `${item.location}: ${sentence(item.why)}`));
+    const settler = review.gate_settled.some(item => item.source === "tripwire") ? "the gate or the cloud trip-wire" : "the gate";
+    details.append(node("summary", `Settled by ${settler}: ${count} placeholder${count === 1 ? "" : "s"}`));
+    for (const item of review.gate_settled) list.append(node("li", `${item.location}: ${sentence(
+      item.source === "tripwire" && item.round ? `${item.why} (round ${item.round})` : item.why)}`));
     details.append(list); section.append(details);
   }
+  section.append(tripwireSection(id, review));
   return section;
 }
 const operatorEnabled = () => state.settings.operator_console_enabled === true || state.settings.pilot_flags?.operator_console_enabled === true;
@@ -661,6 +792,7 @@ async function loadOperator() {
         ["Due", date(job.due)]
       ]), stageIndicators(job), reviewSection(id, job.review));
     const open = job.review?.unresolved > 0;
+    if (job.review?.tripwire?.after_human?.pending) { $("operator-queue").append(card); continue; }
     const label = node("label", "Decision reason — controlled safe code"), reason = node("select");
     for (const [code, text] of [
       ["ROUTINE_APPROVED", "Routine scope approved"], ["REFUSED", "Requested processing refused"],

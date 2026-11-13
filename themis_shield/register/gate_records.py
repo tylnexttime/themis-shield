@@ -505,7 +505,8 @@ class GateRecords:
     def tripwire_records(self, job_id=None):
         with self._transaction() as db:
             query = (
-                "SELECT r.record_id, r.job_id, r.stage, r.outcome, r.flags_json, r.occurred_utc, v.verdict "
+                "SELECT r.record_id, r.job_id, r.manifest_hash, r.stage, r.outcome, r.flags_json, r.occurred_utc, "
+                "v.verdict "
                 "FROM tripwire_records r LEFT JOIN tripwire_reviews v USING(record_id)"
             )
             arguments = []

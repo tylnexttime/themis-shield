@@ -121,6 +121,11 @@ dialog::backdrop { background:rgb(0 0 0/.45); }
 .review h4 { margin:.2rem 0 .5rem; }
 .review-text mark { background:var(--mark); color:var(--mark-text); border-radius:.2rem; padding:0 .15rem; }
 .review-text mark.settled { background:var(--soft); color:var(--text); }
+.review-text mark.tripwire { background:var(--soft); color:var(--text); outline:1px dashed var(--accent); }
+.review-text mark.tripwire-flag { background:var(--danger-bg); color:var(--danger); }
+.review .warning { color:var(--danger); font-weight:600; }
+.tripwire-rounds { padding-left:1.4rem; display:grid; gap:.4rem; }
+.tripwire-rounds p, .tripwire ul { margin:.2rem 0; overflow-wrap:anywhere; }
 .review-text mark sup { font-size:.7em; margin-left:.15rem; font-weight:600; }
 .review-points { padding-left:1.4rem; display:grid; gap:.7rem; }
 .review-point p { margin:.2rem 0; }
