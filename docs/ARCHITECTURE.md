@@ -286,7 +286,8 @@ and shown inside that point on the page; re-rendering the queue, reloading or le
 row, audit row or log line is written by a reveal. Like every `/api/operator/*` route it needs the Operator
 credential; the client token and the chat session are refused.
 
-**Three actions per point.**
+**Three actions per point.** (With the cloud trip-wire's `before_human` mode on, the cloud model has read the
+de-identified package, open points included, before any person sees this review.)
 
 - *Not personal: leave it.* The text stays as shown. A placeholder the gate already put in stays a placeholder: this
   never sends an original.
@@ -296,7 +297,10 @@ credential; the client token and the chat session are refused.
   The clean package goes back to "building"; the next send rebuilds it, binds the new hash and must contain the new
   placeholder, or the job stops (`OPERATOR_REPLACEMENT_NOT_APPLIED`). Confirming the gate's own placeholder with its
   own category changes nothing.
-- *Stop the document.* The job is refused at once (`STOPPED_BY_OPERATOR`); nothing is sent.
+- *Stop the document.* The job is refused at once (`STOPPED_BY_OPERATOR`); nothing more is sent. "Nothing is
+  sent" holds only while the cloud trip-wire's `before_human` mode is off: with it on, the cloud model has already
+  read the de-identified package, held points included, before the Operator saw it, and the three actions act on text
+  the cloud has read (see "Cloud trip-wire" below).
 
 **Undo a mis-click.** Until stage two of the package is approved, the Operator may undo a point's "Not personal" or
 "Replace it" (`POST /api/operator/{job}/points/{point}/undo`; the console shows an Undo button beside a settled point).

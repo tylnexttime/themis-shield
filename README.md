@@ -112,8 +112,10 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
 ## What v0.2 lets you do
 
 - **Run a privacy-gated chat assistant locally.** `themis serve` starts a web app on `127.0.0.1`, opened with a
-  one-use code. It shows what was found and what was sent, holds each cloud job until the Operator approves it, and
-  streams the cloud answer with your original values restored. The Operator's endpoints need a separate Operator
+  one-use code. It shows what was found and what was sent, holds each cloud job until the Operator approves it (with one
+  exception: when the optional cloud trip-wire's `before_human` mode is on, the cloud model reads the de-identified
+  package, held points included, before any person approves it; see
+  [ARCHITECTURE](docs/ARCHITECTURE.md#cloud-trip-wire)), and streams the cloud answer with your original values restored. The Operator's endpoints need a separate Operator
   credential (`operator-token`, created beside `gate-token` on first start, or a browser session opened with
   `themis serve --open-operator`); the gate token and the chat session opened with `--open` are refused there, so an
   API client or agent that holds only the gate token cannot approve its own job. Both files sit in the same user's
@@ -285,7 +287,8 @@ Read this section before you rely on anything above.
  └──────────┬───────────┘
             ▼
  ┌──────────────────────┐
- │ 5. cloud call        │   held until the Operator approves; the exact outgoing request is checked to contain
+ │ 5. cloud call        │   held until the Operator approves (the optional trip-wire's before_human mode reads the
+ │                      │   de-identified package earlier, before any person); the request is checked to contain
  └──────────┬───────────┘   none of the original values, then hashed, and the approval is bound to that hash
             ▼
  ┌──────────────────────┐
