@@ -262,5 +262,13 @@ enabled = false
 # min_label_mass = 0.9    # unsure when the option letters carry less probability (never below 0.9)
 # mixed_families = false  # true lets several families together lift one hold
 # indirect_substitute = true  # a Q-I sentence is substituted as well as held
+# The subject check (off unless subject_lift names a path; needs enabled = true): an ASK:sensitive hold that is the
+# document's only hold and rests on one detector's word may be lifted when the model says, with a clear margin, what
+# kind of text the whole document is and that each flagged sentence is about no one in particular. "general": a
+# general rule in a policy, guidance or technical text, never past a deterministic veto (a name, a pronoun, "the
+# cook" ...). "fiction": an invented character in a text that is fiction (rests on the model more; its own choice).
+# Every finding stays substituted. Development measurements only; see docs/ARCHITECTURE.md, "The subject check".
+# subject_lift = ["general"]
+# subject_margin = 0.5    # unsure when a subject answer's top two options are closer than this
 # [typed.temperatures]
 # Q-S = 3.03   # fitted on development data; Q-M, Q-N, Q-P stay at 1.0

@@ -55,8 +55,9 @@ tokens are restored locally (`restore.py`).
 | `detectors/union.py`, `propagate.py`, `allowlist.py`, `profile_adapter.py` | real | Evidence union, propagation across tables, names and initials, a column-aware quasi-identifier pass for identifier-bearing tables (v0.2), institutional allow-list from a profile. |
 | `detectors/markings.py`, `routing.py` | real | Security-marking gate and the marking-based route, applied before any PII decision. |
 | `detectors/contracts.py`, `types.py` | real | Value-free evidence types and the label set. |
-| `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. |
+| `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. Substitute, don't hold (`empty-finder-substitute`, on by default): when both finders are silent and PII-Tracer found only contact or identifier values, in a document where no stage found a person, an address, a date of birth, a quasi-identifier or anything sensitive and the tracer's sensitivity score is at its noise floor (at most 0.01), the values are substituted and the document is not held for the disagreement. |
 | `detectors/settings.py` | real | `[detection] version`: `v0.2` (default) turns on the tier-1 fixes and the column-aware table pass; `v0.1` restores the evaluated v0.1 detection. |
+| `detectors/subject_guard.py` | real, off by default | The deterministic vetoes of the typed tier's subject check: wording that points to someone in particular keeps a sensitive hold whatever the model answers (see [the subject check](#the-subject-check-q-d-and-q-g)). |
 | `detectors/typed.py`, `detectors/typed_tier.py` | real, off by default | v0.3 typed-decision tier (T1.5): multiple-choice questions about what the cheaper tiers found, answered in one forward pass; the policy decides what an answer may change (see [below](#v03-typed-decision-tier-t15)). |
 | `normalise.py` | real | `detection_view`, the shared detection view (Unicode default-ignorable characters removed, NFKC per character, each view character mapped back to its source character) used by the rule packs, the marking gate and the injection signal. It meets the conservative offset-map contract (property-tested); the older `OffsetMap` skeleton was removed in 0.3.2. |
 
@@ -629,6 +630,51 @@ built.
 - **Evaluation.** `eval/run_eval.py --typed on` with `--capture-typed DIR` / `--replay-typed DIR` (prompt key and
   model identity, like the finder capture; replay refuses anything not captured) and `--typed-ask-all` (asks every
   question any setting could need, changes no decision), so read-out and policy settings can be tuned without a GPU.
+
+### The subject check (Q-D and Q-G)
+
+`[typed] subject_lift` (off by default; `detectors/subject_guard.py`, `ask_subject` in `detectors/typed_tier.py`,
+`_subject_cleared` in `policy.py`). The model-based replacement for the two opt-in wording rules (`policy-statements`
+and `negative-statements-general-exemption`; DD-32, DD-33), built on one idea: **the evidence that substitutes is not
+the evidence that holds.** Every finding is still substituted. An `ASK:sensitive` hold, though, stands on its own
+only when something corroborates it; a hold that rests on one detector's word may become a hint when the local model,
+reading the whole document and then each sentence, says with a clear margin that nobody in particular is spoken of.
+
+- **When it is asked.** Only when `ASK:sensitive` is the document's only hold and no sensitive finding is
+  corroborated: none has a second detector on the same or an overlapping span, and none is a cell of a
+  sensitive-column table. Two detectors agreeing is a hold; nothing is asked.
+- **Q-D, once per document, with the whole text in view** (its first 4,000 characters, or head and tail of a longer
+  one): a record or message about particular real people, fiction, a policy or guidance text, a technical text, or
+  unclear. A policy, guidance or technical text opens the *general* path, fiction the *fiction* path; any other
+  answer keeps the hold and no sentence is asked.
+- **Q-G, once per sentence that holds a sensitive finding:** a particular person or people, a general rule about a
+  whole class of people, an invented character or example, or unclear. Every such sentence needs the path's answer
+  (`general_rule`, or `fiction_or_example`).
+- **A clear answer or the hold stays.** Both questions are read like every typed question (two option orders, label
+  mass, order agreement), at a temperature of about 3 (the over-confidence measured for the same model on the other
+  sentence families; not fitted) and with a wider margin band (`subject_margin`, 0.5): the model's raw probability
+  has to be about 0.97 or more under both orders.
+- **General path: deterministic vetoes that can only keep a hold.** Two reviews showed that wording rules cannot
+  decide that a sentence is a general rule, so here they decide nothing: they veto. A sentence is never put to the
+  model's answer when another finding lies in it (a name, a contact, an identifier, an address, a date of birth, a
+  quasi-identifier), or it holds a personal pronoun ("they" included), an indefinite reference to one person
+  ("someone", "a colleague"), narration or reported speech ("was", "said"), a definite phrase that is not plainly an
+  organisation or an abstract thing ("the cook", "the placement", "the open ward"), a capitalised word that is not a
+  known opener, a class of people or part of an organisation phrase ("Mum", "Jayden", "Wattle Street"), a letter
+  outside the Latin alphabet, or no class of people at all ("No", "Medical history: asthma"). Every rule errs towards
+  the veto. On its wording alone the veto holds every gold sensitive statement of `eval/cases` (3,250; a guard test).
+- **Fiction path: its own switch.** A story is full of names and pronouns, so the sentence vetoes do not apply; the
+  document must instead hold no finding but names, dates, places and the statements themselves (a contact, an
+  identifier or a quasi-identifier makes it a record, not a story). It rests on the model's two answers more than
+  the general path does, which is why it is switched separately.
+- **What a lift does.** `RELEASE` of the substituted text: the statements stay substituted, so a wrong answer does
+  not put the statement itself in front of the cloud; the cost of a wrong lift is whatever else in that document
+  nobody found. The policy records `lifted:ASK:sensitive:Q-D+Q-G:<path>` or `kept:ASK:sensitive:<why>`, and each Q-G
+  answer carries its veto code.
+- **Evaluation.** `--typed-settings` takes `subject_lift`, `subject_margin` and `subject_capture` (ask every subject
+  question of a candidate document, for a capture; no decision changes). `eval/subject_probe.py` records the real
+  model's answers for the probe documents of `tests/test_subject_check.py` (the reviewer's sentences among them) as
+  a value-free capture that the suite replays.
 
 ### Restore safety
 
