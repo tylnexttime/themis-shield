@@ -200,7 +200,10 @@ Read this section before you rely on anything above.
   (JSON, YAML, code) and on a sentence diluted in a long document: in the reviewer's tests a ticket export saying a
   caller is staying at a refuge passed the gate with the statement in clear. With the defaults such a document is
   held, as before. Turn the switch on only for text you know holds no statements about people (a contact
-  directory): when the finders are silent nothing else reads the text for statements.
+  directory): when the finders are silent nothing else reads the text for statements, so the switch is as safe as
+  the tracer's recall of names and no safer. Played against the development sets with silent finders and a tracer
+  that finds contacts and identifiers but no names, it releases 127 of 1,098 held documents with a labelled span
+  unprotected (a guard test records the number).
 - **Quasi-identifiers are substituted, not held.** A found quasi-identifier is replaced, but it doesn't hold the
   document for a human (`[policy] quasi_id_ask = true` changes that). v0.2's table pass finds rare values in
   "anonymised" tables (97.6% recall on our fresh split), but it also flags common job titles, so tables get

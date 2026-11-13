@@ -6,9 +6,11 @@ The known danger of lifting a hold: a span nobody protected, in a document that 
 leak. The switch tries to be narrow (``policy.empty_finder_value_doubt_only``) and the guard at the end runs it over
 every gold span of ``eval/cases`` under the worst case for the finders (both return nothing). That was not enough: the
 switch was adopted as a default on this file and the development replays, and an adversarial review then released a
-person's sensitive statement through it (``tests/test_empty_finder_hold_hl01_hl02.py``). These tests say what the
-switch does when someone turns it on; they are not evidence that it is safe. Synthetic text only in the unit tests;
-reserved ``.example`` domains.
+person's sensitive statement through it (``tests/test_empty_finder_hold_hl01_hl02.py``). The guard had handed the
+tracer every gold name (HL-03); its second arm, a tracer that misses names, now states what the switch would
+release: 127 development documents with a gold span unprotected. These tests say what the switch does when someone
+turns it on; they are not evidence that it is safe. Synthetic text only in the unit tests; reserved ``.example``
+domains.
 """
 
 from __future__ import annotations
@@ -184,19 +186,27 @@ def test_the_v01_policy_control_ignores_the_switch():
 # ----------------------------------------------------------------------------------------------------------------------
 # Guard over every gold span of eval/cases (in the spirit of the DD-16 and DD-17 guards).
 #
-# Worst case for the finders: both return nothing on every document that holds personal information. PII-Tracer is
-# played by the gold itself: it "finds" every gold span of a kind it can label (its nine labels), with the label it
-# would give and full confidence, and its document sensitivity score is the one the real model gave that case in the
-# development replay of candidate 0.5 (tests/fixtures/eval_doc_sensitivity_rc5.json; value-free). Everything after
-# the tracer is the real code: rules, propagation, the allow-list, the policy.
+# Worst case for the finders: both return nothing on every document that holds personal information. Everything after
+# the tracer is the real code: rules, propagation, the allow-list, the policy. The tracer's document sensitivity score
+# is the one the real model gave that case in the development replay of candidate 0.5
+# (tests/fixtures/eval_doc_sensitivity_rc5.json; value-free). The tracer's FINDINGS are a stand-in, in two arms:
 #
-# With the switch on, a document may only leave the empty-finder hold when nothing personal is left unprotected in it:
-# 1. no released document holds a gold span that the findings do not cover in full (the substituted value is whole,
-#    and nothing else personal was in the text);
+# Arm 1, the ideal tracer (the builder's guard). PII-Tracer is played by the gold itself: it "finds" every gold span
+# of a kind it can label (its nine labels), with the label it would give and full confidence. With the switch on, a
+# document may only leave the empty-finder hold when nothing personal is left unprotected in it:
+# 1. no released document holds a gold span that the findings do not cover in full;
 # 2. in particular no released document holds a gold name, address, date of birth, quasi-identifier or sensitive
 #    statement at all.
-# The guard has teeth: with the sensitivity limit at the escalation threshold (0.2) instead of the noise floor it
-# finds the tables that key sensitive statements by an identifier, and with no limit more.
+# This arm has teeth against the sensitivity limit (at 0.2 instead of 0.01 it finds the tables that key sensitive
+# statements by an identifier). It says NOTHING about a tracer that misses a name: every gold name is handed to the
+# tracer, so every document with a name keeps its hold whatever the switch does. It was read as evidence for a default
+# and should not have been (independent review HL-03).
+#
+# Arm 2, the name-blind tracer (the reviewer's variant). The tracer finds the gold contacts and identifiers but no
+# name, address or date of birth: the worst case for the tracer, as arm 1 is its best case. The real tracer lies
+# between, and it does miss names (a name in a file path, a spaced-out name: HL-01). This arm is the honest one: it
+# states how many development documents the switch releases with a gold span unprotected. That number is a record of
+# a known hazard of an opt-in switch, not a target; under the default switches it is zero.
 # ----------------------------------------------------------------------------------------------------------------------
 TRACER_LABEL = {
     "PERSON": Label.PERSON, "EMAIL": Label.EMAIL, "PHONE": Label.PHONE, "ADDRESS": Label.ADDRESS,
@@ -243,10 +253,18 @@ def _uncovered(case, findings):
     return out
 
 
-def _guard(limits=(None,)):
+NAME_BLIND_LABELS = frozenset({Label.EMAIL, Label.PHONE, Label.STUDENT_ID})
+
+
+def _name_blind_tracer_findings(case):
+    """The gold contacts and identifiers, as the tracer would label them; no name, address, date of birth or URL."""
+    return tuple(item for item in _ideal_tracer_findings(case) if item.primary_label in NAME_BLIND_LABELS)
+
+
+def _guard(limits=(None,), tracer=_ideal_tracer_findings):
     """Per sensitivity limit (None = the shipped one): (cases whose empty-finder hold the switch lifts, violations);
-    and the number of cases tested, under silent finders and an ideal tracer. Detection runs once per case; only the
-    policy is asked again for each limit."""
+    and the number of cases tested, under silent finders and the given stand-in tracer. Detection runs once per
+    case; only the policy is asked again for each limit."""
     from themis_shield import policy
 
     scores = json.loads((ROOT / "tests" / "fixtures" / "eval_doc_sensitivity_rc5.json").read_text("utf-8"))["scores"]
@@ -255,7 +273,7 @@ def _guard(limits=(None,)):
     out = {limit: ([], []) for limit in limits}
     try:
         for case in _gold_cases():
-            findings = _ideal_tracer_findings(case)
+            findings = tracer(case)
             if not findings:
                 continue  # nothing the tracer could have found: no empty-finder hold from tracer values to lift
             configure_detection_fixes(OFF)
@@ -285,7 +303,8 @@ def _guard(limits=(None,)):
     return tested, out
 
 
-def test_no_gold_span_of_the_evaluation_sets_is_released_unprotected_when_the_finders_are_silent():
+def test_an_ideal_tracer_and_silent_finders_release_no_unprotected_gold_span_with_the_switch_on():
+    # Arm 1. True, and not evidence that the switch is safe: the tracer is given every gold name (see above).
     started = time.perf_counter()
     tested, out = _guard((None, 0.2, 1.0))
     lifted, bad = out[None]
@@ -297,4 +316,55 @@ def test_no_gold_span_of_the_evaluation_sets_is_released_unprotected_when_the_fi
     loose = out[0.2][1]
     assert len(loose) >= 8 and any("HEALTH" in missing or "SEXUALITY" in missing for _, missing, _ in loose)
     assert len(out[1.0][1]) >= len(loose)
+    assert time.perf_counter() - started < 240
+
+
+# What arm 2 found when it was written (13/11/2026, the suite's rule packs): a record, not a target. If detection
+# changes and the numbers move, find out why and record again; a smaller number is not a licence to make the switch a
+# default (the worst-case tracer is a stand-in, and structured text is not on these sets: HL-01).
+# The reviewer measured the same 1,098 and 127 at 1c044ff (review HL-03, p10.py).
+NAME_BLIND_TESTED = 1098                # development documents with an empty-finder hold under this tracer
+NAME_BLIND_RELEASED_UNPROTECTED = 127   # of those, released by the switch with at least one gold span unprotected
+NAME_BLIND_UNPROTECTED_LABELS = {       # documents per unprotected gold label
+    "PERSON": 127, "DATE_OF_BIRTH": 43, "OTHER_DATE": 41, "ADDRESS": 22, "DISABILITY": 19, "ETHNICITY": 18,
+    "RELIGION": 16, "HEALTH": 15, "SEXUALITY": 7, "UNION": 6, "FAMILY_VIOLENCE": 5, "DRIVER_LICENCE": 2, "PASSPORT": 2,
+    "SECRET": 1, "CRIMINAL": 1,
+}
+
+
+def test_a_tracer_that_misses_names_shows_what_the_switch_would_release():
+    from collections import Counter
+
+    from themis_shield import policy
+
+    started = time.perf_counter()
+    scores = json.loads((ROOT / "tests" / "fixtures" / "eval_doc_sensitivity_rc5.json").read_text("utf-8"))["scores"]
+    tested, released_by_default, bad = 0, [], []
+    try:
+        for case in _gold_cases():
+            findings = _name_blind_tracer_findings(case)
+            if not findings:
+                continue
+            configure_detection_fixes(None)
+            evidence = run(case["text"], findings, sensitivity=scores[case["id"]])
+            if HOLD not in evidence.reasons:
+                continue  # no empty-finder hold to lift
+            tested += 1
+            if HOLD not in policy.decide(evidence).reasons:
+                released_by_default.append(case["id"])
+            configure_detection_fixes(ON)
+            switched = policy.decide(evidence)
+            if switched.decision != Decision.RELEASE:
+                continue
+            missing = sorted(set(_uncovered(case, evidence.findings)))
+            if missing:
+                bad.append((case["id"], missing))
+    finally:
+        configure_detection_fixes(None)
+    # Under the default switches every one of these documents keeps its hold: nothing is released.
+    assert released_by_default == []
+    # With the opt-in switch on: documents released with a gold span nobody protected.
+    labels = Counter(label for _, missing in bad for label in missing)
+    assert (tested, len(bad)) == (NAME_BLIND_TESTED, NAME_BLIND_RELEASED_UNPROTECTED), (tested, len(bad), labels)
+    assert dict(labels) == NAME_BLIND_UNPROTECTED_LABELS, labels.most_common()
     assert time.perf_counter() - started < 240

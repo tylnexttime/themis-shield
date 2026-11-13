@@ -21,6 +21,15 @@ later. A leak is worse than friction, so:
   again too (clean documents held: split C 13 of 95, split E 5 of 60, split F 12 of 80, split G 16 of 65, 0.246).
   It is listed as DD-37 with what it would need before anyone reconsiders it: a statement-level check that reads
   the text, not a document score.
+- **The guard behind that default handed the tracer every gold name (HL-03).** It played PII-Tracer with the gold
+  itself, so every document with a name kept its hold whatever the switch did; "1,342 documents, none released with
+  an unprotected span" said nothing about a tracer that misses a name, which is the case the hold exists for. The
+  guard now has a second arm, the reviewer's: silent finders and a tracer that finds the gold contacts and
+  identifiers but no name, address or date of birth. With the switch on it releases 127 of the 1,098 development
+  documents that hold an empty-finder hold, each with at least one gold span unprotected (a name in all 127, a date
+  of birth in 43, an address in 22; disability statements in 19, ethnicity in 18, religion in 16, health in 15).
+  Under the default switches the same arm releases none. The number is in the test as a record of the hazard, not
+  a target; the truth for the real tracer lies between the two arms.
 
 ### Friction on clean documents (13/11/2026; development measurements only)
 
