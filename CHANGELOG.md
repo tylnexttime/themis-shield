@@ -35,7 +35,7 @@ of this has met a fresh split.
   technical text, "a general rule" for every such sentence, and no deterministic veto on any of them (another
   finding in the sentence, a pronoun, a definite phrase such as "the cook" or "the placement", a name, narration, a
   non-Latin script, no class of people named, no rule verb, a class narrowed to one place such as "tenants in unit
-  12"; `detectors/subject_guard.py`). The vetoes only ever keep a hold, and they are a backstop, not the decision:
+  12", a point in time such as "last week"; `detectors/subject_guard.py`). The vetoes only ever keep a hold, and they are a backstop, not the decision:
   a sentence that mixes a fact with a rule can pass them, and there the model's two answers are what keeps the hold.
   *Fiction path* (its own switch): fiction, "a character in a story" for every such sentence, and no contact,
   identifier or quasi-identifier finding anywhere in the document.
@@ -54,10 +54,18 @@ of this has met a fresh split.
     0, split E 4 -> 3, split F 11 -> 5, split G 11 -> 7 of 65, 0.108). Fiction that stays held: a second detector
     agrees (7 documents), an email address in the document (6), an unsure sentence answer (2), another hold beside
     it (1).
-  - **Why it is off by default.** The numbers meet the adoption rule, but they are in-sample (the questions and
-    the vetoes were written after reading these sets, and split G's four policy documents are what the general path
-    was shaped on); with it on, every entry point needs a typed runtime, every replay needs a typed capture, and a
-    vetting record would quote a baseline that never included it (DD-36). It is ready to be an arm of the next
+  - **A probe the model failed.** Four invented documents with a fact about particular people and a rule in one
+    sentence, which no veto caught at the time: the model held one (a handover note) and lifted two, a team update
+    ("Staff with a criminal record in the finance team must not handle cash.") and a statement about last week's
+    starters under the heading "POLICY NOTE: general guidance for all sites". A heading was enough to make it call
+    the text a policy. Two vetoes written from that result ("located" for a definite place, "dated") hold both now,
+    and the suite keeps the model's own answers on record; other dressed-up shapes will exist.
+  - **Why it is off by default.** The replay numbers and the reviewer's sentences meet the adoption rule, but the
+    probe above shows the model's document answer can be steered by the text itself, so "when in doubt, keep the
+    hold" decides. The numbers are also in-sample (the questions and the vetoes were written after reading these
+    sets, and split G's four policy documents are what the general path was shaped on); and with it on, every
+    entry point needs a typed runtime, every replay needs a typed capture, and a vetting record would quote a
+    baseline that never included it (DD-36). It is ready to be an arm of the next
     frozen plan: `[typed] enabled = true`, `families = []`, `subject_lift = ["general"]` or `["general", "fiction"]`.
 
 ### Steward's decision after the second review (RC-01 to RC-08, 13/11/2026)
