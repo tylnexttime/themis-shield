@@ -4,6 +4,33 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Cloud trip-wire: a correction loop before approval (development, unmeasured)
+
+The optional cloud trip-wire (still off by default) no longer stops a job on its first flag after approval. It now
+runs once the gate has de-identified a package and before any person confirms or approves it: it checks the whole
+package and collects every finding, replaces each flagged span with a placeholder of the category it reported (the
+original goes into the conversation vault; the register records the placeholder ids each round added), and checks the
+corrected package again until a round finds nothing. After at most 3 rounds (`[tripwire] max_rounds`, 1 to 3) a
+package still flagged, or one where a round could replace nothing, goes to the Operator marked NOT CONVERGED (new
+reason `TRIPWIRE_NOT_CONVERGED`). The held response and `themis tripwire list` show what each round added
+(categories, counts, placeholder ids, proposal ids; never values). Every finding with text becomes a proposed
+known-miss entry (source `cloud_tripwire`; a keyed fingerprint or a shape rule, never the value), which changes nothing
+until a person verifies it. Malformed replies, replies containing an original value and transport failures still
+refuse the job; a finding called `SECRET` refuses it (`BLOCK:secret`); a package built while the trip-wire was off is
+refused once it is on (`TRIPWIRE_NOT_RUN`). `themis tripwire review` now records a verdict per flagged round without
+moving the job, and `stats` counts converged and not-converged loops. New register table `tripwire_loops`. The
+trade-off is stated plainly: the cloud model now reads the package before a person has approved it. With the
+trip-wire off the router is unchanged (`tests/test_catalogues_off.py`). Not measured on any split.
+
+**Two independent toggles (project owner, 13/11/2026).** `[tripwire] before_human` is the correction loop above.
+`[tripwire] after_human` runs once on exactly the package the requester and Operator approved, just before the task
+turn (where 0.3 ran it): it collects every finding, replaces nothing (a person approved that package), and sends the
+job back to the Operator (Held, `TRIPWIRE_FLAGGED`) with every finding listed and proposed to the known-miss register;
+`themis tripwire review JOB --reapprove` sends the same package unchanged, `--refuse` refuses the job. Both default to
+false and may be on together. `enabled` is deprecated: read only when neither toggle is set, `true` then means
+`before_human` only (in 0.3 and 0.4 it meant the check after approval: set `after_human = true` for that).
+`tripwire_records` gains a `stage` column (older rows default to `after_human`); `themis tripwire list` shows it.
+
 ### Split G result (eval-kit-v0.6-frozen): 0.4.0 as released fails its frozen rule
 
 0.4.0 as released **fails** its frozen rule on split G ([results](eval/RESULTS-v0.6.md)), the first fresh split to

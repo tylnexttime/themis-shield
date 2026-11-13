@@ -102,8 +102,19 @@ FIXED = {
     "KNOWN_MISS_HIT": "The de-identified text matches the known-miss register; check the listed findings, then confirm.",
     "KNOWN_MISS_STALE": "An imported known-miss snapshot is older than the configured limit; a person checks the text, or an Operator re-imports a current export.",
     "TRIPWIRE_UNAVAILABLE": "The cloud trip-wire could not be completed; the job stopped (fail closed).",
-    "TRIPWIRE_FLAGGED": "The cloud trip-wire flagged possible residual personal information; the job stopped for an Operator.",
-    "TRIPWIRE_REVIEW_REQUIRED": "An Operator must review the trip-wire flag before this job can continue.",
+    "TRIPWIRE_FLAGGED": (
+        "The cloud trip-wire flagged possible residual personal information in the approved package. Nothing was "
+        "replaced; the job went back to the Operator to re-approve the same package or refuse it."
+    ),
+    "TRIPWIRE_REVIEW_REQUIRED": "An Operator must re-approve or refuse the flagged package before this job can continue.",
+    "TRIPWIRE_NOT_CONVERGED": (
+        "NOT CONVERGED: the cloud trip-wire still reported personal information after its last correction round. "
+        "The Operator checks the listed rounds and the package before approving or refusing it."
+    ),
+    "TRIPWIRE_NOT_RUN": (
+        "This package was prepared before the cloud trip-wire was switched on, so it was never checked; start the "
+        "work again as a new request."
+    ),
 }
 POLICY = {
     "STAGE_FAILED": "A required detection stage failed.",

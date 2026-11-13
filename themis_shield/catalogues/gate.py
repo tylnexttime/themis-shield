@@ -30,8 +30,9 @@ from .store import CatalogueUnavailable
 
 KNOWN_MISS_KEYS = {"enabled", "path", "max_snapshot_age_days", "sweep_deadline_seconds"}
 FALSE_POSITIVE_KEYS = {"enabled", "path", "scope"}
-TRIPWIRE_KEYS = {"enabled", "max_completion_tokens"}
+TRIPWIRE_KEYS = {"enabled", "before_human", "after_human", "max_completion_tokens", "max_rounds"}
 DEFAULT_TRIPWIRE_TOKENS = 2048
+MAX_TRIPWIRE_ROUNDS = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +298,17 @@ def settings(config: Mapping[str, Any]) -> dict:
     tokens = trip.get("max_completion_tokens", DEFAULT_TRIPWIRE_TOKENS)
     if type(tokens) is not int or not 64 <= tokens <= 32768:
         raise ValueError("[tripwire] max_completion_tokens must be between 64 and 32768")
+    for key in ("before_human", "after_human"):
+        if key in trip and type(trip[key]) is not bool:
+            raise ValueError(f"[tripwire] {key} must be a boolean")
+    if "before_human" in trip or "after_human" in trip:
+        before, after = trip.get("before_human", False), trip.get("after_human", False)
+    else:
+        # Deprecated alias: with neither toggle set, `enabled = true` means the correction loop (before_human) only.
+        before, after = trip.get("enabled", False), False
+    rounds = trip.get("max_rounds", MAX_TRIPWIRE_ROUNDS)
+    if type(rounds) is not int or not 1 <= rounds <= MAX_TRIPWIRE_ROUNDS:
+        raise ValueError(f"[tripwire] max_rounds must be between 1 and {MAX_TRIPWIRE_ROUNDS}")
     scope = false.get("scope") or ""
     if not isinstance(scope, str):
         raise ValueError("[false_positives] scope must be text")
@@ -310,7 +322,10 @@ def settings(config: Mapping[str, Any]) -> dict:
         "false_positives": {
             "enabled": false.get("enabled", False), "path": _path(false, "false-positives.db"), "scope": scope,
         },
-        "tripwire": {"enabled": trip.get("enabled", False), "max_completion_tokens": tokens},
+        "tripwire": {
+            "enabled": before or after, "before_human": before, "after_human": after,
+            "max_completion_tokens": tokens, "max_rounds": rounds,
+        },
     }
 
 
@@ -320,24 +335,28 @@ def configure(router, config: Mapping[str, Any], *, protector_factory=None) -> d
 
     values = settings(config)
     router.known_miss = router.fp_catalogue = router.tripwire = None
-    known = values["known_miss"]
-    if known["enabled"]:
+    known, trip = values["known_miss"], values["tripwire"]
+    register = None
+    if known["enabled"] or trip["enabled"]:
+        # The trip-wire's proposals go to the known-miss register file even when its sweep is off: a proposal is
+        # never swept until a person verifies it, and nothing is swept unless [known_miss] is enabled.
         protector = protector_factory() if protector_factory is not None else None
-        router.known_miss = KnownMissSweep(
-            KnownMissRegister(
-                known["path"], protector=protector, clock=router.clock, create=True,
-                insecure_test_only=(config.get("vault") or {}).get("insecure_test_only") is True,
-            ),
-            known["max_age"], known["deadline_seconds"],
+        register = KnownMissRegister(
+            known["path"], protector=protector, clock=router.clock, create=True,
+            insecure_test_only=(config.get("vault") or {}).get("insecure_test_only") is True,
         )
+    if known["enabled"]:
+        router.known_miss = KnownMissSweep(register, known["max_age"], known["deadline_seconds"])
     false = values["false_positives"]
     if false["enabled"]:
         router.fp_catalogue = FalsePositiveGate(
             FalsePositiveCatalogue(false["path"], clock=router.clock, create=True), false["scope"],
         )
-    trip = values["tripwire"]
     if trip["enabled"]:
-        router.tripwire = Tripwire(trip["max_completion_tokens"])
+        router.tripwire = Tripwire(
+            trip["max_completion_tokens"], max_rounds=trip["max_rounds"], proposals=register,
+            before_human=trip["before_human"], after_human=trip["after_human"],
+        )
     return values
 
 

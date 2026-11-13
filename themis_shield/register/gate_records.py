@@ -4,8 +4,11 @@ Written only when a v0.3 catalogue feature is enabled; with all of them off thes
 
 - ``gate_decisions``: per job and clean package, the model's decision (detection plus policy) and the catalogue
   override, kept apart, with the known-miss register version and age used by the final sweep.
-- ``tripwire_records`` / ``tripwire_reviews``: what the cloud trip-wire said (spans and placeholder ids only, never
-  text) and the Operator's verdict on each flag, so flag precision can be tracked.
+- ``tripwire_records`` / ``tripwire_reviews``: what the cloud trip-wire said in each round (spans, a fixed
+  category, the placeholder ids each correction round added and the known-miss proposals made, never text) and the
+  Operator's verdict on each flagged round, so flag precision can be tracked.
+- ``tripwire_loops``: one row per finished trip-wire loop: the final package hash, whether it converged, and the
+  value-free list of what each round added (categories, counts, placeholder ids, proposal ids).
 - ``canary_runs`` (written whenever the detector canary is enabled, which is the default): one row per canary run,
   value-free (trigger, pass or fail, and per detector the status, the fixed names of failed expectations, a fixed
   error code and the duration). The canary only ever handles its own fixed synthetic documents.
@@ -25,14 +28,27 @@ from .models import REASONS, canonical_json, identity
 
 
 GATE_RECORD_REASONS = {
-    "TRIPWIRE_SENT": "The approved clean package was sent to the cloud trip-wire.",
+    "TRIPWIRE_SENT": "The clean package was sent to the cloud trip-wire.",
+    "TRIPWIRE_CORRECTED": (
+        "The cloud trip-wire's findings were replaced by placeholders; the corrected package is checked again."
+    ),
+    "TRIPWIRE_NOT_CONVERGED": (
+        "NOT CONVERGED: the cloud trip-wire still reported personal information after its last correction round. "
+        "The Operator checks the listed rounds and the package before approving or refusing it."
+    ),
     "TRIPWIRE_CLEAR": "The cloud trip-wire reported nothing (no evidence either way).",
-    "TRIPWIRE_FLAGGED": "The cloud trip-wire flagged possible residual personal information; the job stopped.",
+    "TRIPWIRE_FLAGGED": (
+        "The cloud trip-wire flagged possible residual personal information in the approved package; the job went "
+        "back to the Operator."
+    ),
     "TRIPWIRE_MALFORMED": "The cloud trip-wire reply was malformed; the job stopped.",
     "TRIPWIRE_UNAVAILABLE": "The cloud trip-wire could not be completed (transport or protocol); the job stopped.",
     "KNOWN_MISS_ASK": "The known-miss sweep now needs a person to check this package before approval.",
     "TRIPWIRE_CONFIRMED": "An Operator confirmed the trip-wire flag; the job is refused.",
-    "TRIPWIRE_REJECTED": "An Operator rejected the trip-wire flag as a false flag.",
+    "TRIPWIRE_REJECTED": (
+        "An Operator rejected the trip-wire flag as a false flag (for a flag on the approved package: re-approved "
+        "that exact package)."
+    ),
     "DETECTOR_CANARY_FAILED": (
         "The detector canary is failing; cloud-bound work is blocked until a canary passes again."
     ),
@@ -48,6 +64,14 @@ _HASH = re.compile(r"[0-9a-f]{64}")
 CANARY_STATUSES = ("pass", "fail", "skipped")
 _CANARY_NAME = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
 _CANARY_TRIGGERS = ("startup", "reload", "periodic", "documents", "retry", "pending", "manual", "eval")
+
+
+STAGES = ("before_human", "after_human")
+
+
+def _loop_record(record) -> bool:
+    """A round of the correction loop that runs before the human steps (never moves the job when it flags)."""
+    return record["stage"] == "before_human"
 
 
 class GateRecords:
@@ -71,6 +95,10 @@ class GateRecords:
                 flags_json TEXT NOT NULL,
                 occurred_utc TEXT NOT NULL
             )""")
+            # Which trip-wire mode wrote the row. Rows from before the column existed all came from the check after
+            # approval, so that is the default.
+            if "stage" not in {row[1] for row in db.execute("PRAGMA table_info(tripwire_records)")}:
+                db.execute("ALTER TABLE tripwire_records ADD COLUMN stage TEXT NOT NULL DEFAULT 'after_human'")
             db.execute(f"""CREATE TABLE IF NOT EXISTS tripwire_reviews (
                 review_id INTEGER PRIMARY KEY,
                 record_id INTEGER NOT NULL UNIQUE REFERENCES tripwire_records(record_id),
@@ -83,6 +111,14 @@ class GateRecords:
                 review_id INTEGER PRIMARY KEY REFERENCES tripwire_reviews(review_id),
                 actor_identity TEXT NOT NULL
             )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS tripwire_loops (
+                loop_id INTEGER PRIMARY KEY,
+                job_id TEXT NOT NULL REFERENCES jobs(job_id),
+                manifest_hash TEXT NOT NULL,
+                converged INTEGER NOT NULL CHECK(converged IN (0, 1)),
+                rounds_json TEXT NOT NULL,
+                occurred_utc TEXT NOT NULL
+            )""")
             db.execute("""CREATE TABLE IF NOT EXISTS canary_runs (
                 run_id INTEGER PRIMARY KEY,
                 version TEXT NOT NULL,
@@ -92,7 +128,8 @@ class GateRecords:
                 occurred_utc TEXT NOT NULL
             )""")
             for table in (
-                "gate_decisions", "tripwire_records", "tripwire_reviews", "tripwire_review_actors", "canary_runs",
+                "gate_decisions", "tripwire_records", "tripwire_reviews", "tripwire_review_actors", "tripwire_loops",
+                "canary_runs",
             ):
                 for action in ("UPDATE", "DELETE"):
                     db.execute(
@@ -234,7 +271,8 @@ class GateRecords:
             yield
 
     def record_tripwire(self, job_id, manifest_hash, outcome, flags, *, instruction_version, now=None):
-        """Append a trip-wire result. A flag stops the job (Held-Offline) until an Operator reviews it."""
+        """Append a result of the check after approval (``after_human``). A flag sends the job back to the Operator
+        (Held-Offline) until they re-approve the same package or refuse it (``review_tripwire``)."""
         from .sqlite_store import stamp, utc
         now = utc(now)
         if outcome not in OUTCOMES or not isinstance(flags, (list, tuple)):
@@ -263,8 +301,104 @@ class GateRecords:
                 self._stage_event(db, row, "TRIPWIRE_MALFORMED", now)
             return cursor.lastrowid
 
-    def tripwire_state(self, job_id, manifest_hash=None):
-        """The latest trip-wire record for the job (and package, if given), with its review, or None."""
+    @contextmanager
+    def tripwire_round_guard(self, job_id, *, now=None):
+        """A correction-loop round runs before approval: the job must be cloud-bound and still building its package
+        (so neither stage two nor any release can have happened), and not active or closed."""
+        from .sqlite_store import utc
+        now = utc(now)
+        with self._transaction() as db:
+            row = self._row(db, job_id)
+            if (
+                row["route"] != Route.CLOUD.value or row["package"] != "building"
+                or S(row["status"]) not in {S.LOGGED, S.AWAITING_OPERATOR, S.ESCALATED_REVIEW}
+            ):
+                raise PermissionError("trip-wire round not authorised")
+            self._stage_event(db, row, "TRIPWIRE_SENT", now)
+            yield
+
+    def record_tripwire_round(
+        self, job_id, manifest_hash, outcome, flags, *, round_number, last, instruction_version, now=None,
+    ):
+        """Append one correction-loop round. Unlike ``record_tripwire`` a flag never moves the job: its findings were
+        replaced by placeholders (``TRIPWIRE_CORRECTED``), or this was the last round (``TRIPWIRE_NOT_CONVERGED``).
+        A malformed reply or a failed round is audited here; the router then refuses the job."""
+        from .sqlite_store import stamp, utc
+        now = utc(now)
+        if (
+            outcome not in OUTCOMES or not isinstance(flags, (list, tuple))
+            or not isinstance(manifest_hash, str) or not _HASH.fullmatch(manifest_hash)
+            or type(round_number) is not int or not 1 <= round_number <= 3 or type(last) is not bool
+        ):
+            raise ValueError("invalid trip-wire round")
+        if (outcome == "flagged") != bool(flags):
+            raise ValueError("a flagged round, and only a flagged round, carries findings")
+        if not isinstance(instruction_version, str) or not re.fullmatch(r"[a-z0-9.-]{1,32}", instruction_version):
+            raise ValueError("invalid instruction version")
+        records = [dict(item) for item in flags]
+        if any(item.get("round") != round_number for item in records):
+            raise ValueError("every finding names its round")
+        with self._transaction() as db:
+            row = self._row(db, job_id)
+            cursor = db.execute(
+                "INSERT INTO tripwire_records (job_id,manifest_hash,instruction_version,outcome,flags_json,"
+                "occurred_utc,stage) VALUES (?,?,?,?,?,?,?)",
+                (job_id, manifest_hash, instruction_version, outcome, canonical_json(records), stamp(now),
+                 "before_human"),
+            )
+            event = {
+                "clear": "TRIPWIRE_CLEAR", "failed": "TRIPWIRE_UNAVAILABLE", "malformed": "TRIPWIRE_MALFORMED",
+                "flagged": "TRIPWIRE_NOT_CONVERGED" if last else "TRIPWIRE_CORRECTED",
+            }[outcome]
+            self._stage_event(db, row, event, now)
+            return cursor.lastrowid
+
+    def record_tripwire_loop(self, job_id, manifest_hash, converged, rounds, *, now=None):
+        """Append the finished loop: the final package, whether a round came back clean, and per round what it
+        added (value-free: counts, fixed categories, placeholder ids and proposal ids)."""
+        from .sqlite_store import stamp, utc
+        if (
+            not isinstance(manifest_hash, str) or not _HASH.fullmatch(manifest_hash) or type(converged) is not bool
+            or not isinstance(rounds, (list, tuple)) or not 1 <= len(rounds) <= 3
+            or any(type(item) is not dict for item in rounds)
+        ):
+            raise ValueError("invalid trip-wire loop")
+        with self._transaction() as db:
+            self._row(db, job_id)
+            cursor = db.execute(
+                "INSERT INTO tripwire_loops (job_id,manifest_hash,converged,rounds_json,occurred_utc) "
+                "VALUES (?,?,?,?,?)",
+                (job_id, manifest_hash, int(converged), canonical_json(list(rounds)), stamp(utc(now))),
+            )
+            return cursor.lastrowid
+
+    def tripwire_loop(self, job_id, manifest_hash):
+        """The latest finished loop whose final package is ``manifest_hash``, or None."""
+        with self._transaction() as db:
+            self._row(db, job_id)
+            row = db.execute(
+                "SELECT * FROM tripwire_loops WHERE job_id=? AND manifest_hash=? ORDER BY loop_id DESC LIMIT 1",
+                (job_id, manifest_hash),
+            ).fetchone()
+            if row is None:
+                return None
+            return dict(row, converged=bool(row["converged"]), rounds=json.loads(row["rounds_json"]))
+
+    def tripwire_loops(self, job_id=None):
+        with self._transaction() as db:
+            query, arguments = "SELECT * FROM tripwire_loops", []
+            if job_id is not None:
+                query += " WHERE job_id=?"
+                arguments.append(job_id)
+            return tuple(
+                dict(row, converged=bool(row["converged"]), rounds=json.loads(row["rounds_json"]))
+                for row in db.execute(query + " ORDER BY loop_id", arguments)
+            )
+
+    def tripwire_state(self, job_id, manifest_hash=None, *, stage=None):
+        """The latest trip-wire record for the job (and package, and mode, if given), with its review, or None."""
+        if stage is not None and stage not in STAGES:
+            raise ValueError("invalid trip-wire stage")
         with self._transaction() as db:
             self._row(db, job_id)
             query = "SELECT * FROM tripwire_records WHERE job_id=?"
@@ -272,6 +406,9 @@ class GateRecords:
             if manifest_hash is not None:
                 query += " AND manifest_hash=?"
                 arguments.append(manifest_hash)
+            if stage is not None:
+                query += " AND stage=?"
+                arguments.append(stage)
             row = db.execute(query + " ORDER BY record_id DESC LIMIT 1", arguments).fetchone()
             if row is None:
                 return None
@@ -286,6 +423,10 @@ class GateRecords:
 
     def review_tripwire(self, job_id, verdict, *, reviewer_identity, reviewer_role="operator", now=None):
         """An Operator's verdict on the job's pending flag.
+
+        A round of the correction loop (``before_human``) was corrected before approval: the verdict is recorded for
+        flag precision and the job does not move; repeat the command for each flagged round. The rest describes a
+        flag from the check after approval (``after_human``), which holds the job.
 
         ``confirmed``: a real residual; the job is refused. ``rejected``: a false flag; the job returns to Approved
         if its approval still holds for the same package (it is never re-checked by the trip-wire), otherwise to
@@ -305,13 +446,16 @@ class GateRecords:
                 "WHERE r.job_id=? AND r.outcome='flagged' AND v.review_id IS NULL "
                 "ORDER BY r.record_id DESC LIMIT 1", (job_id,),
             ).fetchone()
-            if record is None or S(row["status"]) != S.HELD_OFFLINE:
+            corrected = record is not None and _loop_record(record)
+            if record is None or not corrected and S(row["status"]) != S.HELD_OFFLINE:
                 raise ValueError("no pending trip-wire flag for this job")
             cursor = db.execute(
                 "INSERT INTO tripwire_reviews (record_id,job_id,verdict,reviewer_role,occurred_utc) "
                 "VALUES (?,?,?,?,?)", (record["record_id"], job_id, verdict, reviewer_role, stamp(now)),
             )
             db.execute("INSERT INTO tripwire_review_actors VALUES (?,?)", (cursor.lastrowid, reviewer))
+            if corrected:
+                return S(row["status"])
             if verdict == "confirmed":
                 row = self._move(
                     db, row, S.REFUSED, reviewer_role, "TRIPWIRE_CONFIRMED", now, reviewer, event="REFUSED",
@@ -344,6 +488,9 @@ class GateRecords:
             verdicts = dict(db.execute(
                 "SELECT verdict, COUNT(*) FROM tripwire_reviews GROUP BY verdict"
             ).fetchall())
+            loops = dict(db.execute(
+                "SELECT converged, COUNT(*) FROM tripwire_loops GROUP BY converged"
+            ).fetchall())
         confirmed, rejected = verdicts.get("confirmed", 0), verdicts.get("rejected", 0)
         flagged = outcomes.get("flagged", 0)
         return {
@@ -352,12 +499,13 @@ class GateRecords:
             "flags_confirmed": confirmed, "flags_rejected": rejected,
             "flags_pending": flagged - confirmed - rejected,
             "flag_precision": (confirmed / (confirmed + rejected)) if confirmed + rejected else None,
+            "loops_converged": loops.get(1, 0), "loops_not_converged": loops.get(0, 0),
         }
 
     def tripwire_records(self, job_id=None):
         with self._transaction() as db:
             query = (
-                "SELECT r.record_id, r.job_id, r.outcome, r.flags_json, r.occurred_utc, v.verdict "
+                "SELECT r.record_id, r.job_id, r.stage, r.outcome, r.flags_json, r.occurred_utc, v.verdict "
                 "FROM tripwire_records r LEFT JOIN tripwire_reviews v USING(record_id)"
             )
             arguments = []

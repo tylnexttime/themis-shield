@@ -299,10 +299,10 @@ class Router:
         return working, matched_indices
 
     def _protect(self, boundary, conversation_id, matched_indices):
-        starts, position = [], 0
-        for surface in boundary.surfaces:
-            starts.append(position)
-            position += len(surface.text) + 2
+        return self._protect_package(boundary, conversation_id, matched_indices, self._scan_package(boundary))
+
+    def _scan_package(self, boundary):
+        """Detection for cloud-bound work: the detector canary's checks around one scan of every surface."""
         scanned = "\n\n".join(surface.text for surface in boundary.surfaces)
         canary = self.canary
         if canary is not None:
@@ -315,12 +315,25 @@ class Router:
             blocked = canary.block_reason()
             if blocked is not None:
                 raise GateFailure(blocked, 200)
+        return evidence
+
+    def _protect_package(self, boundary, conversation_id, matched_indices, evidence, *, vault=None, sweep=True):
+        """Decide and substitute from one scan's evidence; ``_protect`` is exactly scan, then this.
+
+        The cloud trip-wire's correction rounds call it again with the same evidence (no second scan): with
+        ``vault`` set to a trial overlay and ``sweep`` off while trying a value, then on the real vault.
+        """
+        starts, position = [], 0
+        for surface in boundary.surfaces:
+            starts.append(position)
+            position += len(surface.text) + 2
+        scanned = "\n\n".join(surface.text for surface in boundary.surfaces)
         # v0.3: exactly decide(evidence) unless the reviewed false-positive catalogue is enabled.
         result, evidence = decide_with_catalogue(self, scanned, evidence)
         timings = dict(evidence.timings_ms)
         if result.decision == Decision.BLOCK:
             raise GateFailure(result.reasons[0].value if result.reasons else "POLICY_BLOCK", 200)
-        allocator = TokenAllocator(conversation_id, self.vault)
+        allocator = TokenAllocator(conversation_id, self.vault if vault is None else vault)
         previous = allocator.mapping()
         sent, counts = set(), Counter()
         labels_by_token: dict[str, set] = {}  # placeholders first allocated in this request: their evidence labels
@@ -378,7 +391,8 @@ class Router:
         originals = tuple(mapping.values())
         verify_json(raw, originals)
         # v0.3: the known-miss final sweep on the exact outbound JSON (a no-op unless enabled).
-        result = final_sweep(self, raw, result)
+        if sweep:
+            result = final_sweep(self, raw, result)
         return raw, scoped, sent, originals, result, timings, dict(counts)
 
     def handle(self, request, headers=None, *, source_document_count=1):
