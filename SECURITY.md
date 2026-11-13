@@ -41,6 +41,9 @@ In scope, for example:
 - an Operator action (approve, refuse, escalate, the Operator queue) accepted
   with the client's credential (the gate token or the chat session), or the
   Operator token accepted as a client credential on `/v1` or the hooks API;
+- an original shown by the Operator review's reveal reaching the register, an audit record, a log, browser storage,
+  or any caller without the Operator credential; or a held point's original reaching the cloud through an
+  Operator action;
 - a secret or credential being read from configuration files instead of the
   named environment variables.
 
@@ -84,3 +87,9 @@ Behaviour that is known and documented, so that nobody relies on the opposite. S
   profile, so a process running as that user can read both and approve. The
   separation stops a client that holds only the gate token; it does not prove
   that a second human approved.
+- **The Operator can reveal originals.** In the Operator review, whoever holds the Operator credential can ask to
+  see the original text of a highlighted point (one point per request). This is deliberate: some points can only be
+  judged by reading them. The original is read from the local vault, returned to that request only and shown on that
+  screen; it is not written to the register, the audit trail or a log, and the page does not keep it after it
+  re-renders or reloads. It is still on the Operator's screen while shown, so treat the Operator credential like the
+  vault key it opens.

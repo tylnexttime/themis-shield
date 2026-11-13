@@ -80,6 +80,7 @@ tokens are restored locally (`restore.py`).
 | `cloud/` | real | Fixed-destination transport, OpenAI-compatible by default; `api = "anthropic-messages"` selects the native Messages leg (`anthropic_messages.py`), which translates the approved package at send time, checks the translated body (`system` included) and translates the reply back; no tools. API key read from the named environment variable at send time. |
 | `register/sqlite_store.py`, `models.py`, `two_stage.py`, `reporting.py`, `cli.py`, `pilot.py` | real | The SQLite job register (append-only history tables), intake validation, two-stage approval, reports, the `themis register` CLI and the off-by-default automatic approval fixture. |
 | `register/client.py` | partial | Real: the register contracts (`JobRecord`, `JobStatus`, approval validation, offline journal) used everywhere. Skeleton: `JobRegisterClient` protocol methods and `HttpRegisterClient`, a non-networking stub for a remote register. |
+| `review.py`, `register/review_records.py` | real | Operator review of a held job, point by point: where each hold came from in the de-identified text, a plain-English reason, the Operator's reveal of one original, and a value-free, append-only record of how each point was settled (see [below](#operator-review-point-by-point)). |
 | `handover.py`, `app_services.py` | real | Handover mode: a deterministic, re-scanned package for manual use; safe projections for the web app. |
 | `vetting.py` | real, v0.3.1 | `themis vet`: a data release through the chat path's own steps (markings, detection, policy, catalogue, final sweep), derived documents under position-only names, a codebook vault per release, and the vetting record, which holds counts, not document text, and is checked against every protected value of six characters or more ([VETTING-RECORD.md](VETTING-RECORD.md)). |
 | `ledger.py` | skeleton | Specification of an append-only evidence ledger per request, for a central register service (roadmap, Later). Today the register's append-only records and decision records carry the evidence (`tests/test_register_immutability.py`). |
@@ -254,6 +255,58 @@ Operator reading the clean package. Making the two paths match is an open
 item. With `[known_miss]` enabled (v0.3), both paths also run the known-miss
 final sweep on their outbound text: it catches repeats of misses a person has
 already confirmed, not new ones.
+
+## Operator review, point by point
+
+Every document ends in one of three states, and ASK is only a waypoint on the way there: **stopped** (a local-only
+marking, an Operator refusal or an Operator stop), **de-identified and released**, or **released as-is** (nothing
+personal or sensitive was found). Each job reports its `end_state` in the register views (`null` while it is open).
+
+**What the Operator sees.** For a held job, the Operator console shows the de-identified text (each content surface's
+substituted text, joined by blank lines) with each hold trigger highlighted and numbered, and beside each a one-line
+reason and its place, for example "paragraph 2, line 4: The detectors disagreed on whether this is a name." The
+points come from the decision evidence (`Router._protect` builds them with `review.draft`): for each ASK reason, the
+findings behind it (sensitive statements, quasi-identifiers, the tracer findings behind an empty-finder or few-persons
+disagreement, typed-tier sentences, injection phrases), mapped to their position in the de-identified text. A reason
+with no single place (unmatched finder values, a stale known-miss snapshot) becomes a whole-document point. The
+reason text comes from a fixed catalogue (`point_reason` in `web/reasons.py`); the point's value is never part of it.
+Placeholders the gate put in without a hold are listed as "settled by the gate".
+
+**Where it is kept.** The register records the points value-free for each bound clean package
+(`review_points`: fixed reason, label, kind, character positions, `gate` or `operator`), and each Operator decision
+(`review_resolutions` and `review_resolution_actors`: action, category, positions, who, when). Like the rest of the
+register these tables refuse UPDATE and DELETE. The de-identified text itself stays in the router's memory only
+(`ReviewState`), with the conversation whose vault holds the originals; after a restart or once the conversation
+expires, the requester sends again to rebuild it.
+
+**Originals, carefully.** For a highlighted point only, the signed-in Operator may ask for the original text
+(`POST /api/operator/{job}/points/{point}/reveal`), because some points can only be judged that way (is "Blake" a
+person or a product?). The value is read from the vault for that request, returned in that response only (no-store),
+and shown inside that point on the page; re-rendering the queue, reloading or leaving the page drops it. No register
+row, audit row or log line is written by a reveal. Like every `/api/operator/*` route it needs the Operator
+credential; the client token and the chat session are refused.
+
+**Three actions per point.**
+
+- *Not personal: leave it.* The text stays as shown. A placeholder the gate already put in stays a placeholder: this
+  never sends an original.
+- *Replace it.* The Operator confirms or adjusts the span (it must still cover the point, keep whole placeholders and
+  stay within one content surface) and picks a category. The span's original becomes a placeholder in that job's
+  codebook (its conversation's vault), marked `de-identified-by-operator`, and is restored locally like any other.
+  The clean package goes back to "building"; the next send rebuilds it, binds the new hash and must contain the new
+  placeholder, or the job stops (`OPERATOR_REPLACEMENT_NOT_APPLIED`). Confirming the gate's own placeholder with its
+  own category changes nothing.
+- *Stop the document.* The job is refused at once (`STOPPED_BY_OPERATOR`); nothing is sent.
+
+**The release rule.** While a held point of the current package is unsettled, no stage is approved: the register
+refuses it on every path (`_decide_stage`, and `_stages_valid` for an earlier approval), and the console disables the
+approval buttons. The two-stage approval, refusal and escalation are otherwise unchanged. A job whose decision was
+RELEASE has no held points and is approved as before.
+
+**Nothing an Operator does in one job changes the gate by itself.** A replacement lives in that job's codebook only.
+"Not personal" verdicts are counted per hold reason (`themis operator stats`, value-free), so the team can see which
+reasons waste checks; they become false-positive catalogue entries only when someone deliberately proposes and
+accepts them (`themis fpc`). Nothing promotes them automatically.
 
 ## v0.3 catalogues: a gate that learns from its own runs
 
