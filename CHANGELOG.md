@@ -22,6 +22,10 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   every negative the `negative-statements` vocabulary reads is a statement again, as in 0.4.0; split G's GT-008 (a
   clean FAQ rule) is held again, and the DD-26 split G guard is a strict expected failure once more (it passes with
   the switch on).
+- Regression tests (`tests/test_default_holds_rc01_rc02.py`): RC-01's ten sentences and RC-02's five are ASK
+  (sensitive) under the default switches, as in 0.4.0. The same file records, per opt-in configuration, which of them
+  the switches still release (all but the one with a found name, for RC-01 with `policy-statements`); that table is a
+  record, not a target.
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 
