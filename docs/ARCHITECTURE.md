@@ -661,8 +661,12 @@ reading the whole document and then each sentence, says with a clear margin that
   ("someone", "a colleague"), narration or reported speech ("was", "said"), a definite phrase that is not plainly an
   organisation or an abstract thing ("the cook", "the placement", "the open ward"), a capitalised word that is not a
   known opener, a class of people or part of an organisation phrase ("Mum", "Jayden", "Wattle Street"), a letter
-  outside the Latin alphabet, or no class of people at all ("No", "Medical history: asthma"). Every rule errs towards
-  the veto. On its wording alone the veto holds every gold sensitive statement of `eval/cases` (3,250; a guard test).
+  outside the Latin alphabet, no class of people at all ("No", "Medical history: asthma"), no rule verb ("Staff in
+  payroll have been diagnosed with depression." states a fact), or a class narrowed to one place or time ("tenants
+  in unit 12"). Every rule errs towards the veto. On its wording alone the veto holds every gold sensitive statement
+  of `eval/cases` (3,250; a guard test). It is a backstop, not the decision: a sentence that mixes a fact with a rule
+  ("Staff who started last week are on parole and must report on Fridays.") passes it, and there the model's two
+  answers are what keeps the hold.
 - **Fiction path: its own switch.** A story is full of names and pronouns, so the sentence vetoes do not apply; the
   document must instead hold no finding but names, dates, places and the statements themselves (a contact, an
   identifier or a quasi-identifier makes it a record, not a story). It rests on the model's two answers more than

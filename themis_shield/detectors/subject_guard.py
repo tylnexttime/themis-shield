@@ -22,7 +22,12 @@ both option orders and the document-level answer (see ``policy.py``).
   an organisation phrase or a calendar or community word ("Dana", "Mum", "Mr Okafor", "Wattle Street", "HIV");
 - ``script``: a letter outside the Latin alphabet (these rules read English wording only);
 - ``no-class``: the sentence names no class of people ("staff", "applicants", "any employee", "a person", "anyone"):
-  a form answer ("No", "Medical history: asthma") or a fragment is not a rule about a class.
+  a form answer ("No", "Medical history: asthma") or a fragment is not a rule about a class;
+- ``no-rule``: the sentence has no rule verb ("can", "may", "must", "is entitled to", "is treated as", "does not
+  ask"): "Staff in payroll have been diagnosed with depression." names a class and states a fact about the people in
+  it;
+- ``located``: a class of people narrowed to one place or time ("staff on nights", "any employee in room 4", "tenants
+  in unit 12"): the people there, not everyone of that kind ("at any stage", "in all departments" are not places).
 """
 
 from __future__ import annotations
@@ -95,6 +100,22 @@ _OPENERS_OK = frozenset((
 # A class of people in the singular: "any employee", "a person", "no applicant", "each new starter".
 _CLASS_SINGULAR = re.compile(r"(?i)\b(?:a|an|any|every|each|no)\s+(?:[a-z][a-z-]*\s+){0,2}?([a-z][a-z-]*)\b")
 _CLASS_PRONOUN = re.compile(r"(?i)\b(?:anyone|anybody|everyone|everybody|nobody|no\s+one|those\s+(?:who|with))\b")
+# A rule verb: a modal, or a normative construction. Lower case only (a "May" is a month). A sentence without one
+# states a fact, and a fact about a class of people in one place is a statement about those people.
+_RULE_VERB = re.compile(
+    r"\b(?:can|could|may|might|must|should|shall|will|cannot|can't|need\s+not"
+    r"|(?:is|are)\s+(?:(?:not|never|always|also|only)\s+)?(?:entitled|eligible|required|expected|able|allowed|permitted"
+    r"|welcome|free|encouraged|treated|assessed|governed|handled|regarded|considered|kept|held|recorded|covered"
+    r"|protected|managed|available|asked|invited|supported|offered)"
+    r"|(?:does|do)\s+not\s+(?:[a-z]+\s+)?(?:ask|require|record|collect|keep|disqualify|prevent|exclude|bar|affect"
+    r"|need|have\s+to)"
+    r"|appl(?:y|ies)\s+to)\b")
+# A class of people followed (within three words) by one of these and then anything but a quantifier or a stock phrase
+# is a group in one place or time.
+_LOCATING = frozenset(("in", "on", "at", "from", "near", "inside", "outside"))
+_NOT_A_PLACE = frozenset((
+    "any all every each either both general particular principle practice employment writing advance addition "
+    "accordance line full part time need good work").split())
 _JOINERS = frozenset(("and", "of", "for", "&"))
 _OPENING = "\"'“‘([{:*•>#|–—"
 
@@ -177,6 +198,8 @@ def wording_veto(text: str, start: int, end: int) -> str | None:
         return "script"
     if not _names_a_class(sentence):
         return "no-class"
+    if not _RULE_VERB.search(sentence):
+        return "no-rule"
     if _PRONOUN.search(sentence):
         return "pronoun"
     if _SOMEONE.search(sentence):
@@ -184,6 +207,15 @@ def wording_veto(text: str, start: int, end: int) -> str | None:
     if _REPORTED.search(sentence):
         return "reported"
     tokens = [(m.start(), m.end(), m.group()) for m in _WORD.finditer(text, start, end)]
+    for at, (_, _, word) in enumerate(tokens):
+        low = word.casefold()
+        if not (_class_word(low, listed=True) or low in ROLE_WORDS):
+            continue
+        for k in range(at + 1, min(at + 4, len(tokens) - 1)):
+            if re.search(r"[^\s\w'’-]", text[tokens[k - 1][1]:tokens[k][0]]):
+                break  # punctuation ends the phrase
+            if tokens[k][2].casefold() in _LOCATING and tokens[k + 1][2].casefold() not in _NOT_A_PLACE:
+                return "located"
     excused: set[int] = set()
     for at, (_, _, word) in enumerate(tokens):
         low = word.casefold()

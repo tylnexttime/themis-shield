@@ -32,8 +32,8 @@ from ..types import Decision, Label, ReasonCode
 from .contracts import FindingEvidence, StageReport, Status, failure_code, finding
 from .subject_guard import sentence_veto
 from .typed import (
-    INDIRECT_NONE, SUBJECT_CHOICES, SUBJECT_KINDS, Decider, TypedAnswer, TypedEvidence, TypedSettings,
-    TypedStageError, make_document_question, make_question, sentences, typed_settings,
+    INDIRECT_NONE, SUBJECT_KINDS, Decider, TypedAnswer, TypedEvidence, TypedSettings, TypedStageError,
+    make_document_question, make_question, sentences, typed_settings,
 )
 
 STAGE = "typed-decisions"

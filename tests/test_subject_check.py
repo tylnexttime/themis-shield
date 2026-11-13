@@ -111,33 +111,59 @@ GENERAL_RULES = [
     "Staff who observe Ramadan may swap shifts on Fridays.",
     "Reasonable adjustments are available to any employee with a disability.",
     "Staff should note that adjustments are available to anyone with a disability.",
+    "Employees in all departments may ask for a prayer room.",
+    "Staff with a disability can request reasonable adjustments at any stage of employment.",
+]
+# Known to pass the vetoes although they speak of particular people (a fact and a rule in one sentence, no place right
+# after the class): here only the model's two answers keep the hold. Recorded so nobody reads the vetoes as complete.
+PASSES_THE_VETO_BUT_IS_SPECIFIC = [
+    "Staff who started last week are on parole and must report on Fridays.",
+    "Staff with a criminal record in the finance team must not handle cash.",
 ]
 VETOED = [
     ("Dana has epilepsy.", "no-class"),
     ("Medical history: asthma, uses a reliever puffer", "no-class"),
     ("No", "no-class"),
     ("The team cook has epilepsy.", "no-class"),
-    ("Staff know that Mum has dementia.", "definite"),
+    # A class of people and a fact about the people in it, with no rule verb.
+    ("Staff in payroll have been diagnosed with depression.", "no-rule"),
+    ("Tenants in unit 12 have a history of family violence.", "no-rule"),
+    ("A person at the front desk has dementia.", "no-rule"),
+    ("Staff on nights are all union members and plan to walk out on Friday.", "no-rule"),
+    ("No employee on level three is a union member.", "no-rule"),
+    ("Employees hired in May are members of the union.", "no-rule"),  # "May" the month is not the modal
+    # A class narrowed to one place or time: the people there.
+    ("Staff in payroll have been diagnosed with depression and may need time off.", "located"),
+    ("Any employee in room 4 has epilepsy and should not be left alone.", "located"),
+    ("Tenants in unit 12 must not be contacted because of a history of family violence.", "located"),
+    ("Volunteers on Saturday mornings are recovering from surgery and cannot lift anything heavy.", "located"),
+    ("Staff must remember that Mum has dementia.", "definite"),
     ("Staff are expected to remember that the cook has epilepsy.", "definite"),
     ("Carers who have never been charged may keep the placement.", "definite"),
     ("Patients with no criminal record may be moved to the open ward.", "definite"),
     ("Employees must note that the relevant manager has a criminal record.", "definite"),
-    ("All staff know that this employee is pregnant.", "definite"),
+    ("All staff should know that this employee is pregnant.", "definite"),
     ("Staff should be aware that our receptionist is pregnant.", "pronoun"),
     ("Staff with a disability can ask me for their adjustments.", "pronoun"),
-    ("Employees say a colleague in payroll is HIV positive.", "someone"),
-    ("An employee was charged with assault.", "reported"),
+    ("Employees should know a colleague in payroll is HIV positive.", "someone"),
+    ("Any employee who was charged with assault must tell the Institute.", "reported"),
     ("Applicants such as Dana with a disability can request adjustments.", "name"),
-    ("Employees at 14 Wattle Street have no criminal history.", "name"),
+    ("Employees at 14 Wattle Street may park there and have no criminal history.", "located"),
     ("Parents with no criminal record can be considered for kinship care of Jayden.", "name"),
     ("Volunteers must not tell anyone that Mr Okafor has dementia.", "name"),
-    ("Employees must not mention that staff in Payroll are HIV positive.", "name"),
+    ("Employees must not mention that staff in Payroll are HIV positive.", "located"),
+    ("Staff should know that HIV status is a private matter for employees.", "name"),  # an unknown acronym
     ("Сотрудники с инвалидностью могут запросить any employee adjustments.", "script"),
 ]
 
 
 @pytest.mark.parametrize("sentence", GENERAL_RULES)
 def test_a_general_rule_is_not_vetoed(sentence):
+    assert wording_veto(sentence, 0, len(sentence)) is None
+
+
+@pytest.mark.parametrize("sentence", PASSES_THE_VETO_BUT_IS_SPECIFIC)
+def test_the_vetoes_are_a_backstop_not_the_decision(sentence):
     assert wording_veto(sentence, 0, len(sentence)) is None
 
 
@@ -505,8 +531,9 @@ POLICY_CHECKS = (
     "An applicant with no criminal record is assessed like any other applicant once the check comes back clear. "
     "A check that lists an offence is read by the panel against the duties of the role.\n"
 )
-# Sentences the wording veto does not catch although they speak of particular people: only the model's answers (and
-# the document answer) stand between them and a lifted hold. Kept as probes so the record shows what the model says.
+# Sentences about particular people that name a class and nobody by name. When the model was asked, no veto caught
+# them and its answers held all three on their own; the "no-rule" and "located" vetoes written afterwards hold them
+# too. Kept as probes so the record shows what the model says.
 SPECIFIC_TEAM = ("Handover note for the weekend\n\nStaff on nights are all union members and plan to walk out on "
                  "Friday. Keep the gate log up to date.\n")
 SPECIFIC_SITE = ("Site diary, Tuesday\n\nApprentices on site have a hearing impairment, so every briefing is "
@@ -601,7 +628,7 @@ KNOWN_WITH_THE_REAL_MODEL = {
     **{f"rc01-{n}": "held" for n in range(1, 11)}, **{f"rc02-{n}": "held" for n in range(1, 6)},
     "policy-faq": "general", "policy-yaml": "general", "policy-log": "general", "policy-union": "general",
     "policy-checks": "general",
-    # Particular people in sentences the wording veto does not catch: here the model's answers held all three.
+    # Particular people named only as a class: the model's answers held all three (and the vetoes now do too).
     "specific-team": "held", "specific-site": "held", "specific-shift": "held",
     "fiction-story": "fiction", "real-as-story": "held",
 }
