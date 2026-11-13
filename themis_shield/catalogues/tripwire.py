@@ -401,7 +401,7 @@ class _Overlay:
         self.pending[token] = value
 
 
-_SHAPE = re.compile(r"[^\W\d_]+|\d+|\s+|.", re.S)
+_SHAPE = re.compile(r"(?P<letters>[^\W\d_]+)|(?P<digits>\d+)|(?P<spaces>\s+)|(?P<other>.)", re.S)
 
 
 def shape_pattern(value: str) -> str:
@@ -409,14 +409,18 @@ def shape_pattern(value: str) -> str:
     other characters stay. ``Mara Lindahl`` becomes ``[^\\W\\d_]{4}\\s[^\\W\\d_]{7}``."""
     parts = []
     for run in _SHAPE.finditer(value):
-        text = run.group()
+        # FAB-09: the class comes from the alternative that matched, never from the run's first character, so a run
+        # that starts with a letter-number or a fraction ("ⅧLindahl", "½Mara") is a counted class, not the value.
+        text, kind = run.group(), run.lastgroup
         count = "" if len(text) == 1 else "{%d}" % len(text)
-        if text[0].isspace():
+        if kind == "spaces":
             parts.append(r"\s" + count)
-        elif text[0].isdigit():
+        elif kind == "digits":
             parts.append(r"\d" + count)
-        elif text[0].isalpha():
+        elif kind == "letters":
             parts.append(r"[^\W\d_]" + count)
+        elif text.isalnum() or text == "_":
+            parts.append(r"\w")  # a word character outside the classes above: never written as itself
         else:
             parts.append(re.escape(text))
     return "".join(parts)

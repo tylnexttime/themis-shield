@@ -476,3 +476,13 @@ def test_fab_06_a_flagged_fragment_is_listed_for_the_operator_not_vaulted(tmp_pa
         assert loop["rounds"][0]["added"] == [] and loop["rounds"][0]["findings"] >= 2
     finally:
         h.cloud.close()
+
+
+# FAB-09: a run that starts with a letter-number or a fraction is a counted class, never written as itself.
+@pytest.mark.parametrize("value", ["\u2167Lindahl", "\u00bdMara", "\u3007\u4e09\u90ce", "Mara_Lindahl"])
+def test_fab_09_shape_patterns_never_hold_a_value_that_starts_with_an_unusual_letter(value):
+    pattern = shape_pattern(value)
+    assert re.fullmatch(pattern, value)
+    for run in re.findall(r"[^\W\d_]{2,}", value):
+        assert run not in pattern
+
