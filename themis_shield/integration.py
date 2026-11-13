@@ -175,6 +175,8 @@ def configure_legend_settings(config: Mapping[str, Any]) -> dict:
 TYPED_KEYS = {
     "enabled", "families", "temperatures", "margin", "min_label_mass", "mixed_families", "indirect_substitute",
     "max_state_chars", "model_role",
+    # The subject check (off unless subject_lift names a path); subject_capture is an evaluation setting, like ask_all.
+    "subject_lift", "subject_margin", "max_document_chars",
 }
 
 

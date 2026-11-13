@@ -164,7 +164,10 @@ def q(text, family, value):
 # Questions, windows, wording
 # ----------------------------------------------------------------------------------------------------------------------
 def test_wording_is_the_training_generators():
-    assert FAMILY_IDS == ("Q-S", "Q-M", "Q-N", "Q-P", "Q-I")
+    from themis_shield.detectors.typed import SUBJECT_FAMILIES, SWITCH_FAMILIES
+
+    # The five switched families are the training generator's; Q-D and Q-G (the subject check) are the gate's own.
+    assert SWITCH_FAMILIES == ("Q-S", "Q-M", "Q-N", "Q-P", "Q-I") and FAMILY_IDS == SWITCH_FAMILIES + SUBJECT_FAMILIES
     assert [name for name, _ in FAMILIES["Q-S"]["options"]] == [
         "real_person", "fiction_or_example", "general_information", "not_sensitive"]
     assert FAMILIES["Q-M"]["instructions"] == (

@@ -95,8 +95,46 @@ FAMILIES: dict[str, dict[str, Any]] = {
             ("none", "none of these about a real person"),
         ),
     },
+    # The subject check (``subject_lift``; 13/11/2026). Not the training generator's wording: written for this gate.
+    # Q-D is asked once per document with the whole text in view; Q-G once per sentence that holds a sensitive
+    # finding. Neither is switched by ``families``: ``subject_lift`` says which answers may lift a hold.
+    "Q-D": {
+        "qid": "q_d",
+        "scope": "document",
+        "instructions": "What kind of text is this, and does it say anything about particular real people?",
+        "options": (
+            ("about_real_people", "a record, message, note, report, form, list, chat or news item that says something "
+                                  "about particular real people"),
+            ("fiction", "fiction or creative writing: a story, a scene or an excerpt about invented characters"),
+            ("policy_or_guidance", "a policy, procedure, FAQ, notice, guide or training text that states general "
+                                   "rules or information, about no one in particular"),
+            ("technical", "configuration, code, a template or a system log about systems and jobs, not about people"),
+            ("unclear", "something else, or the text does not show which"),
+        ),
+    },
+    "Q-G": {
+        "qid": "q_g",
+        "instructions": "Who is the flagged sentence between [[ and ]] about: \"{target}\"?",
+        "options": (
+            ("particular_person", "a particular person or particular people: someone named, described by a role or "
+                                  "relation (the cook, our receptionist, her brother), written as I, you, he, she or "
+                                  "they, or the people in one particular case, team, household or place"),
+            ("general_rule", "no one in particular: a general rule, policy, entitlement or public information about "
+                             "a whole class of people"),
+            ("fiction_or_example", "an invented character in a story, or a made-up example, template or hypothetical"),
+            ("unclear", "the text does not show which"),
+        ),
+    },
 }
 FAMILY_IDS = tuple(FAMILIES)
+# The families ``[typed] families`` switches (and "all" selects). Q-D and Q-G belong to ``subject_lift``.
+SUBJECT_FAMILIES = ("Q-D", "Q-G")
+SWITCH_FAMILIES = tuple(family for family in FAMILIES if family not in SUBJECT_FAMILIES)
+# What the subject check may lift on: "general" (a general rule in a policy, guidance or technical text) and
+# "fiction" (an invented character in a text that is fiction). Both off by default.
+SUBJECT_PATHS = ("general", "fiction")
+SUBJECT_KINDS = {"policy_or_guidance": "general", "technical": "general", "fiction": "fiction"}
+SUBJECT_CHOICES = {"general": "general_rule", "fiction": "fiction_or_example"}
 LETTERS = "ABCDEFGH"
 
 # Answers that let the policy lift its family's hold, or (Q-I) add one. Everything else keeps the hold as it is.
@@ -141,7 +179,11 @@ DEFAULT_MODEL_ROLE = "gemma4-26b-a4b"
 DEFAULT_FAMILIES = ("Q-M", "Q-N", "Q-P")
 # Fitted on development data (negative log-likelihood of gold-implied answers): the 26B is over-confident on Q-S and
 # Q-I (T ~ 3). Q-M, Q-N and Q-P had too few gold-implied questions (2-4) to fit, so they stay at 1.
-DEFAULT_TEMPERATURES = {"Q-S": 3.03, "Q-M": 1.0, "Q-N": 1.0, "Q-P": 1.0, "Q-I": 3.03}
+# Q-D and Q-G (13/11/2026): not fitted. They take the over-confidence measured for the same model on the two other
+# sentence-reading families (T ~ 3), and a wider margin band (``subject_margin``): a clear answer, or the hold stays.
+DEFAULT_TEMPERATURES = {"Q-S": 3.03, "Q-M": 1.0, "Q-N": 1.0, "Q-P": 1.0, "Q-I": 3.03, "Q-D": 3.03, "Q-G": 3.03}
+DEFAULT_SUBJECT_MARGIN = 0.5
+DEFAULT_DOCUMENT_CHARS = 4000
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,9 +205,22 @@ class TypedSettings:
     ask_all: bool = False
     max_state_chars: int = DEFAULT_MAX_STATE_CHARS
     model_role: str = DEFAULT_MODEL_ROLE
+    # The subject check: which of SUBJECT_PATHS may lift ASK:sensitive (empty = off, the default; only read when
+    # ``enabled``). It asks Q-D once per document and Q-G per sensitive sentence; see policy.py for what may lift.
+    subject_lift: frozenset[str] = frozenset()
+    # Unsure when a Q-D or Q-G answer's margin is below this (never below ``margin``).
+    subject_margin: float = DEFAULT_SUBJECT_MARGIN
+    # Evaluation capture only: ask Q-D and every Q-G of a candidate document whatever a guard or an earlier answer
+    # says, so later replays can tune without the GPU. Effects are unchanged.
+    subject_capture: bool = False
+    # Q-D reads the whole document up to this many characters (head and tail of a longer one).
+    max_document_chars: int = DEFAULT_DOCUMENT_CHARS
 
     def family_on(self, family: str) -> bool:
         return self.enabled and family in self.families
+
+    def subject_on(self, path: str | None = None) -> bool:
+        return self.enabled and (bool(self.subject_lift) if path is None else path in self.subject_lift)
 
 
 _lock = Lock()
@@ -179,16 +234,23 @@ def validate_typed_settings(**values: Any) -> TypedSettings:
         raise ValueError("unknown typed settings")
     merged = {name: getattr(base, name) for name in known}
     merged.update({name: value for name, value in values.items() if value is not None})
-    for name in ("enabled", "mixed_families", "indirect_substitute", "ask_all"):
+    for name in ("enabled", "mixed_families", "indirect_substitute", "ask_all", "subject_capture"):
         if type(merged[name]) is not bool:
             raise ValueError(f"invalid typed setting {name}")
     families = merged["families"]
     if isinstance(families, str):
         families = [item.strip() for item in families.split(",") if item.strip()]
-        families = list(FAMILY_IDS) if families == ["all"] else ([] if families == ["none"] else families)
+        families = list(SWITCH_FAMILIES) if families == ["all"] else ([] if families == ["none"] else families)
     families = frozenset(families)
-    if families - set(FAMILY_IDS):
+    if families - set(SWITCH_FAMILIES):
         raise ValueError("unknown typed family")
+    subject = merged["subject_lift"]
+    if isinstance(subject, str):
+        subject = [item.strip() for item in subject.split(",") if item.strip()]
+        subject = list(SUBJECT_PATHS) if subject == ["all"] else ([] if subject == ["none"] else subject)
+    if not isinstance(subject, (list, tuple, set, frozenset)) or set(subject) - set(SUBJECT_PATHS):
+        raise ValueError("unknown subject_lift path")
+    subject = frozenset(subject)
     temperatures = dict(base.temperatures)
     supplied = merged["temperatures"]
     if not isinstance(supplied, Mapping) or set(supplied) - set(FAMILY_IDS):
@@ -203,16 +265,23 @@ def validate_typed_settings(**values: Any) -> TypedSettings:
     mass = merged["min_label_mass"]
     if type(mass) not in (int, float) or not 0.9 <= mass <= 1:
         raise ValueError("invalid typed label-mass floor (never below 0.9)")
+    subject_margin = merged["subject_margin"]
+    if type(subject_margin) not in (int, float) or not margin <= subject_margin < 1:
+        raise ValueError("invalid subject margin (never below the typed margin)")
     chars = merged["max_state_chars"]
     if type(chars) is not int or not 200 <= chars <= 4000:
         raise ValueError("invalid typed window size")
+    document_chars = merged["max_document_chars"]
+    if type(document_chars) is not int or not 500 <= document_chars <= 12000:
+        raise ValueError("invalid typed document size")
     if not isinstance(merged["model_role"], str) or not merged["model_role"]:
         raise ValueError("invalid typed model role")
     return TypedSettings(
         enabled=merged["enabled"], families=families, temperatures=temperatures, margin=float(margin),
         min_label_mass=float(mass), mixed_families=merged["mixed_families"],
         indirect_substitute=merged["indirect_substitute"], ask_all=merged["ask_all"], max_state_chars=chars,
-        model_role=merged["model_role"],
+        model_role=merged["model_role"], subject_lift=subject, subject_margin=float(subject_margin),
+        subject_capture=merged["subject_capture"], max_document_chars=document_chars,
     )
 
 
@@ -233,7 +302,10 @@ def settings_record(settings: TypedSettings | None = None) -> dict:
     """JSON-ready view of the settings (for run configurations and decision records)."""
     settings = settings or _settings
     return {
-        "enabled": settings.enabled, "families": [f for f in FAMILY_IDS if f in settings.families],
+        "enabled": settings.enabled, "families": [f for f in SWITCH_FAMILIES if f in settings.families],
+        "subject_lift": [path for path in SUBJECT_PATHS if path in settings.subject_lift],
+        "subject_margin": settings.subject_margin, "subject_capture": settings.subject_capture,
+        "max_document_chars": settings.max_document_chars,
         "temperatures": {f: settings.temperatures[f] for f in FAMILY_IDS}, "margin": settings.margin,
         "min_label_mass": settings.min_label_mass, "mixed_families": settings.mixed_families,
         "indirect_substitute": settings.indirect_substitute, "ask_all": settings.ask_all,
@@ -332,6 +404,31 @@ def make_question(text: str, family: str, start: int, end: int,
         raise ValueError("invalid typed question")
     state, _, _ = window(text, start, end, max_chars)
     return Question(family, start, end, state, text[start:end])
+
+
+DOCUMENT_GAP = "\n[...]\n"
+
+
+def document_state(text: str, max_chars: int = DEFAULT_DOCUMENT_CHARS) -> str:
+    """The whole document for a document-level question; of a longer one, its first two thirds of ``max_chars`` and
+    its last third, cut at line ends where one is near, with a gap marker between."""
+    if len(text) <= max_chars:
+        return _clean(text)
+    head, tail = text[:max_chars * 2 // 3], text[len(text) - max_chars // 3:]
+    cut = head.rfind("\n")
+    if cut >= len(head) * 3 // 4:
+        head = head[:cut]
+    cut = tail.find("\n")
+    if 0 <= cut <= len(tail) // 4:
+        tail = tail[cut + 1:]
+    return _clean(head) + DOCUMENT_GAP + _clean(tail)
+
+
+def make_document_question(text: str, family: str = "Q-D", max_chars: int = DEFAULT_DOCUMENT_CHARS) -> Question:
+    """One question about the whole document (its answer spans the document: 0 to its length)."""
+    if FAMILIES.get(family, {}).get("scope") != "document" or not text:
+        raise ValueError("invalid typed question")
+    return Question(family, 0, len(text), document_state(text, max_chars), "")
 
 
 def option_orders(family: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -509,15 +606,20 @@ class TypedAnswer:
     label_mass: float = 0.0
     margin: float = 0.0
     order_agree: bool = False
-    reason: str | None = None  # why unsure: transport, malformed, label-mass, order-disagree, margin
+    reason: str | None = None  # why unsure: transport, malformed, label-mass, order-disagree, margin, unasked
+    # Q-G only: the deterministic veto on this sentence (a fixed code from ``subject_guard``), whatever the model says.
+    guard: str | None = None
 
     def record(self) -> dict:
-        return {
+        out = {
             "family": self.family, "start": self.start, "end": self.end, "choice": self.choice,
             "unsure": self.unsure, "probabilities": {name: round(p, 6) for name, p in self.probabilities},
             "label_mass": round(self.label_mass, 6), "margin": round(self.margin, 6),
             "order_agree": self.order_agree, "reason": self.reason,
         }
+        if self.guard is not None:
+            out["guard"] = self.guard
+        return out
 
 
 def read_prefill(raw: Mapping[str, Any], order: tuple[str, ...], label_ids: Mapping[str, tuple[int, ...]],
@@ -591,7 +693,7 @@ def combine(question: Question, readings: list[OrderReading], settings: TypedSet
         reason = "label-mass"
     elif not order_agree:
         reason = "order-disagree"
-    elif margin < settings.margin:
+    elif margin < (settings.subject_margin if family in SUBJECT_FAMILIES else settings.margin):
         reason = "margin"
     return TypedAnswer(
         family, question.start, question.end, ranked[0], reason is not None,
@@ -674,10 +776,11 @@ class LlamaServerTypedRuntime:
 
 
 __all__ = [
-    "FAMILIES", "FAMILY_IDS", "LIFTING_CHOICES", "Decider", "LlamaServerTypedRuntime", "PrefillBackend", "Question",
+    "FAMILIES", "FAMILY_IDS", "LIFTING_CHOICES", "SUBJECT_CHOICES", "SUBJECT_FAMILIES", "SUBJECT_KINDS",
+    "SUBJECT_PATHS", "SWITCH_FAMILIES", "Decider", "LlamaServerTypedRuntime", "PrefillBackend", "Question",
     "SystemOneBackend", "TypedAnswer", "TypedSettings", "TypedStageError", "combine", "configure_typed",
-    "make_question", "option_orders", "prompt_key", "read_prefill", "render_messages", "sentences",
-    "settings_record", "typed_settings", "window",
+    "document_state", "make_document_question", "make_question", "option_orders", "prompt_key", "read_prefill",
+    "render_messages", "sentences", "settings_record", "typed_settings", "window",
 ]
 
 

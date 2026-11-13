@@ -38,7 +38,9 @@ weights, a tokenizer mismatch, an engine template change) and stops the run befo
 and recorded as skipped. The result is written to config.json.
 
 Typed-decision tier (v0.3, T1.5): --typed on runs it (off by default) with --typed-families and --typed-settings
-(a JSON file of temperatures, margin, label-mass floor, mixed_families, indirect_substitute). --capture-typed DIR
+(a JSON file of temperatures, margin, label-mass floor, mixed_families, indirect_substitute, and the subject check's
+subject_lift, subject_margin and subject_capture: the last asks every subject question of a candidate document, for a
+capture that later tuning can replay, and changes no decision). --capture-typed DIR
 writes every typed call (prompt key, model identity, top log-probabilities); --replay-typed DIR serves them and
 refuses a call that was not captured or another model identity (see typed_capture.py). --typed-ask-all asks every
 question any setting could need (for a capture that later tuning can replay); it changes no decision.
@@ -400,7 +402,7 @@ def configure_typed_args(args) -> dict:
         values = json.loads(Path(args.typed_settings).read_text(encoding="utf-8"))
         if not isinstance(values, dict) or set(values) - {
             "temperatures", "margin", "min_label_mass", "mixed_families", "indirect_substitute", "max_state_chars",
-            "families",
+            "families", "subject_lift", "subject_margin", "subject_capture", "max_document_chars",
         }:
             raise SystemExit("invalid --typed-settings file")
     if getattr(args, "typed_families", None):

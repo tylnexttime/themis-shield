@@ -8,6 +8,8 @@ The previous EvidenceLedger input stub is replaced by DetectionResult.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .config import UseCasePolicy
 from .detectors.contracts import DetectionResult, Status
 from .detectors.engine import FINAL_STAGES, LLM_STAGES, TIER1_STAGES
@@ -205,6 +207,97 @@ def _cleared(answers, family, items, settings):
     return None
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+# The subject check ([typed] subject_lift; off by default; 13/11/2026). The model-based replacement for the two opt-in
+# wording rules (DD-32, DD-33), built on "separate the evidence that substitutes from the evidence that holds": every
+# finding is still substituted, but an ASK:sensitive hold that rests on ONE detector's word may become a hint when a
+# local model, reading the whole document and then each sentence, says with a clear margin under both option orders
+# that nobody in particular is spoken of. All of these must hold, and anything unsure keeps the hold:
+# 1. ASK:sensitive is the document's only hold (``_typed_effects``: never a marking, secret, injection,
+#    unmatched-value, few-persons, stage or quasi-identifier hold beside it);
+# 2. no sensitive finding is corroborated: none has two detectors behind it (on the same or an overlapping span) and
+#    none is a cell of a sensitive-column table (``subject_candidate``). Two detectors agreeing is a hold;
+# 3. Q-D, asked once with the whole document in view, says what kind of text it is: a policy, guidance or technical
+#    text opens the "general" path, fiction the "fiction" path, anything else keeps the hold;
+# 4. Q-G, asked for every sentence that holds a sensitive finding, gives that path's answer for each: "general_rule",
+#    or "fiction_or_example";
+# 5. general path: no sentence carries a deterministic veto (``detectors/subject_guard.py``: a PERSON or other
+#    personal finding in the sentence, a personal pronoun, a definite reference such as "the cook", a name, narration);
+#    fiction path: the document holds no finding but names, dates, places and the statements themselves
+#    (``FICTION_QUIET_LABELS``): a contact, an identifier or a quasi-identifier makes it a record, not a story.
+# A lifted hold means RELEASE of the substituted text: the statements stay substituted, so a wrong answer does not put
+# the statement itself in front of the cloud.
+# ----------------------------------------------------------------------------------------------------------------------
+SUBJECT_IGNORED_STAGES = ("propagate", "allowlist", "union-final")
+FICTION_QUIET_LABELS = frozenset({Label.PERSON, Label.OTHER_DATE, Label.DATE_OF_BIRTH, Label.ADDRESS}) | SENSITIVE_LABELS
+
+
+def _detectors(item) -> set[str]:
+    """The detectors that called this finding sensitive (bookkeeping stages are not detectors)."""
+    return {entry.stage for entry in item.evidence
+            if entry.label in SENSITIVE_LABELS and not entry.stage.startswith(SUBJECT_IGNORED_STAGES)}
+
+
+def uncorroborated(evidence: DetectionResult) -> bool:
+    """True when every sensitive finding rests on one detector: none has a second detector on the same or an
+    overlapping span, and none is a cell of a sensitive-column table."""
+    from .detectors.statements import TABLE_STATEMENT_STAGE
+
+    items = sensitive_findings(evidence)
+    for item in items:
+        detectors = _detectors(item)
+        if TABLE_STATEMENT_STAGE in detectors:
+            return False
+        for other in items:
+            if other is not item and other.start < item.end and item.start < other.end:
+                detectors |= _detectors(other)
+        if len(detectors) != 1:
+            return False
+    return bool(items)
+
+
+def subject_candidate(evidence: DetectionResult) -> bool:
+    """The subject check could lift this document's hold: ASK:sensitive is its only hold and nothing corroborates a
+    sensitive finding. (Whether it does is the model's answers and the guards: ``_subject_cleared``.)"""
+    base = decide(replace(evidence, typed=None))
+    return base.decision == Decision.ASK and base.reasons == (ReasonCode.SENSITIVE,) and uncorroborated(evidence)
+
+
+def _subject_cleared(evidence: DetectionResult, answers, settings) -> tuple[str | None, str | None]:
+    """(path, None) when the subject check clears the sensitive hold; else (None, why not: a fixed code)."""
+    from .detectors.typed import SUBJECT_CHOICES, SUBJECT_KINDS
+
+    items = sensitive_findings(evidence)
+    if not items:
+        return None, "no-finding"
+    if not uncorroborated(evidence):
+        return None, "corroborated"
+    document = [answer for answer in answers if answer.family == "Q-D"]
+    if not document:
+        return None, "unasked"
+    if any(answer.unsure for answer in document):
+        return None, "unsure"
+    paths = {SUBJECT_KINDS.get(answer.choice) for answer in document}
+    path = paths.pop() if len(paths) == 1 else None
+    if path is None or not settings.subject_on(path):
+        return None, "answered-keep"
+    if path == "fiction" and any(
+        item.labels - FICTION_QUIET_LABELS for item in evidence.findings if not typed_only(item)
+    ):
+        return None, "guard"
+    for item in items:
+        found = _covered(answers, "Q-G", item)
+        if not found:
+            return None, "unasked"
+        if path == "general" and any(answer.guard is not None for answer in found):
+            return None, "guard"
+        if any(answer.unsure for answer in found):
+            return None, "unsure"
+        if any(answer.choice != SUBJECT_CHOICES[path] for answer in found):
+            return None, "answered-keep"
+    return path, None
+
+
 def _typed_effects(evidence: DetectionResult, reasons: tuple) -> tuple[tuple, tuple[str, ...]]:
     from .detectors.typed import INDIRECT_NONE, typed_settings
 
@@ -217,10 +310,14 @@ def _typed_effects(evidence: DetectionResult, reasons: tuple) -> tuple[tuple, tu
     if reasons and set(reasons) <= TYPED_LIFTABLE:
         families: set[str] = set()
         why: dict = {}
+        subject_path = None
         for reason in reasons:
             if reason == ReasonCode.SENSITIVE:
                 why[reason] = _cleared(answers, "Q-S", sensitive_findings(evidence), settings)
                 families.add("Q-S")
+                if why[reason] is not None and settings.subject_on() and reasons == (ReasonCode.SENSITIVE,):
+                    # The subject check: a second way to clear the same hold, only when it is the only hold.
+                    subject_path, why[reason] = _subject_cleared(evidence, answers, settings)
                 continue
             candidates = empty_llm_lift_candidates(evidence)
             if candidates is None:
@@ -236,7 +333,8 @@ def _typed_effects(evidence: DetectionResult, reasons: tuple) -> tuple[tuple, tu
             # Several families behind the holds: not one sole cause, whatever the answers (none are asked then).
             why = {reason: value if value == "not-liftable" else "mixed-families" for reason, value in why.items()}
         if all(value is None for value in why.values()):
-            notes.extend(f"lifted:{reason.value}:{'+'.join(sorted(families))}" for reason in reasons)
+            by = f"Q-D+Q-G:{subject_path}" if subject_path else "+".join(sorted(families))
+            notes.extend(f"lifted:{reason.value}:{by}" for reason in reasons)
             reasons = ()
         else:
             notes.extend(f"kept:{reason.value}:{value or 'other-hold'}" for reason, value in why.items())

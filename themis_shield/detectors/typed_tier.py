@@ -6,7 +6,10 @@ the cheaper tiers already found (ROADMAP section 2):
 - **Q-S** for each sentence holding a sensitive-statement finding, on a document whose only hold is ASK:sensitive;
 - **Q-M / Q-N / Q-P** for each tracer email or phone / date of birth or number / name behind an empty-finder hold
   (both finders returned nothing), on a document whose only hold is that one;
-- **Q-I** for each sentence no detector touched, on a document that would otherwise be released.
+- **Q-I** for each sentence no detector touched, on a document that would otherwise be released;
+- **Q-D** and **Q-G** (the subject check, ``subject_lift``; off by default): what kind of text the whole document is,
+  and who each sentence with a sensitive finding is about, on a document whose only hold is ASK:sensitive and whose
+  sensitive findings no second detector confirms (``ask_subject``).
 
 The model's answers are attached to the evidence (``DetectionResult.typed``) and the policy (``policy.decide``)
 decides what they may change. With ``indirect_substitute`` a Q-I sentence the policy holds for is also substituted
@@ -27,9 +30,10 @@ from types import MappingProxyType
 
 from ..types import Decision, Label, ReasonCode
 from .contracts import FindingEvidence, StageReport, Status, failure_code, finding
+from .subject_guard import sentence_veto
 from .typed import (
-    INDIRECT_NONE, Decider, TypedEvidence, TypedSettings, TypedStageError, make_question, sentences,
-    typed_settings,
+    INDIRECT_NONE, SUBJECT_CHOICES, SUBJECT_KINDS, Decider, TypedAnswer, TypedEvidence, TypedSettings,
+    TypedStageError, make_document_question, make_question, sentences, typed_settings,
 )
 
 STAGE = "typed-decisions"
@@ -106,6 +110,50 @@ def lift_targets(text: str, evidence, settings: TypedSettings) -> list[tuple[str
     return wanted if liftable else []
 
 
+def subject_sentences(text: str, evidence) -> list[tuple[int, int]]:
+    """The sentence spans (merged) that hold the document's sensitive findings: one Q-G question each."""
+    from ..policy import sensitive_findings
+
+    units = sentences(text)
+    spans = []
+    for item in sensitive_findings(evidence):
+        hits = [(s, e) for s, e in units if s < item.end and item.start < e]
+        spans.append((min([item.start, *(s for s, _ in hits)]), max([item.end, *(e for _, e in hits)])))
+    return _merge(spans)
+
+
+def ask_subject(decider, text: str, evidence, settings: TypedSettings) -> list:
+    """The subject check's answers for one document (``[typed] subject_lift``), or [] when it cannot apply.
+
+    Asked only when ASK:sensitive is the document's only hold and no sensitive finding is corroborated (the policy's
+    ``subject_candidate``). Q-D first, once, with the whole document in view; then Q-G for each sentence that holds a
+    sensitive finding. A sentence the deterministic guard vetoes carries the veto on its answer; it is put to the
+    model only when the fiction path could still use the answer. Questions no answer could use are not asked (they
+    are recorded as unsure with the reason ``unasked``), unless ``subject_capture`` is set. ``decider`` is a callable
+    returning the Decider (the model is acquired only when a question is really asked).
+    """
+    from ..policy import subject_candidate
+
+    if not settings.subject_on() or not subject_candidate(evidence):
+        return []
+    document = decider().decide(make_document_question(text, "Q-D", settings.max_document_chars))
+    path = None if document.unsure else SUBJECT_KINDS.get(document.choice)
+    if path is not None and path not in settings.subject_lift:
+        path = None
+    spans = subject_sentences(text, evidence)
+    vetoes = [sentence_veto(text, start, end, evidence.findings) for start, end in spans]
+    if path == "general" and any(vetoes):
+        path = None  # one vetoed sentence keeps the hold: no answer about the others can lift it
+    answers = [document]
+    for (start, end), veto in zip(spans, vetoes):
+        if path is None and not settings.subject_capture:
+            answers.append(TypedAnswer("Q-G", start, end, None, True, reason="unasked", guard=veto))
+            continue
+        answers.append(replace(decider().decide(make_question(text, "Q-G", start, end, settings.max_state_chars)),
+                               guard=veto))
+    return answers
+
+
 def indirect_targets(text: str, evidence) -> list[tuple[str, int, int]]:
     """Q-I: every sentence of at least three words that no finding touches."""
     touched = [(item.start, item.end) for item in evidence.findings]
@@ -175,8 +223,11 @@ def run_typed_tier(texts, results, runtime):
     if not settings.enabled:
         return list(results)
     texts, results = list(texts), list(results)
+    from ..policy import subject_candidate
+
     plans = [lift_targets(text, result, settings) for text, result in zip(texts, results)]
     bases = [decide(replace(result, typed=None)) for result in results]
+    subjects = [settings.subject_on() and subject_candidate(result) for result in results]
     answered: list[list] = [[] for _ in results]
     calls = [0 for _ in results]
     walls = [0.0 for _ in results]
@@ -195,7 +246,7 @@ def run_typed_tier(texts, results, runtime):
             decider = None
             for index, (text, result) in enumerate(zip(texts, results)):
                 start = perf_counter()
-                if plans[index] or needs_indirect(index, bases[index]):
+                if plans[index] or subjects[index] or needs_indirect(index, bases[index]):
                     begin = getattr(runtime, "begin_document", None)
                     if begin is not None:
                         begin(index)
@@ -205,6 +256,8 @@ def run_typed_tier(texts, results, runtime):
                         decider = Decider(stack.enter_context(runtime.session(settings)), settings)
                     before = decider.calls
                     answered[index] = _ask(decider, text, plans[index], settings)
+                    if subjects[index]:
+                        answered[index] += ask_subject(lambda: decider, text, result, settings)
                     provisional = decide(_with_answers(result, answered[index], 0, 0.0))
                     if needs_indirect(index, provisional):
                         answered[index] += _ask(decider, text, indirect_targets(text, result), settings)
