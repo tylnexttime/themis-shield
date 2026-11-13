@@ -576,6 +576,12 @@ def replace(router, job_id, point_id, start, end, category, *, actor):
     if whole is not None and parse_strict_token(segment).token_class == token_class:
         reopen, added = False, (None, False, state.conversation_id)
     else:
+        from .substitute import CATEGORY_STRENGTH
+        # FAB-07: a weaker category over a stronger placeholder would lose to it when the package is rebuilt (the
+        # strongest label wins a merged group) and the job would be refused on the next send; refuse it here instead.
+        if any(CATEGORY_STRENGTH[parse_strict_token(match.group()).token_class] > CATEGORY_STRENGTH[token_class]
+               for match in TOKEN.finditer(segment)):
+            raise GateFailure("REPLACEMENT_CATEGORY_WEAKER", 400)
         original = _original(router, state, start, end)
         if len(original) > MAX_REPLACEMENT or not original.strip():
             raise GateFailure("INVALID_REPLACEMENT_SPAN", 400)
@@ -635,6 +641,16 @@ def undo(router, job_id, point_id, *, actor):
         if entry is None:
             raise GateFailure("UNDO_UNAVAILABLE", 409)
         token, created, conversation = entry
+        if created:
+            with router._state_lock:
+                shared = any(
+                    other != point_id and item[0] == token
+                    for other, item in router._operator_points.get(job_id, {}).items()
+                )
+            if shared:
+                # FAB-07: another replacement of this job reuses the placeholder; removing it would make the next
+                # send refuse the job (OPERATOR_REPLACEMENT_NOT_APPLIED). Undo that one first.
+                raise GateFailure("PLACEHOLDER_SHARED", 409)
         if created and _in_use(router, job_id, conversation, token):
             raise GateFailure("PLACEHOLDER_IN_USE", 409)
     router.register.undo_point(job_id, point_id, actor_identity=actor, reopen=created, now=router.clock())

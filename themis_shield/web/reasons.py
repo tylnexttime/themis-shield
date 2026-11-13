@@ -140,6 +140,14 @@ FIXED = {
         "The placeholder this replacement added is already part of what was sent, or of another job's package, so "
         "it is kept and the replacement cannot be undone."
     ),
+    "PLACEHOLDER_SHARED": (
+        "Another replacement in this job reuses the placeholder this one added (the same value was replaced there "
+        "too). Undo that replacement first, then this one."
+    ),
+    "REPLACEMENT_CATEGORY_WEAKER": (
+        "The chosen category is weaker than a placeholder inside the span. Pick that placeholder's category or a "
+        "stronger one."
+    ),
     "TRIPWIRE_NOT_PENDING": (
         "Nothing is waiting for a trip-wire decision on this job: re-approve and refuse apply only to a package the "
         "check after approval sent back."

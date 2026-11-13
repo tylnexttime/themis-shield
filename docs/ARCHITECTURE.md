@@ -296,7 +296,9 @@ de-identified package, open points included, before any person sees this review.
   codebook (its conversation's vault), marked `de-identified-by-operator`, and is restored locally like any other.
   The clean package goes back to "building"; the next send rebuilds it, binds the new hash and must contain the new
   placeholder, or the job stops (`OPERATOR_REPLACEMENT_NOT_APPLIED`). Confirming the gate's own placeholder with its
-  own category changes nothing.
+  own category changes nothing. A category weaker than a placeholder inside the span is refused at once
+  (`REPLACEMENT_CATEGORY_WEAKER`, FAB-07): the stronger placeholder would win when the package is rebuilt and the job
+  would be refused on the next send.
 - *Stop the document.* The job is refused at once (`STOPPED_BY_OPERATOR`); nothing more is sent. "Nothing is
   sent" holds only while the cloud trip-wire's `before_human` mode is off: with it on, the cloud model has already
   read the de-identified package, held points included, before the Operator saw it, and the three actions act on text
@@ -316,7 +318,9 @@ confirming it and the value would go out in clear. Three
 limits: a stop is never undone (the job is refused); what a replacement added is kept in memory only, like the review
 text, so a replacement made before the gate restarted cannot be undone (`UNDO_UNAVAILABLE`); and a placeholder that is
 already part of what was sent, or of another job's package, is kept and its replacement cannot be undone
-(`PLACEHOLDER_IN_USE`). Only a placeholder marked as the Operator's can be removed this way
+(`PLACEHOLDER_IN_USE`); and while another replacement of the same job reuses the placeholder (the same value
+replaced at two points), undo that one first (`PLACEHOLDER_SHARED`, FAB-07). Only a placeholder marked as the
+Operator's can be removed this way
 (`Vault.forget_operator_placeholder`); the gate's own placeholders go only with their conversation.
 
 **The cloud trip-wire in the console.** When the trip-wire is on (see "Cloud trip-wire" below), the job's card has a

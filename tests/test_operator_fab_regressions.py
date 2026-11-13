@@ -49,3 +49,53 @@ def test_fab_03_replace_undo_replace_again_never_sends_the_value(tmp_path):
         assert "Morrison" not in outbound and "Blake" not in outbound
 
     _run(h, exercise)
+
+
+TWO = "Blake Morrison ships the synthetic widget on Tuesday. Blake Morrison signs for it."
+
+
+def test_fab_07a_a_weaker_category_over_a_gate_placeholder_is_refused_at_once(tmp_path):
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, view = await _held(client, operator)
+        point = view["points"][0]
+        base = f"/api/operator/{job}/points/{point['id']}"
+        span = {"start": 0, "end": view["text"].index(" ships")}
+        weaker = await operator.post(f"{base}/replace", json={**span, "category": "quasi-identifier"})
+        assert weaker.status_code == 400 and weaker.json()["error"]["code"] == "REPLACEMENT_CATEGORY_WEAKER"
+        assert h.register.get_details(job)["status"] != "Refused"
+        # The same span with the placeholder's own category, or a stronger one, is accepted and the job goes on.
+        stronger = await operator.post(f"{base}/replace", json={**span, "category": "identifier"})
+        assert stronger.status_code == 200
+        rebuilt = await client.post("/v1/chat/completions", json=request(TEXT), headers={"X-Themis-Confirm": job})
+        assert rebuilt.headers["x-themis-reason"] not in {"REQUIRED_STAGE_FAILED", "OPERATOR_REPLACEMENT_NOT_APPLIED"}
+        assert h.register.get_details(job)["status"] != "Refused"
+
+    _run(h, exercise)
+
+
+def test_fab_07b_undoing_the_first_of_two_same_value_replacements_is_refused_at_once(tmp_path):
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, view = await _held(client, operator, TWO)
+        first, second = view["points"][:2]
+        text = view["text"]
+        spans = ((0, text.index(" ships")), (text.index(". ") + 2, text.index(" signs")))
+        for point, (start, end) in zip((first, second), spans):
+            replaced = await operator.post(
+                f"/api/operator/{job}/points/{point['id']}/replace",
+                json={"start": start, "end": end, "category": "person"},
+            )
+            assert replaced.status_code == 200
+        refused = await operator.post(f"/api/operator/{job}/points/{first['id']}/undo", json={})
+        assert refused.status_code == 409 and refused.json()["error"]["code"] == "PLACEHOLDER_SHARED"
+        # Undo the second (which reused the placeholder), then the first: both accepted, and the job is not refused.
+        assert (await operator.post(f"/api/operator/{job}/points/{second['id']}/undo", json={})).status_code == 200
+        assert (await operator.post(f"/api/operator/{job}/points/{first['id']}/undo", json={})).status_code == 200
+        rebuilt = await client.post("/v1/chat/completions", json=request(TWO), headers={"X-Themis-Confirm": job})
+        assert rebuilt.headers["x-themis-reason"] != "OPERATOR_REPLACEMENT_NOT_APPLIED"
+        assert h.register.get_details(job)["status"] != "Refused"
+
+    _run(h, exercise)
