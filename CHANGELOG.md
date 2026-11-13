@@ -4,6 +4,45 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
+
+The development-set measurements below passed while FAB-01 and FAB-02 released statements about specific people, so
+each of these fixes is guarded by the reviewer's own reproductions as regression tests, not by a score. Principle for
+any change that removes a hold or a finding: it must never release a statement about a specific person; in doubt the
+hold stays. Nothing here was re-measured on a split.
+
+- **FAB-01 (High)** `policy-statements` dropped a sensitive finding whenever a general rule shared its clause ("The cook
+  has no criminal record and staff are expected to ...", "Amira Haddad, the payroll officer, is not a member of any
+  union and staff are expected to ..."): 0.4.0 ASK became RELEASE. Now the clause that carries the statement must
+  itself be the rule, with only lead-in words before its generic subject; a definite noun phrase before the verb, any
+  pronoun (they/them/their added) or a PERSON/QUASI_ID finding anywhere in the sentence keeps the finding. 17 probe
+  sentences must hold ASK:sensitive (`tests/test_policy_statements.py`), and a guard reads the 1,846 gold sensitive
+  spans whose sentence names a person or a definite role (`tests/test_specific_subject_guard.py`).
+- **FAB-02 (High)** the DD-26 change to `negative-statements` read a bare plural subject as a rule ("Parents have no
+  criminal record.", "Carers have never been charged."). A plural is generic now only with "with/who/that" and either
+  a quantifier ("all", "any") or a modal rule after the negative ("may", "can", "are not required", "need not"). Ten
+  must-hold sentences; the same guard asserts the exemption never fires on a named or definite-role sentence. DD-26's
+  split G guards still pass.
+- **FAB-03 (High)** Replace, rebuild, Undo, Replace again sent the replaced value in clear while the point read
+  "replaced". An undo that removes a placeholder now drops the stale review text; every point action is refused until
+  the requester re-sends (`REVIEW_REBUILD_REQUIRED`), and "confirm as it is" needs a placeholder still in the codebook.
+- **FAB-04** README and ARCHITECTURE now say that with `before_human` on the cloud model reads the de-identified package,
+  held points included, before any person approves it, and that "nothing is sent" after a stop holds only with it off.
+- **FAB-05** `[tripwire] enabled = true` (deprecated; now means `before_human`) prints a value-free start-up warning and
+  logs it (`TRIPWIRE_ENABLED_ALIAS`).
+- **FAB-06** the correction loop vaults only plausible personal values (at least three letters or digits, not a common
+  word, never a span that cuts a word); a fragment is listed for the Operator instead. The reviewer's 120-seed hostile
+  fuzz now keeps every invariant.
+- **FAB-07** a weaker category over a stronger placeholder (`REPLACEMENT_CATEGORY_WEAKER`) and undoing the first of two
+  same-value replacements (`PLACEHOLDER_SHARED`) are refused when the Operator acts, instead of refusing the job later.
+- **FAB-09** known-miss shape rules classify by the matched alternative, so a value starting with a letter-number or a
+  fraction ("Ⅷ...", "½...") is no longer written into the rule as itself.
+- **FAB-10** reveal is refused once the job is closed (`REVIEW_CLOSED`).
+- **FAB-13** the version is `0.5.0.dev0`, and "approval needs every point settled" is scoped to the web and `/v1` path.
+- **FAB-14** the "Operator replacement applied" check runs on the first build, before the loop sends anything.
+- Open, in [DEV-DEBT](docs/DEV-DEBT.md): FAB-08 (DD-27), FAB-11 (DD-28) and the reviewer's further suggestions (DD-29
+  to DD-31).
+
 ### Cloud trip-wire: a correction loop before approval (development, unmeasured)
 
 The optional cloud trip-wire (still off by default) no longer stops a job on its first flag after approval. It now
@@ -100,7 +139,7 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
   stays a literal; at least two otherwise), no user, password, query, host with dots or letters
   run into digits, and a web scheme never counts. A literal after the same keys, `user:pass@`, an `https://` URI, a path
   with a high-entropy segment, a literal beside a reference on the same line or on another line, a literal in a trailing
-  comment, a value-less key line and a lone padded base64 key still BLOCK (COR-001), and no gold SECRET span in
+  comment (when a detector marks that literal; FAB-08: the look-alike itself no longer blocks the line), a value-less key line and a lone padded base64 key still BLOCK (COR-001), and no gold SECRET span in
   `eval/cases` passes the rule. `--detection-fixes` without the switch restores the previous behaviour byte for byte.
   Measured by replay as development evidence only (written from split G's six documents): split G friction
   0.308 -> 0.246 (four of the six released; GR-083 is now held only for a sensitive finding and GR-098 still for
@@ -108,7 +147,8 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
 
 ### General policy statements are not sensitive statements (split G friction)
 
-- `policy-statements` (new default switch): a sensitive finding, from any detector, is dropped when the clause it lies
+- `policy-statements` (new default switch; narrowed by FAB-01 above, the clause that carries the statement must itself
+  be the rule): a sensitive finding, from any detector, is dropped when the clause it lies
   in is plainly a general rule about a class of people and about no one in particular (taxonomy section 3: a statement
   is labelled only when it is about a person; section 4's `policy_statement`, "staff with a disability can request
   reasonable adjustments"). Fixed wording only: a generic subject (staff, employees, applicants, "any employee",
@@ -151,8 +191,8 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
   `test-g-*.adjudicated.jsonl`; the sealed files stay as they were) and two were switch errors, fixed here with no new
   switch. `negative-statements` no longer matches a negative inside a general rule about a class of people ("A person
   with no criminal record at all is treated the same as any other applicant once the check is returned as clear", in a
-  clean FAQ): only a generic subject (a person, any applicant, applicants, staff, people, anyone who) before it in its
-  sentence, nothing personal in the sentence and no ":" after it; a name, "He", "I", an appositive ("Priya Nand, a
+  clean FAQ): only a generic subject (a person, any applicant, anyone who, or a plural marked as a class: narrowed by
+  FAB-02 above) before it in its sentence, nothing personal in the sentence and no ":" after it; a name, "He", "I", an appositive ("Priya Nand, a
   person with no criminal record, ...") and a list under a generic heading still match. `quasi-cells` widens a partial
   finding only to the clause of the cell that holds it, so a ";" inside a cell ends it (GT-081's second clause ended in
   a role title).
