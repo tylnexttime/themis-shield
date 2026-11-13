@@ -4,6 +4,11 @@ Split G's finders (and the union-role pass) held three clean documents for sente
 can request reasonable adjustments" (taxonomy section 3: sensitive statements are labelled only when they are about a
 person; section 4: ``policy_statement``). The pass drops a sensitive finding whose clause is plainly a general rule, by
 fixed wording only. Synthetic only: every sentence below is invented.
+
+Since 13/11/2026 the switch is OPT-IN (steward's decision after the second independent review, RC-01 and RC-03): a
+rule-based genericity test misses sentence shapes, so it is not safe for release decisions. Every test in this module
+runs with the switch turned on explicitly (the autouse fixture below), except where it says otherwise; the default
+behaviour (the 0.4.0 hold) is asserted here and in ``tests/test_default_holds_rc01_rc02.py``.
 """
 
 from __future__ import annotations
@@ -79,6 +84,18 @@ def without_switch():
     configure_detection_fixes([name for name in DEFAULT_DETECTION_FIXES if name != SWITCH])
 
 
+def with_switch():
+    configure_detection_fixes([*DEFAULT_DETECTION_FIXES, SWITCH])
+
+
+@pytest.fixture(autouse=True)
+def _opt_in_switch_on():
+    """The switch is opt-in: turn it on for the tests of what it does, and restore the defaults afterwards."""
+    with_switch()
+    yield
+    configure_detection_fixes(None)
+
+
 SHAPES = [
     pytest.param(YAML_COMMENT, [("DISABILITY", YAML_RULE)], id="comment-in-a-configuration-file"),
     pytest.param(LOG_LINE, [("DISABILITY", NOTICE)], id="notice-quoted-in-a-log-line-two-clauses"),
@@ -87,13 +104,19 @@ SHAPES = [
 
 
 # ----------------------------------------------------------------------------------------------------------------
-def test_the_switch_is_a_default_fix_after_quasi_cells():
+def test_the_switch_is_opt_in_after_quasi_cells():
+    from themis_shield.detectors.settings import OPT_IN_DETECTION_FIXES
+
     assert DETECTION_FIXES[DETECTION_FIXES.index("quasi-cells") + 1] == SWITCH
-    assert SWITCH in DEFAULT_DETECTION_FIXES and fix_on(SWITCH)
+    assert SWITCH not in DEFAULT_DETECTION_FIXES and SWITCH in OPT_IN_DETECTION_FIXES
+    assert fix_on(SWITCH)  # turned on by this module's fixture
+    configure_detection_fixes(None)
+    assert not fix_on(SWITCH)
+    assert SWITCH in configure_detection_fixes("all")
     assert validate_detection_fixes(SWITCH) == (SWITCH,)
 
 
-# Regression: before the switch each of these clean documents was held for ASK:sensitive.
+# With the opt-in switch on, each of these clean documents is released (without it: held for ASK:sensitive).
 @pytest.mark.parametrize("text, entities", SHAPES)
 def test_a_general_rule_no_longer_holds_a_clean_document(text, entities):
     result = gate(text, entities)
@@ -107,7 +130,9 @@ def test_without_the_switch_the_old_behaviour_is_restored(text, entities):
     try:
         without_switch()
         assert reasons(text, entities) == [ReasonCode.SENSITIVE]
-        configure_detection_fixes(None)
+        configure_detection_fixes(None)  # the defaults: the switch is opt-in, so the 0.4.0 hold stands
+        assert reasons(text, entities) == [ReasonCode.SENSITIVE]
+        with_switch()
         assert reasons(text, entities) == []
     finally:
         configure_detection_fixes(None)

@@ -4,6 +4,18 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Steward's decision after the second review (RC-01 to RC-08, 13/11/2026)
+
+Two rounds of independent review showed that judging "general rule or statement about a specific person" with rules
+is not safe: each narrowing left another sentence shape that releases a person's sensitive information. A leak is
+worse than friction, so the passes that remove a hold on that judgement are off by default.
+
+- **`policy-statements` is opt-in (off by default).** Not safe for release decisions: a rule-based genericity test
+  misses sentence shapes; see RC-01 ("Staff are expected to remember that the cook has epilepsy." was ASK in 0.4.0 and
+  RELEASE with the switch on) and RC-03 (its over-strictness on plain policy text). A model-based check with
+  abstain-to-hold is the planned replacement. The code and the switch stay (`[detection] fixes` naming it, or `"all"`).
+  With the defaults, the three split G clean documents it released are held again (ASK:sensitive), as in 0.4.0.
+
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 
 The development-set measurements below passed while FAB-01 and FAB-02 released statements about specific people, so
@@ -147,8 +159,8 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
 
 ### General policy statements are not sensitive statements (split G friction)
 
-- `policy-statements` (new default switch; narrowed by FAB-01 above, the clause that carries the statement must itself
-  be the rule): a sensitive finding, from any detector, is dropped when the clause it lies
+- `policy-statements` (new switch, **opt-in since the steward's decision above**; narrowed by FAB-01 above, the clause
+  that carries the statement must itself be the rule): a sensitive finding, from any detector, is dropped when the clause it lies
   in is plainly a general rule about a class of people and about no one in particular (taxonomy section 3: a statement
   is labelled only when it is about a person; section 4's `policy_statement`, "staff with a disability can request
   reasonable adjustments"). Fixed wording only: a generic subject (staff, employees, applicants, "any employee",

@@ -348,5 +348,7 @@ def test_default_has_every_fix_but_the_ones_still_off():
     selected = configure_detection_fixes(None)
     # Off on purpose: tolerant trust released genuine misses on the real slice. Adding to this set is a deliberate
     # decision; so is removing from it (the v0.4 readers left it on 30/10/2026 after a live measurement).
-    off = {"finder-whitespace-trust"}
+    # policy-statements: off by the steward's decision of 13/11/2026 (second review RC-01, RC-03): a rule-based
+    # genericity test is not safe for release decisions.
+    off = {"finder-whitespace-trust", "policy-statements"}
     assert set(selected) == set(DETECTION_FIXES) - off

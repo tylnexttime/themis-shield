@@ -10,7 +10,8 @@ Set at start-up from ``[detection] version`` (or the evaluation runner's ``--det
 v0.3 friction fixes (lane 1) are named switches on top of v0.2, each measured alone and together by replay on the
 development sets. ``[detection] fixes`` (a list of names, ``"all"`` or ``"none"``) or the runner's
 ``--detection-fixes`` selects them; ``version = "v0.1"`` switches every one of them off as well. All are on by
-default; ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte.
+default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust`` and ``policy-statements``);
+``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte and ``"all"`` turns the opt-in ones on too.
 
 - ``secret-placeholders``: a secret assignment whose whole value is a template placeholder or a reference to a
   secret manager (``${VAULT:...}``, ``{{ secret }}``, ``<set in vault>``, ``%(name)s``, ``$(VAR)``, ``<REDACTED>``)
@@ -132,7 +133,12 @@ v0.5 detection fixes (from split F, now development data):
   that holds the finding is widened (DD-26). A finding across cells, a cell over 160 characters and a
   QUASI_ID label given only by PII-Tracer (it calls single sensitive words quasi-identifiers) are left as they are;
   see ``quasi_cell_spans`` in ``detectors/propagate.py``.
-- ``policy-statements`` (from split G's friction): a sensitive finding, from any detector, is dropped when the clause it
+- ``policy-statements`` (from split G's friction; **opt-in, off by default** since 13/11/2026): **not safe for release
+  decisions: a rule-based genericity test misses sentence shapes; see RC-01, RC-03 (second independent review). A
+  model-based check with abstain-to-hold is the planned replacement.** Two rounds of review each found another
+  sentence shape that released a statement about a specific person ("Staff are expected to remember that the cook has
+  epilepsy." was ASK in 0.4.0 and RELEASE with this switch on); a leak is worse than friction. The code and the switch
+  stay for measurement. What it does when selected: a sensitive finding, from any detector, is dropped when the clause it
   lies in is plainly a general rule about a class of people and about no one in particular (taxonomy section 3: a
   sensitive statement is labelled only when it is about a person). Fixed wording only: a generic subject (``staff with
   a disability``, ``employees``, ``any employee``, ``anyone who``, ``union matters``, ``union activity``, ``the College
@@ -198,8 +204,14 @@ SECRET_CONTEXT_FIXES = (
 # The real-document fixes (secret context classes, finder-whitespace, address-line-numbers) held the ratchet on the
 # development sets and on the private real slice. finder-whitespace-trust is off: on the real slice it released
 # documents whose only hold was the unmatched-values rule and that also had genuine finder misses (+2 leaks).
+# Opt-in switches, off by default:
+# - finder-whitespace-trust: see above.
+# - policy-statements (steward's decision, 13/11/2026): not safe for release decisions; a rule-based genericity test
+#   misses sentence shapes (second review RC-01, RC-03). A model-based check with abstain-to-hold is the planned
+#   replacement.
+OPT_IN_DETECTION_FIXES = ("finder-whitespace-trust", "policy-statements")
 DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(
-    name for name in DETECTION_FIXES if name != "finder-whitespace-trust"
+    name for name in DETECTION_FIXES if name not in OPT_IN_DETECTION_FIXES
 )
 # v0.4 (0.3.2): column-identifiers and bare-number-formats held the ratchet on all four development sets by replay
 # (split D half C: released leaks 26 -> 3). finder-windows and detectors-detection-view changed the finder prompts, so
