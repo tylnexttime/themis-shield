@@ -18,6 +18,13 @@ of people and about no one in particular, by fixed wording only (``policy_clause
   subject (a name), no "the only", "sole" or "one", no "a staff member at ..." or "the employee of ...", no speech verb
   ("asked", "said", "told": someone is reporting), and no PERSON or QUASI_ID finding in the clause.
 
+FAB-01 (independent review): the clause in which the finding starts must itself be the rule, with nothing but lead-in
+words ("and", "all", "if", a numbering) before its generic subject, and the whole sentence must be impersonal (they,
+them and their count as personal) and hold no PERSON or QUASI_ID finding. "The cook has no criminal record and staff
+are expected to ...", "Both crew members are treated ...", "The site foreman's union activity is considered ..." and
+"Amira Haddad, the payroll officer, is not a member of any union and staff are expected to ..." are kept. A rule
+elsewhere in the sentence never excuses a clause about someone; when in doubt the finding stays.
+
 A finding that spans several clauses of one sentence ("... at any stage of employment; requests are handled by the
 People and Capability team.") is dropped only when one of them is such a rule and each of the others says nothing about
 a sensitive category (no word of a short fixed list: disability, health, union, religion, criminal ...), holds no name
@@ -35,7 +42,7 @@ import re
 
 from ..placeholders import SENSITIVE_LABELS
 from ..types import Label
-from .statements import TABLE_STATEMENT_STAGE, _sentence_clause
+from .statements import _STATEMENT_END, TABLE_STATEMENT_STAGE
 
 _PLURAL = (r"(?:staff(?!\s+member\b)(?:\s+members)?|employees|workers|applicants|candidates|students|customers|clients"
            r"|patients|residents|volunteers|contractors|members|people|parents|carers|tenants|new\s+starters"
@@ -65,7 +72,20 @@ _VERB = re.compile(
     r"|(?:does|do)\s+not\s+ask\s+(?:whether|if)\b)")
 _GAP = re.compile(r"(?:\s+[a-z][a-z'\u2019-]*){0,8}\s+")  # lower-case words only between the subject and its verb
 
-_PRONOUN = re.compile(r"(?i)\b(?:he|she|him|her|hers|his|himself|herself|i|me|my|mine|myself|you|your|yours|yourself)\b")
+# FAB-01: "they", "them" and "their" can refer to one person ("Sam said they ..."): a sentence holding one is kept.
+_PRONOUN = re.compile(r"(?i)\b(?:he|she|him|her|hers|his|himself|herself|i|me|my|mine|myself|you|your|yours|yourself"
+                      r"|they|them|their|theirs|themselves|themself)\b")
+# FAB-01: the only words that may stand before the generic subject in its own clause: a numbering, a bullet or quote, a
+# conjunction, a quantifier ("all", "only") or a lead-in ("if", "note that"). Anything else before it ("The cook has no
+# criminal record and staff ...", "Both crew members", "Our three volunteers", "The site foreman's union activity") is
+# a specific subject, or a statement beside the rule, and the clause is not a rule about nobody.
+_LEAD_IN = re.compile(
+    r"(?i)[\s\"'“‘(#*>•-]*(?:\d+(?:\.\d+)*[.)]?\s+)?"
+    r"(?:(?:and|or|but|so|then|also|generally|usually|normally|typically|note\s+that|in\s+practice|in\s+most\s+cases"
+    r"|if|when|where|once|whether|all|only)\s+)*")
+# FAB-01: a definite noun phrase between the subject and its verb is someone in particular ("staff who know the cook
+# has epilepsy are expected ...").
+_DEFINITE = re.compile(r"(?i)\b(?:the|this|that|our|my|your|his|her|their)\s+[a-z]")
 _ROLE = (r"(?:staff\s+member|member\s+of\s+staff|employee|worker|colleague|team\s+member|contractor|volunteer|student"
          r"|customer|client|patient|resident|applicant|candidate|person|individual|manager|supervisor|teacher|nurse"
          r"|officer|man|woman)")
@@ -103,15 +123,20 @@ def _names(prefix: str, initial: bool) -> bool:
 
 
 def _rule(clause: str, initial: bool = True) -> bool:
-    """A generic subject followed by a modal or generic verb, with only lower-case words between them and no name
-    before the subject."""
+    """A generic subject followed by a modal or generic verb, with only lower-case words between them (no definite
+    noun phrase among them) and nothing but lead-in words before the subject in its clause (FAB-01: the clause's own
+    subject is the class of people)."""
     found = _ASKS.search(clause)
-    if found is not None and not _names(clause[:found.start()], initial):
+    if found is not None and _LEAD_IN.fullmatch(clause, 0, found.start()) and not _names(clause[:found.start()], initial):
         return True
     for subject in _SUBJECTS:
         for match in subject.finditer(clause):
+            if not _LEAD_IN.fullmatch(clause, 0, match.start()):
+                continue
             verb = _VERB.search(clause, match.end())
             if verb is None or _GAP.fullmatch(clause, match.end(), verb.start()) is None:
+                continue
+            if _DEFINITE.search(clause, match.end(), verb.start()):
                 continue
             if not _names(clause[:match.start()], initial):
                 return True
@@ -135,37 +160,56 @@ def _initial(text: str, at: int) -> bool:
     return not (at > 0 and text[at - 1] in ";,")
 
 
-def _pieces(text: str, start: int, end: int) -> list[tuple[int, int]]:
-    """The clauses of the sentence that the span ``[start, end)`` touches, as spans (none when the sentence is longer
-    than ``_REACH`` characters either side of the span)."""
+def _sentence(text: str, start: int, end: int) -> tuple[int, int] | None:
+    """The sentence around the span ``[start, end)``, without its final stop (None when it reaches further than
+    ``_REACH`` characters either side of the span)."""
     lo, hi = max(0, start - _REACH), min(len(text), end + _REACH)
-    left, right = _sentence_clause(text[lo:hi], start - lo, end - lo)
-    if (lo and left == 0) or (hi < len(text) and right == hi - lo):
-        return []
-    left, right = left + lo, right + lo
-    return [
-        (left + m.start(), left + m.end()) for m in _CLAUSE_PIECE.finditer(text[left:right])
-        if text[left + m.start():left + m.end()].strip() and left + m.start() < end and start < left + m.end()
-    ]
+    ends = [m.end() for m in _STATEMENT_END.finditer(text, lo, start)]
+    left = ends[-1] if ends else lo
+    after = _STATEMENT_END.search(text, end, hi)
+    right = after.start() if after else hi
+    if (lo and left == lo) or (hi < len(text) and right == hi):
+        return None
+    return left, right
 
 
 def policy_statement(text: str, start: int, end: int, people: tuple[tuple[int, int], ...] = ()) -> bool:
-    """True when the span ``[start, end)`` lies in one sentence and the clauses it touches are, as a group, a general
-    rule: one of them is a rule (see ``policy_clause``), none is personal, each of the others says nothing sensitive and
-    holds no name, and no span of ``people`` (PERSON and QUASI_ID findings) overlaps any of them."""
+    """True when the span ``[start, end)`` lies in one sentence and that sentence is a general rule about nobody in
+    particular (FAB-01):
+
+    - the clause in which the span starts (the clause that carries the statement) is itself a rule (``_rule``): its
+      own subject is a class of people with only lead-in words before it, so a rule elsewhere in the sentence never
+      excuses a clause about "the cook", "our storeman" or a named person;
+    - nothing in the whole sentence is personal (a pronoun, "the only", a speech verb ...) and no span of ``people``
+      (PERSON and QUASI_ID findings) lies anywhere in it;
+    - every other clause after the last ":" before the span (a heading such as "Notice text:" stays out) that is not a
+      rule says nothing about a sensitive category; one before the statement holds no name; one after a rule does not
+      start with a name.
+    """
     while start < end and text[start].isspace():
         start += 1
     # A span that ends with the full stop (or the closing quote after it) must not reach into the next sentence.
     end = start + len(text[start:end].rstrip(_TRAILING))
     if start >= end or _SENTENCE_INSIDE.search(text[start:end]):
         return False
-    pieces = _pieces(text, start, end)
-    if not pieces:
+    sentence = _sentence(text, start, end)
+    if sentence is None:
+        return False
+    left, right = sentence
+    if _personal(text[left:right]) or any(p < right and left < q for p, q in people):
+        return False
+    colon = text.rfind(":", left, start)
+    if colon >= 0:
+        left = colon + 1
+    pieces = [(left + m.start(), left + m.end()) for m in _CLAUSE_PIECE.finditer(text[left:right])
+              if text[left + m.start():left + m.end()].strip()]
+    carrier = next(((a, b) for a, b in pieces if a <= start < b), None)
+    if carrier is None or not _rule(text[carrier[0]:carrier[1]], _initial(text, carrier[0])):
         return False
     ruled = False
     for a, b in pieces:
         clause, initial = text[a:b], _initial(text, a)
-        if _personal(clause) or any(p < b and a < q for p, q in people):
+        if _personal(clause):
             return False
         if _rule(clause, initial):
             ruled = True

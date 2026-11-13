@@ -307,3 +307,52 @@ def test_no_gold_sensitive_span_of_the_evaluation_sets_is_read_as_a_general_rule
     assert len(files) == len(_GUARD_FILES) == 9  # dev, test, C, D-q, D-c, E, F and the adjudicated G halves
     assert tested >= 3200  # 3248 gold sensitive spans when written
     assert time.perf_counter() - started < 30
+
+# ----------------------------------------------------------------------------------------------------------------
+# FAB-01 (independent review of candidate 0.5): a general rule in the same sentence must never excuse a clause whose
+# own subject is a named person, a pronoun or a definite singular role. 0.4.0 held every one of these (ASK:sensitive);
+# the first cut of this switch released them. The development sets passed with that bug present, so these cases are
+# the guard. Invented sentences; the finder answers are stubbed.
+FAB_01_MUST_HOLD = [
+    # The gate's own rules make the statement (no finder entity).
+    ("The cook has no criminal record and staff are expected to stop the gossip.", []),
+    ("Our storeman is not a member of any union and staff are expected to respect that.", []),
+    ("The new groundskeeper is not on any medication and employees are encouraged to welcome the change.", []),
+    ("Our storeman is on parole and staff are expected to report any contact.", []),
+    ("Amira Haddad, the payroll officer, is not a member of any union and staff are expected to respect that.",
+     [("PERSON", "Amira Haddad")]),
+    # A finder statement.
+    ("The receptionist has epilepsy and staff are expected to keep the corridor lights dimmed.",
+     [("HEALTH", "has epilepsy")]),
+    ("Priya Nand, our receptionist, has epilepsy and staff are expected to keep the corridor lights dimmed.",
+     [("PERSON", "Priya Nand"), ("HEALTH", "has epilepsy")]),
+    ("The finance manager was diagnosed with bipolar disorder last month and employees are expected to be supportive.",
+     [("HEALTH", "was diagnosed with bipolar disorder")]),
+    ("Both crew members are treated for hepatitis C at the clinic.", [("HEALTH", "are treated for hepatitis C")]),
+    ("The site foreman's union activity is considered a problem by management.",
+     [("UNION", "union activity is considered a problem")]),
+    ("The two apprentices are members of the union and members are entitled to paid meeting time.",
+     [("UNION", "are members of the union")]),
+    ("Our three volunteers are covered by a family violence protection order.",
+     [("FAMILY_VIOLENCE", "are covered by a family violence protection order")]),
+    ("The night cleaner is HIV positive and staff must not share this.", [("HEALTH", "is HIV positive")]),
+    ("Priya has epilepsy and staff are expected to keep the lights dimmed.", [("HEALTH", "has epilepsy")]),
+    ("Mum has cancer and carers are encouraged to visit on Tuesdays.", [("HEALTH", "has cancer")]),
+    ("Staff who know the cook has epilepsy are expected to keep it private.", [("HEALTH", "has epilepsy")]),
+    ("Sam told us they have epilepsy, and staff with epilepsy may request a quiet room.",
+     [("HEALTH", "staff with epilepsy may request a quiet room")]),
+]
+
+
+@pytest.mark.parametrize("text, entities", FAB_01_MUST_HOLD)
+def test_fab_01_a_rule_beside_a_specific_subject_does_not_release_it(text, entities):
+    from themis_shield.detectors.policy_statements import policy_statement
+
+    result = gate(text, entities)
+    assert result.policy_result.decision == Decision.ASK
+    assert ReasonCode.SENSITIVE in result.policy_result.reasons
+    for label, value in entities:
+        if label != "PERSON":
+            start = text.index(value)
+            assert not policy_statement(text, start, start + len(value))
+    assert not policy_statement(text, 0, len(text))
