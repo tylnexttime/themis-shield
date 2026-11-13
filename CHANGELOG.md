@@ -22,6 +22,15 @@ moving the job, and `stats` counts converged and not-converged loops. New regist
 trade-off is stated plainly: the cloud model now reads the package before a person has approved it. With the
 trip-wire off the router is unchanged (`tests/test_catalogues_off.py`). Not measured on any split.
 
+**Two independent toggles (project owner, 13/11/2026).** `[tripwire] before_human` is the correction loop above.
+`[tripwire] after_human` runs once on exactly the package the requester and Operator approved, just before the task
+turn (where 0.3 ran it): it collects every finding, replaces nothing (a person approved that package), and sends the
+job back to the Operator (Held, `TRIPWIRE_FLAGGED`) with every finding listed and proposed to the known-miss register;
+`themis tripwire review JOB --reapprove` sends the same package unchanged, `--refuse` refuses the job. Both default to
+false and may be on together. `enabled` is deprecated: read only when neither toggle is set, `true` then means
+`before_human` only (in 0.3 and 0.4 it meant the check after approval: set `after_human = true` for that).
+`tripwire_records` gains a `stage` column (older rows default to `after_human`); `themis tripwire list` shows it.
+
 ### Split G result (eval-kit-v0.6-frozen): 0.4.0 as released fails its frozen rule
 
 0.4.0 as released **fails** its frozen rule on split G ([results](eval/RESULTS-v0.6.md)), the first fresh split to

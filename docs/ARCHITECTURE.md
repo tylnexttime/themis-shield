@@ -94,7 +94,7 @@ tokens are restored locally (`restore.py`).
 |---|---|---|
 | `catalogues/known_miss.py` | real, off by default | The known-miss register (rules, context shapes, keyed fingerprints of high-entropy strings) and the final sweep over outbound text. |
 | `catalogues/false_positives.py` | real, off by default | The reviewed false-positive catalogue (`no_hold` and `allow` entries), scoped and expiring. |
-| `catalogues/tripwire.py` | real, off by default | The optional cloud trip-wire, before approval: fixed instruction, strict JSON reply, fail closed; a correction loop of at most 3 rounds, and known-miss proposals. |
+| `catalogues/tripwire.py` | real, off by default | The optional cloud trip-wire in two independent modes: a correction loop before approval (at most 3 rounds) and a check of the approved package that never replaces anything; fixed instruction, strict JSON reply, fail closed, known-miss proposals. |
 | `catalogues/gate.py` | real | Configuration (`[known_miss]`, `[false_positives]`, `[tripwire]`) and how the router applies them; a no-op when all are off. |
 | `catalogues/cli.py`, `store.py` | real | `themis kmr`, `themis fpc`, `themis tripwire`; shared append-only SQLite storage helpers. |
 
@@ -267,8 +267,10 @@ feed training and the regression set, never a held-out test split (docs/ROADMAP.
 ```
  detect ─► decide ─► [false-positive catalogue: set aside reviewed look-alikes] ─► substitute
        ─► FINAL SWEEP (known-miss register, on the outbound JSON)
-       ─► [cloud trip-wire: check, correct, check again; at most 3 rounds]
-       ─► requester / Operator approval ─► the task ─► restore locally
+       ─► [trip-wire before_human: check, correct, check again; at most 3 rounds]
+       ─► requester / Operator approval
+       ─► [trip-wire after_human: check the approved package; a finding goes back to the Operator]
+       ─► the task ─► restore locally
 ```
 
 ### Known-miss register and final sweep
@@ -374,15 +376,28 @@ so a mistyped `--db` cannot leave a confirmed miss in a register the gate never 
 
 ### Cloud trip-wire
 
-`catalogues/tripwire.py`; results read and reviewed with `themis tripwire` (`list`, `review`, `stats`). Off by default
-(`[tripwire] enabled = false`); with it off the router takes exactly the path it took before (the golden comparison in
-`tests/test_catalogues_off.py`).
+`catalogues/tripwire.py`; results read and reviewed with `themis tripwire` (`list`, `review`, `stats`). Two
+independent modes, each off by default, so each organisation chooses either, both or neither:
+
+| `[tripwire]` key | When it runs | What the cloud model reads | What a finding does |
+|---|---|---|---|
+| `before_human` | While the package is built, **before** requester confirmation and Operator approval | The de-identified package, **before any person has approved it**; again after each correction round (up to `max_rounds`, 3) | Replaced by a placeholder; the package is checked again; still flagged after the last round = NOT CONVERGED, and the Operator decides |
+| `after_human` | Once, **after** the requester and the Operator approved the package, just before the task turn | Exactly the approved package (what the task turn would send anyway) | Nothing is replaced: the job goes back to the Operator with every finding listed, to re-approve that package or refuse it |
+
+Both on: the loop corrects, then the check after approval double-checks the approved package (the cloud model reads
+the final package twice, once as the loop's clean round and once after approval). Both off, or nothing set: the router
+takes exactly the path it took before (the golden comparison in `tests/test_catalogues_off.py`). `enabled` is
+**deprecated**: it is read only when neither toggle is present, and `enabled = true` then means `before_human` only.
+In 0.3 and 0.4 `enabled = true` ran the check after approval; for that placement set `after_human = true`. Neither
+mode runs for BLOCK or local-only work (they never reach the cloud), nor on the hooks path. Every finding with text
+becomes a pending known-miss proposal in both modes (below), and both fail closed the same way.
+
+#### `before_human`: the correction loop
 
 - **When.** On the web/provider path only, once the gate has de-identified a cloud-bound package and while the
   package is still being built: **before** requester confirmation and Operator approval, and before the package hash
-  is bound in the register. Never for BLOCK or local-only work (they never reach the cloud). It runs once per
-  package: a package that is already built is never checked again, and one built while the trip-wire was off is
-  refused once it is on (`TRIPWIRE_NOT_RUN`).
+  is bound in the register. It runs once per package: a package that is already built is never checked again by the
+  loop, and one built while `before_human` was off is refused once it is on (`TRIPWIRE_NOT_RUN`).
 - **What it sends.** The whole de-identified package (messages and tools) as one JSON document in a user message,
   behind a fixed first system instruction (`tripwire-v1`): list residual personal information by character span or
   placeholder, never guess who anyone is, reply with exactly `{"residual": [...], "stop": bool}`, bare or as the
@@ -414,6 +429,21 @@ so a mistyped `--db` cannot leave a confirmed miss in a register the gate never 
   5. Then the usual human steps. The response that holds the job for confirmation or approval lists each round
      (categories, counts, placeholder ids added and proposal ids; never an original value), and so does `themis
      tripwire list`. The automatic pilot approval fixture never approves a NOT CONVERGED package.
+#### `after_human`: the check of the approved package
+
+- **When.** After both approval stages, after the exact-value check, just before the task turn; once per approved
+  package. The request is bound to the job's current approval for exactly this package.
+- **What it sends.** The same fixed instruction and the approved package as one JSON document: what the task turn is
+  about to send anyway.
+- **Outcomes.** A clean pass sends the task (and changes nothing the gate decided). Any finding stops the task:
+  nothing is replaced, because a person approved exactly this package. The job goes back to the Operator (Held,
+  audited `TRIPWIRE_FLAGGED`) with every finding listed (category, character span or placeholder id, proposal id;
+  never a value). `themis tripwire review JOB --reapprove` (alias `--reject`: a false flag) returns the job to
+  Approved, and the same package is sent unchanged without a second check; `--refuse` (alias `--confirm`: a real
+  residual) refuses the job, and the work is re-submitted as a new job.
+
+#### Both modes
+
 - **Proposals.** Every finding with text becomes a **proposed** known-miss entry (source `cloud_tripwire`, proposer
   `cloud-tripwire`, the job id recorded): a keyed fingerprint when the value is high-entropy, otherwise a rule for its
   shape (letters, digits and spaces become counted classes, so `Mara Lindahl` becomes `[^\W\d_]{4}\s[^\W\d_]{7}`),
@@ -421,25 +451,27 @@ so a mistyped `--db` cannot leave a confirmed miss in a register the gate never 
   until a person other than the proposer verifies it and puts it in the sweep (`themis kmr verify` and `promote`, or
   `reject`), and nothing is swept unless `[known_miss]` is enabled. With the trip-wire on, its proposals go to the
   known-miss register file (created if missing) even when the sweep is off.
-- **Records.** `tripwire_records` holds one row per round (outcome `clear` or `flagged`; per finding its span, a fixed
-  category, its round, the placeholder ids it added and its proposal id). `tripwire_loops` holds one row per finished
+- **Records.** `tripwire_records` holds one row per pass, with its mode (`stage`: `before_human` or `after_human`;
+  rows written before the column existed all came from the check after approval). Per finding: its span, a fixed
+  category and its proposal id, and for a loop round its round and the placeholder ids it added. `tripwire_loops` holds one row per finished
   loop (the final package hash, whether it converged, the per-round list). Both are value-free and append-only. The
   vault itself has no source column: which placeholders came from the trip-wire is recorded in the register.
 - **Fail closed, as before.** A malformed reply (prose, text around a fence, two fences, extra keys, inconsistent
   `stop`, spans outside the document, unknown placeholders), including one produced by an instruction injected into
-  the document, refuses the job (`TRIPWIRE_MALFORMED`) in whichever round it comes. A transport or protocol failure,
-  including a reply that contains an original value (a value the loop added in an earlier round counts), refuses it
-  too under its own reason (`TRIPWIRE_UNAVAILABLE`). A finding the trip-wire calls `SECRET` refuses the job
-  (`BLOCK:secret`): the gate never replaces a secret with a placeholder. Over-redaction is accepted (the loop only adds
-  placeholders, and restoration returns the exact original text), and a clear reply never upgrades a decision.
-- **Precision.** `themis tripwire review JOB --confirm` or `--reject` records a verdict on the job's next unreviewed
-  flagged round (repeat it for each round); for a corrected round it does not move the job. `themis tripwire stats`
-  reports confirmed, rejected and pending flagged rounds, flag precision, and how many loops converged or did not. A
-  record from the earlier stop-on-flag trip-wire (no round numbers) keeps its old review behaviour.
+  the document, refuses the job (`TRIPWIRE_MALFORMED`) in either mode and in whichever round it comes. A transport or
+  protocol failure, including a reply that contains an original value (a value the loop added in an earlier round
+  counts), refuses it too under its own reason (`TRIPWIRE_UNAVAILABLE`). In the loop, a finding the trip-wire calls
+  `SECRET` refuses the job (`BLOCK:secret`): the gate never replaces a secret with a placeholder (after approval it is
+  listed and held like any other finding). Over-redaction is accepted (the loop only adds placeholders, and
+  restoration returns the exact original text), and a clear reply never upgrades a decision.
+- **Precision.** `themis tripwire review JOB` records a verdict on the job's latest unreviewed flagged pass. For a
+  loop round it only records the verdict (repeat it for each round); for a flag on the approved package it
+  re-approves or refuses the job, as above. `themis tripwire stats` reports confirmed, rejected and pending flagged
+  passes, flag precision, and how many loops converged or did not.
 - **Injection.** The trip-wire is an LLM reading untrusted text, so an injection can suppress its findings; that only
   weakens an extra layer. The document is only ever user content; the instruction is always first.
-- **Not measured.** Whether the loop changes released leaks, recall, friction or over-redaction has not been measured
-  on any split.
+- **Not measured.** Whether either mode changes released leaks, recall, friction or over-redaction has not been
+  measured on any split.
 
 ## v0.3 typed-decision tier (T1.5)
 
