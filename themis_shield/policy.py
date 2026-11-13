@@ -237,7 +237,9 @@ def _cleared(answers, family, items, settings):
 # 2. no sensitive finding is corroborated: none has two detectors behind it (on the same or an overlapping span) and
 #    none is a cell of a sensitive-column table (``subject_candidate``). Two detectors agreeing is a hold;
 # 3. Q-D, asked once with the whole document in view, says what kind of text it is: a policy, guidance or technical
-#    text opens the "general" path, fiction the "fiction" path, anything else keeps the hold;
+#    text opens the "general" path, fiction the "fiction" path, anything else keeps the hold. A document longer than
+#    ``[typed] max_document_chars`` was not put to the question whole (the model saw its head and tail), so no answer
+#    about it lifts anything: the hold stays, with the code ``partial-document`` (review HL-08);
 # 4. Q-G, asked for every sentence that holds a sensitive finding, gives that path's answer for each: "general_rule",
 #    or "fiction_or_example";
 # 5. general path: no sentence carries a deterministic veto (``detectors/subject_guard.py``: a PERSON or other
@@ -246,6 +248,13 @@ def _cleared(answers, family, items, settings):
 #    (``FICTION_QUIET_LABELS``): a contact, an identifier or a quasi-identifier makes it a record, not a story.
 # A lifted hold means RELEASE of the substituted text: the statements stay substituted, so a wrong answer does not put
 # the statement itself in front of the cloud.
+#
+# Known gaps (independent review HL-07, HL-09, HL-10; DEV-DEBT DD-38; on record in tests/test_subject_check.py). The
+# vetoes are a backstop, not a guarantee: a role without an article, a lower-case title, a numbered person and a list
+# item pass every one of them, and there only the model's answers keep the hold. A lift also releases whatever no
+# detector found beside the flagged sentence. The fiction path accepts a document with a name, a street address and a
+# date of birth as "a story" when the model says so; it rests on the model's answer to a question a disclaimer can
+# steer, no deterministic check can apply to a story, and it must never become a default.
 # ----------------------------------------------------------------------------------------------------------------------
 SUBJECT_IGNORED_STAGES = ("propagate", "allowlist", "union-final")
 FICTION_QUIET_LABELS = frozenset({Label.PERSON, Label.OTHER_DATE, Label.DATE_OF_BIRTH, Label.ADDRESS}) | SENSITIVE_LABELS
@@ -294,6 +303,10 @@ def _subject_cleared(evidence: DetectionResult, answers, settings) -> tuple[str 
     document = [answer for answer in answers if answer.family == "Q-D"]
     if not document:
         return None, "unasked"
+    if any(answer.end - answer.start > settings.max_document_chars for answer in document):
+        # HL-08: a Q-D answer spans the document it was asked about. Past the limit the model read the head and the
+        # tail only, and a statement in the middle was never in front of it. Whatever it answered, keep the hold.
+        return None, "partial-document"
     if any(answer.unsure for answer in document):
         return None, "unsure"
     paths = {SUBJECT_KINDS.get(answer.choice) for answer in document}

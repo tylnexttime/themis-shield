@@ -124,10 +124,10 @@ institution_profile = ""
 # detection, kept as a negative control).
 version = "v0.2"
 # v0.3 friction fixes on top of v0.2. Default: every fix except the opt-in
-# ones, "finder-whitespace-trust", "policy-statements" and
-# "negative-statements-general-exemption" (not safe for release decisions; see
-# the CHANGELOG); "all" adds them, "none" is exact
-# v0.2.1 behaviour,
+# ones, "finder-whitespace-trust", "policy-statements",
+# "negative-statements-general-exemption" and "empty-finder-substitute" (not
+# safe for release decisions; see the CHANGELOG); "all" adds them, "none" is
+# exact v0.2.1 behaviour,
 # or list names: "secret-placeholders", "organisation-contacts",
 # "checksum-context", "rule-completeness", "table-role-words", "title-tokens",
 # "contact-brackets", "secret-url-components", "secret-prose-values",
@@ -266,9 +266,12 @@ enabled = false
 # document's only hold and rests on one detector's word may be lifted when the model says, with a clear margin, what
 # kind of text the whole document is and that each flagged sentence is about no one in particular. "general": a
 # general rule in a policy, guidance or technical text, never past a deterministic veto (a name, a pronoun, "the
-# cook" ...). "fiction": an invented character in a text that is fiction (rests on the model more; its own choice).
+# cook" ...). "fiction": an invented character in a text that is fiction (rests on the model's word alone: a "case
+# study" with a name, an address and a date of birth passes; never make it a default). The vetoes are a backstop,
+# not a guarantee, and a lift releases whatever no detector found beside the flagged sentence.
 # Every finding stays substituted. Development measurements only; see docs/ARCHITECTURE.md, "The subject check".
 # subject_lift = ["general"]
 # subject_margin = 0.5    # unsure when a subject answer's top two options are closer than this
+# max_document_chars = 4000  # a longer document is not put to the document question and keeps its hold
 # [typed.temperatures]
 # Q-S = 3.03   # fitted on development data; Q-M, Q-N, Q-P stay at 1.0

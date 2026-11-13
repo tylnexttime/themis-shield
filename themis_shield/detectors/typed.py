@@ -96,8 +96,9 @@ FAMILIES: dict[str, dict[str, Any]] = {
         ),
     },
     # The subject check (``subject_lift``; 13/11/2026). Not the training generator's wording: written for this gate.
-    # Q-D is asked once per document with the whole text in view; Q-G once per sentence that holds a sensitive
-    # finding. Neither is switched by ``families``: ``subject_lift`` says which answers may lift a hold.
+    # Q-D is asked once per document with the whole text in view (a document too long for that is not asked, and
+    # keeps its hold); Q-G once per sentence that holds a sensitive finding. Neither is switched by ``families``:
+    # ``subject_lift`` says which answers may lift a hold.
     "Q-D": {
         "qid": "q_d",
         "scope": "document",
@@ -214,7 +215,9 @@ class TypedSettings:
     # Evaluation capture only: ask Q-D and every Q-G of a candidate document whatever a guard or an earlier answer
     # says, so later replays can tune without the GPU. Effects are unchanged.
     subject_capture: bool = False
-    # Q-D reads the whole document up to this many characters (head and tail of a longer one).
+    # Q-D reads the whole document up to this many characters. A longer document is not put to the question whole
+    # (``document_state`` gives its head and tail), so no answer about it may lift a hold: the tier does not ask, and
+    # the policy refuses a lift on any Q-D answer that spans more than this (review HL-08).
     max_document_chars: int = DEFAULT_DOCUMENT_CHARS
 
     def family_on(self, family: str) -> bool:
@@ -412,7 +415,14 @@ DOCUMENT_GAP = "\n[...]\n"
 
 def document_state(text: str, max_chars: int = DEFAULT_DOCUMENT_CHARS) -> str:
     """The whole document for a document-level question; of a longer one, its first two thirds of ``max_chars`` and
-    its last third, cut at line ends where one is near, with a gap marker between."""
+    its last third, cut at line ends where one is near, with a gap marker between.
+
+    The model does not see the middle of a longer document, so an answer about one is an answer about its head and
+    tail only (a note about one person at character 3,000 of a 6,000-character policy is not in it; review HL-08).
+    The subject check therefore never lifts a hold on a document longer than ``max_chars``: see ``ask_subject`` in
+    ``typed_tier.py`` and ``_subject_cleared`` in ``policy.py``. The head-and-tail state is kept for evaluation
+    captures only.
+    """
     if len(text) <= max_chars:
         return _clean(text)
     head, tail = text[:max_chars * 2 // 3], text[len(text) - max_chars // 3:]
@@ -607,7 +617,9 @@ class TypedAnswer:
     label_mass: float = 0.0
     margin: float = 0.0
     order_agree: bool = False
-    reason: str | None = None  # why unsure: transport, malformed, label-mass, order-disagree, margin, unasked
+    # Why unsure: transport, malformed, label-mass, order-disagree, margin, unasked, partial-document (Q-D on a
+    # document too long to be put to the question whole).
+    reason: str | None = None
     # Q-G only: the deterministic veto on this sentence (a fixed code from ``subject_guard``), whatever the model says.
     guard: str | None = None
 

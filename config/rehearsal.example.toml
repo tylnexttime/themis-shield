@@ -87,8 +87,8 @@ institution_profile = "harbourline-eval"
 version = "v0.2"
 # v0.3 friction fixes: default = all but the opt-in ones
 # ("finder-whitespace-trust", "policy-statements",
-# "negative-statements-general-exemption"); "all", "none" (v0.2.1) or a list
-# of names.
+# "negative-statements-general-exemption", "empty-finder-substitute"); "all",
+# "none" (v0.2.1) or a list of names.
 # fixes = "none"
 
 [policy]

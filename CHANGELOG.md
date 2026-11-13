@@ -56,11 +56,30 @@ later. A leak is worse than friction, so:
   ("Minutes ... contain no personal information about any attendee"), which is the friction it costs there. Not
   replayed end to end: whether those documents were already held for another reason is not measured here, and
   whether the real finders obey such a note was not tested in the review.
+- **The subject check (off by default) cannot lift a document its document question did not read whole (HL-08).**
+  Q-D read the first two thirds and the last third of a 4,000-character window, so a note about one person in the
+  middle of a 6,000-character policy was never in front of the model, which then answered "a policy" honestly. A
+  document longer than `[typed] max_document_chars` is now not asked at all and keeps its hold, and the policy
+  refuses a lift on any Q-D answer that spans more than the window (`kept:ASK:sensitive:partial-document`), so a
+  replayed capture cannot lift one either. Two of the seven clean development documents the general path had
+  lifted are over 4,000 characters (split G: GT-008, 4,776; GR-034, 5,570) and keep their hold now, so by count
+  it lifts five (split D half Q 3, split G 2); not replayed.
+- **The subject check's known gaps are on record, not fixed (HL-07, HL-09, HL-10; DD-38).** The module text of
+  `detectors/subject_guard.py` claimed that a sentence showing any sign of someone in particular is never put to
+  the model's answer. That was false and is reworded: the vetoes are a backstop. A role without an article
+  ("Staff must cover front desk while receptionist has chemo."), a lower-case title, a numbered person and a list
+  item pass every veto and are lifted when a stand-in model says "general rule"; a lift releases whatever no
+  detector found beside the flagged sentence; and the fiction path accepts a "case study (all details fictional)"
+  with a name, a street address and a date of birth. `tests/test_subject_check.py` records each as it behaves
+  today, with the tracer findings of the review. **The fiction path must never become a default**: no
+  deterministic check can apply to a story, so its safety is the model's answer to a question a disclaimer can
+  steer.
 
 ### Friction on clean documents (13/11/2026; development measurements only)
 
 **Read the section above first: `empty-finder-substitute` was on by default when this was written and is opt-in
-now.** The friction figures quoted for the subject check below were measured on top of that switch.
+now.** The friction figures quoted for the subject check below were measured on top of that switch, and before
+documents over 4,000 characters were excluded from it (HL-08: two of the general path's seven).
 
 Measured by replaying captured finder answers on the seven development sets (the v0.1 set, split C, split D halves Q
 and C, splits E, F and G; split G against its sealed gold), each against candidate 0.5 as it stood (`62b5865`). None

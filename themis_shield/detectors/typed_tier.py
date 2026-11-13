@@ -9,7 +9,8 @@ the cheaper tiers already found (ROADMAP section 2):
 - **Q-I** for each sentence no detector touched, on a document that would otherwise be released;
 - **Q-D** and **Q-G** (the subject check, ``subject_lift``; off by default): what kind of text the whole document is,
   and who each sentence with a sensitive finding is about, on a document whose only hold is ASK:sensitive and whose
-  sensitive findings no second detector confirms (``ask_subject``).
+  sensitive findings no second detector confirms (``ask_subject``). A document longer than ``max_document_chars``
+  cannot be put to Q-D whole, so it is not asked and keeps its hold.
 
 The model's answers are attached to the evidence (``DetectionResult.typed``) and the policy (``policy.decide``)
 decides what they may change. With ``indirect_substitute`` a Q-I sentence the policy holds for is also substituted
@@ -131,13 +132,22 @@ def ask_subject(decider, text: str, evidence, settings: TypedSettings) -> list:
     model only when the fiction path could still use the answer. Questions no answer could use are not asked (they
     are recorded as unsure with the reason ``unasked``), unless ``subject_capture`` is set. ``decider`` is a callable
     returning the Decider (the model is acquired only when a question is really asked).
+
+    A document longer than ``max_document_chars`` cannot be put to Q-D whole: the model would see its head and tail
+    and answer for the middle it never read (review HL-08). Such a document is not asked at all: its Q-D answer is
+    recorded as unsure with the reason ``partial-document`` and the hold stays. (With ``subject_capture`` the head
+    and tail are still asked, for the record; the policy refuses the lift on the answer's span either way.)
     """
     from ..policy import subject_candidate
 
     if not settings.subject_on() or not subject_candidate(evidence):
         return []
-    document = decider().decide(make_document_question(text, "Q-D", settings.max_document_chars))
-    path = None if document.unsure else SUBJECT_KINDS.get(document.choice)
+    whole = len(text) <= settings.max_document_chars
+    if whole or settings.subject_capture:
+        document = decider().decide(make_document_question(text, "Q-D", settings.max_document_chars))
+    else:
+        document = TypedAnswer("Q-D", 0, len(text), None, True, reason="partial-document")
+    path = None if document.unsure or not whole else SUBJECT_KINDS.get(document.choice)
     if path is not None and path not in settings.subject_lift:
         path = None
     spans = subject_sentences(text, evidence)

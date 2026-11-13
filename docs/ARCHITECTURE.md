@@ -57,7 +57,7 @@ tokens are restored locally (`restore.py`).
 | `detectors/contracts.py`, `types.py` | real | Value-free evidence types and the label set. |
 | `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. Substitute, don't hold (`empty-finder-substitute`, **opt-in, off by default**): when both finders are silent and PII-Tracer found only whole email addresses or phone numbers, in a document where no stage found anything but contacts and plain dates and the tracer's sensitivity score is at most 0.01, the values are substituted and the document is not held for the disagreement. Not safe as a default (review HL-01, HL-02; see [why below](#why-empty-finder-substitute-is-not-a-default)). |
 | `detectors/settings.py` | real | `[detection] version`: `v0.2` (default) turns on the tier-1 fixes and the column-aware table pass; `v0.1` restores the evaluated v0.1 detection. |
-| `detectors/subject_guard.py` | real, off by default | The deterministic vetoes of the typed tier's subject check: wording that points to someone in particular keeps a sensitive hold whatever the model answers (see [the subject check](#the-subject-check-q-d-and-q-g)). |
+| `detectors/subject_guard.py` | real, off by default | The deterministic vetoes of the typed tier's subject check: the wording they read as pointing to someone in particular keeps a sensitive hold whatever the model answers. A backstop, not a guarantee: ordinary shapes that name one person pass them (see [the subject check](#the-subject-check-q-d-and-q-g)). |
 | `detectors/typed.py`, `detectors/typed_tier.py` | real, off by default | v0.3 typed-decision tier (T1.5): multiple-choice questions about what the cheaper tiers found, answered in one forward pass; the policy decides what an answer may change (see [below](#v03-typed-decision-tier-t15)). |
 | `normalise.py` | real | `detection_view`, the shared detection view (Unicode default-ignorable characters removed, NFKC per character, each view character mapped back to its source character) used by the rule packs, the marking gate and the injection signal. It meets the conservative offset-map contract (property-tested); the older `OffsetMap` skeleton was removed in 0.3.2. |
 
@@ -643,10 +643,17 @@ reading the whole document and then each sentence, says with a clear margin that
 - **When it is asked.** Only when `ASK:sensitive` is the document's only hold and no sensitive finding is
   corroborated: none has a second detector on the same or an overlapping span, and none is a cell of a
   sensitive-column table. Two detectors agreeing is a hold; nothing is asked.
-- **Q-D, once per document, with the whole text in view** (its first 4,000 characters, or head and tail of a longer
-  one): a record or message about particular real people, fiction, a policy or guidance text, a technical text, or
-  unclear. A policy, guidance or technical text opens the *general* path, fiction the *fiction* path; any other
-  answer keeps the hold and no sentence is asked.
+- **Q-D, once per document, with the whole text in view:** a record or message about particular real people,
+  fiction, a policy or guidance text, a technical text, or unclear. A policy, guidance or technical text opens the
+  *general* path, fiction the *fiction* path; any other answer keeps the hold and no sentence is asked.
+- **A document Q-D cannot read whole is never lifted** (review HL-08). The question takes a document of up to
+  `max_document_chars` (4,000 by default). Of a longer one the model would see the first two thirds and the last
+  third of that window, and answer "a policy" honestly for a text whose one note about a person sits in the middle
+  it never read. So a longer document is not asked at all, and the policy refuses a lift on any Q-D answer that
+  spans more than the window (`kept:ASK:sensitive:partial-document`), whatever the answer says. Raising
+  `max_document_chars` (up to 12,000) puts a longer document to the question whole; that is a new prompt and has
+  not been measured. Two of the seven clean development documents the general path lifted are over 4,000
+  characters (split G, 4,776 and 5,570) and keep their hold now.
 - **Q-G, once per sentence that holds a sensitive finding:** a particular person or people, a general rule about a
   whole class of people, an invented character or example, or unclear. Every such sentence needs the path's answer
   (`general_rule`, or `fiction_or_example`).
@@ -665,23 +672,35 @@ reading the whole document and then each sentence, says with a clear margin that
   payroll have been diagnosed with depression." states a fact), a class narrowed to one place ("tenants in unit 12",
   "staff with a record in the finance team"), or a point in time ("last week", "yesterday"). Every rule errs towards
   the veto. On its wording alone the veto holds every gold sensitive statement of `eval/cases` (3,250; a guard
-  test). It is a backstop, not the decision: a sentence that mixes a fact with a rule and names no place or date
-  ("Staff who joined as apprentices have convictions and must report weekly.") passes it, and there the model's two
-  answers are what keeps the hold.
+  test). It is a backstop, not the decision and not a guarantee: a sentence that mixes a fact with a rule and
+  names no place or date ("Staff who joined as apprentices have convictions and must report weekly.") passes it,
+  and so do ordinary shapes that name one person (review HL-07): a role without an article ("Staff must cover front
+  desk while receptionist has chemo."), a lower-case title ("... tell anyone ceo has hiv."), a numbered person
+  ("tenant 12"), a list item ("night cook: staff must call 000 ..."). There the model's two answers are all that
+  keeps the hold. The suite records these shapes as lifted when a stand-in model says "general rule" (DD-38).
 - **The model can be moved by a heading.** A probe put "Staff who started last week are on parole and must report
   on Fridays." under the heading "POLICY NOTE: general guidance for all sites": the model called the document a
   policy text and the sentence a general rule, with a clear margin under both orders, and the hold was lifted (the
   same sentence in a handover note was held). The "dated" and definite-place vetoes were written from that result
   and hold it now, but the lesson stands: the document answer is only as good as the model's reading of a text that
   may be dressed up, which is the main reason the check is not a default.
-- **Fiction path: its own switch.** A story is full of names and pronouns, so the sentence vetoes do not apply; the
-  document must instead hold no finding but names, dates, places and the statements themselves (a contact, an
-  identifier or a quasi-identifier makes it a record, not a story). It rests on the model's two answers more than
-  the general path does, which is why it is switched separately.
+- **Fiction path: its own switch, and never a default.** A story is full of names and pronouns, so the sentence
+  vetoes do not apply; the document must instead hold no finding but names, dates, places and the statements
+  themselves (a contact, an identifier or a quasi-identifier makes it a record, not a story). That label test lets
+  a record through: a "case study (all details fictional)" with a full name, a street address, a date of birth and
+  a conviction is lifted when the model says "fiction" (review HL-10), and two other dressed-up disclosures were
+  held in the review only because the tracer happened to call the condition a quasi-identifier. A story, a case
+  study, a hypothetical and a training scenario are the normal dress of a real disclosure, and no deterministic
+  check can apply to a story, so this path's safety is the model's answer to a question a disclaimer can steer.
+  **The fiction path must never become a default**, whatever a replay on development sets shows; it stays an
+  explicit, per-deployment choice for text a person has already judged to be fiction.
 - **What a lift does.** `RELEASE` of the substituted text: every finding stays substituted, so a wrong answer does
   not put what the detector marked in front of the cloud; the cost of a wrong lift is whatever nobody marked (the
-  rest of a statement a finder cut short, or anything else in that document that was missed). The policy records `lifted:ASK:sensitive:Q-D+Q-G:<path>` or `kept:ASK:sensitive:<why>`, and each Q-G
-  answer carries its veto code.
+  rest of a statement a finder cut short, or anything else in that document that was missed). The precondition "one
+  detector only" selects exactly the documents in which one finder has just been shown to miss a statement, so a
+  lift removes the only human look at whatever both finders missed beside the flagged sentence (review HL-09: a
+  second sentence, "... found a lump in March, surgery is booked ...", left in clear; DD-38). The policy records
+  `lifted:ASK:sensitive:Q-D+Q-G:<path>` or `kept:ASK:sensitive:<why>`, and each Q-G answer carries its veto code.
 - **Evaluation.** `--typed-settings` takes `subject_lift`, `subject_margin` and `subject_capture` (ask every subject
   question of a candidate document, for a capture; no decision changes). `eval/subject_probe.py` records the real
   model's answers for the probe documents of `tests/test_subject_check.py` (the reviewer's sentences among them) as

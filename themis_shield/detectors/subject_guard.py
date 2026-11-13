@@ -3,10 +3,16 @@
 The subject check lets a local model decide that a sentence a detector called a sensitive statement is a general rule
 about nobody in particular. Two independent reviews showed that wording rules cannot make that decision (DD-32, DD-33:
 each rule left a sentence shape that released a statement about one person). So the rules here make no decision to
-release. They can only VETO: a sentence that shows any sign of someone in particular is never put to the model's
-answer, whatever the model says. Every rule errs towards the veto (an unknown word is read as a name, an unknown
-definite phrase as someone); a sentence none of them vetoes still needs the model's confident "general rule" under
-both option orders and the document-level answer (see ``policy.py``).
+release. They can only VETO: a sentence one of them fires on keeps its hold, whatever the model says. Every rule errs
+towards the veto (an unknown word is read as a name, an unknown definite phrase as someone).
+
+They are a backstop, not a guarantee. They catch the signs of someone in particular that are listed below, not every
+sign: ordinary sentence shapes that name one person pass all of them (a role without an article, "Staff must cover
+front desk while receptionist has chemo."; a lower-case title, "... tell anyone ceo has hiv."; a numbered person,
+"tenant 12"; a list item, "night cook: staff must ..."; independent review HL-07, kept on record in
+``tests/test_subject_check.py``). For a sentence none of them vetoes, the model's confident "general rule" under both
+option orders and its document-level answer are all that stands between the sentence and a lift (see ``policy.py``),
+and a heading has been enough to move the model. That is why the check is off by default.
 
 ``sentence_veto`` returns a fixed code (never text) or None:
 
