@@ -62,6 +62,10 @@ up.**
   is not adopted.
 - **Three families, three roles.** The test author, the gate's own models and the labeller come from different model
   families. Every result says which.
+- **Removing a hold needs an adversary.** A change that removes a hold is never adopted on development-set replays
+  alone: it needs an adversarial review of the shapes it could release, because three such changes
+  (`policy-statements`, the general-rule exemption of `negative-statements` and `empty-finder-substitute`) passed
+  every development set in the week of 13/11/2026 and still released a specific person's sensitive statement.
 
 ## v0.2.1: security hardening (27/10/2026)
 
