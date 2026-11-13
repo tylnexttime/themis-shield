@@ -33,6 +33,14 @@ def statements(text):
     ]
 
 
+EXEMPTION = "negative-statements-general-exemption"
+
+
+def exemption_on():
+    """The DD-26 / FAB-02 general-rule exemption is opt-in since 13/11/2026 (second review RC-02)."""
+    configure_detection_fixes([*DEFAULT_DETECTION_FIXES, EXEMPTION])
+
+
 def sensitive(text):
     """(label, text) of every sensitive finding, whatever made it (the regression test does not name the pass)."""
     return [
@@ -107,7 +115,10 @@ def test_look_alikes_are_not_statements(text):
 
 # DD-26 (split G's GT-008, a clean FAQ; invented words): a general rule about a class of people that mentions a
 # negative ("a person with no criminal record is treated the same as ...") is policy, not a statement about anyone.
-@pytest.mark.parametrize("text", [
+# Since 13/11/2026 that exemption is OPT-IN (``negative-statements-general-exemption``, off by default: the steward's
+# decision after the second review, RC-02, because the same rule released "Parents with no criminal record can be
+# considered for kinship care of Jayden."). With the defaults these are statements, as in 0.4.0.
+GENERAL_RULES = [
     "A person with no convictions is treated the same as any other volunteer once the check is returned.",
     "Any applicant with no criminal history may skip the second interview.",
     "Anyone who has no criminal record pays the standard fee.",
@@ -116,9 +127,24 @@ def test_look_alikes_are_not_statements(text):
     "People who have no convictions need not attend the briefing.",
     "3.2 What happens if a person has no criminal record? Nothing changes.",
     "Does any applicant with no criminal record need a second check?",
-])
-def test_a_general_rule_about_a_class_of_people_is_not_a_statement(text):
-    assert statements(text) == []
+]
+
+
+@pytest.mark.parametrize("text", GENERAL_RULES)
+def test_with_the_opt_in_exemption_a_general_rule_about_a_class_of_people_is_not_a_statement(text):
+    try:
+        exemption_on()
+        assert statements(text) == []
+    finally:
+        configure_detection_fixes(None)
+
+
+@pytest.mark.parametrize("text", GENERAL_RULES)
+def test_by_default_a_negative_in_a_general_rule_is_still_a_statement_as_in_0_4_0(text):
+    from themis_shield.detectors.settings import OPT_IN_DETECTION_FIXES
+
+    assert EXEMPTION in OPT_IN_DETECTION_FIXES and EXEMPTION not in DEFAULT_DETECTION_FIXES and not fix_on(EXEMPTION)
+    assert [label for label, _ in statements(text)] == [Label.CRIMINAL]
 
 
 # The same words said of someone (a name, a pronoun, "I", an appositive) keep matching.
@@ -137,13 +163,17 @@ def test_a_negative_about_a_named_or_pronoun_subject_still_matches(text, value):
 
 
 def test_a_list_under_a_generic_heading_and_a_form_answer_still_match():
-    text = "Staff with no criminal record: Dana Smith, Ravi Patel.\n"
-    assert statements(text) and all(label is Label.CRIMINAL for label, _ in statements(text))
-    text = ("Applicants with no criminal record are treated as any other applicant.\n"
-            "Has the worker any criminal convictions? None\n")
-    assert statements(text) == [(Label.CRIMINAL, "None")]
-    text = "A person with no convictions is treated as any other volunteer. Rhys has no criminal record."
-    assert statements(text) == [(Label.CRIMINAL, "Rhys has no criminal record")]
+    try:
+        exemption_on()  # still statements with the opt-in exemption on
+        text = "Staff with no criminal record: Dana Smith, Ravi Patel.\n"
+        assert statements(text) and all(label is Label.CRIMINAL for label, _ in statements(text))
+        text = ("Applicants with no criminal record are treated as any other applicant.\n"
+                "Has the worker any criminal convictions? None\n")
+        assert statements(text) == [(Label.CRIMINAL, "None")]
+        text = "A person with no convictions is treated as any other volunteer. Rhys has no criminal record."
+        assert statements(text) == [(Label.CRIMINAL, "Rhys has no criminal record")]
+    finally:
+        configure_detection_fixes(None)
 
 
 def test_matters_need_a_criminal_word_nearby_and_the_statement_is_the_clause():
@@ -185,7 +215,15 @@ def test_the_switch_turns_the_pass_off():
 _CASE_FILES = sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl"))
 _GUARD_SETS = [
     pytest.param([p for p in _CASE_FILES if not p.name.startswith("test-g-")], (40, 50), id="sets-before-split-g"),
-    pytest.param(sorted((ROOT / "eval" / "cases").glob("test-g-*.adjudicated.jsonl")), (12, 14), id="split-g"),
+    # Strict expected failure again since 13/11/2026: with the general-rule exemption opt-in (steward's decision after
+    # the second review, RC-02: the rule released "Parents with no criminal record can be considered for kinship care
+    # of Jayden."), GT-008's clean FAQ sentence "A person with no criminal record at all is treated the same as any
+    # other applicant ..." is a statement again, in a clean document, as in 0.4.0. Friction, not a leak. It passes with
+    # the opt-in switch on (the next test); strict, so it is noticed when the replacement check lands.
+    pytest.param(sorted((ROOT / "eval" / "cases").glob("test-g-*.adjudicated.jsonl")), (12, 14), id="split-g",
+                 marks=pytest.mark.xfail(strict=True, reason=(
+                     "RC-02 / steward's decision 13/11/2026: the general-rule exemption is opt-in, so GT-008's clean "
+                     "FAQ rule is a statement again (0.4.0 behaviour)"))),
 ]
 
 
@@ -213,6 +251,16 @@ def test_no_negative_statement_of_the_evaluation_sets_overlaps_a_hard_negative(p
     assert hits == [] and clean == [] and wrong == []
     assert made >= floor[0] and covered >= floor[1]  # 42 statements covering 56 gold spans when written
     assert time.perf_counter() - started < 30
+
+
+def test_with_the_opt_in_exemption_split_g_guard_holds():
+    """The DD-26 guard of split G, with the opt-in exemption turned on: strict, as before the steward's decision."""
+    try:
+        exemption_on()
+        test_no_negative_statement_of_the_evaluation_sets_overlaps_a_hard_negative(
+            sorted((ROOT / "eval" / "cases").glob("test-g-*.adjudicated.jsonl")), (12, 14))
+    finally:
+        configure_detection_fixes(None)
 
 
 # ----------------------------------------------------------------------------------------------------------------

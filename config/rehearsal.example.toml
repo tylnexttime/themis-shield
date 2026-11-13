@@ -86,8 +86,9 @@ institution_profile = "harbourline-eval"
 # detection, kept as a negative control).
 version = "v0.2"
 # v0.3 friction fixes: default = all but the opt-in ones
-# ("finder-whitespace-trust", "policy-statements"); "all", "none" (v0.2.1) or
-# a list of names.
+# ("finder-whitespace-trust", "policy-statements",
+# "negative-statements-general-exemption"); "all", "none" (v0.2.1) or a list
+# of names.
 # fixes = "none"
 
 [policy]

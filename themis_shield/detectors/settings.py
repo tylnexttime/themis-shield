@@ -10,7 +10,8 @@ Set at start-up from ``[detection] version`` (or the evaluation runner's ``--det
 v0.3 friction fixes (lane 1) are named switches on top of v0.2, each measured alone and together by replay on the
 development sets. ``[detection] fixes`` (a list of names, ``"all"`` or ``"none"``) or the runner's
 ``--detection-fixes`` selects them; ``version = "v0.1"`` switches every one of them off as well. All are on by
-default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust`` and ``policy-statements``);
+default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust``, ``policy-statements`` and
+``negative-statements-general-exemption``);
 ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte and ``"all"`` turns the opt-in ones on too.
 
 - ``secret-placeholders``: a secret assignment whose whole value is a template placeholder or a reference to a
@@ -114,11 +115,18 @@ v0.5 detection fixes (from split F, now development data):
   matters`` (CRIMINAL; "matters" and "outcomes" only near a police, court, conviction or criminal word, and never in a
   paragraph about a company); ``is not experiencing family violence``; ``am not a member of any union``; and a ``No``
   (or other whole answer) after a question about Aboriginal or Torres Strait Islander origin, ethnicity, criminal
-  history, union membership or disability. The span is the clause. A negative in a general rule about a class of
-  people is not one (DD-26): ``A person with no criminal record is treated the same as any other applicant ...``,
-  with a generic subject (a person, any applicant, applicants, staff, anyone who) before it and nothing personal in the
-  sentence; ``He has no criminal record`` and ``Theo has never been charged`` still match. See
-  ``negative_statement_spans`` in ``detectors/statements.py``.
+  history, union membership or disability. The span is the clause. See ``negative_statement_spans`` in
+  ``detectors/statements.py``.
+- ``negative-statements-general-exemption`` (DD-26 and FAB-02, split out of ``negative-statements``; **opt-in, off by
+  default** since 13/11/2026): **not safe for release decisions: a rule-based genericity test misses sentence shapes;
+  see RC-01, RC-03 (second independent review) and RC-02. A model-based check with abstain-to-hold is the planned
+  replacement.** With the default, every negative the vocabulary above reads is a statement, as in 0.4.0. When
+  selected (and only with ``negative-statements`` on), a negative in what looks like a general rule about a class of
+  people is not one: ``A person with no criminal record is treated the same as any other applicant ...``, with a
+  generic subject (a person, any applicant, anyone who, or a plural marked as a class: "with/who/that" and a quantifier
+  or a modal rule after the negative) before it and nothing personal in the sentence. Known to release a statement
+  about one named person or place: ``Parents with no criminal record can be considered for kinship care of Jayden.``,
+  ``Tenants that have no criminal history can stay at 14 Wattle Street.`` (RC-02).
 - ``unique-roles`` (from split F): a role the text says only one person holds (``the only analyst on the overnight
   roster``, ``the one contractor seconded from ...``, ``Sole night-shift pharmacist at ...``) is a QUASI_ID: "the
   only", "only", "sole", "the sole" or "the one", up to three describing words (no function word or number: "only one
@@ -192,6 +200,8 @@ DETECTION_FIXES = (
     "policy-statements",
     # From split G's sensitive misses (development data; detectors/statements.py).
     "indirect-statements",
+    # DD-26 / FAB-02, split out of negative-statements on 13/11/2026 (second review RC-02); opt-in, see below.
+    "negative-statements-general-exemption",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
@@ -206,10 +216,10 @@ SECRET_CONTEXT_FIXES = (
 # documents whose only hold was the unmatched-values rule and that also had genuine finder misses (+2 leaks).
 # Opt-in switches, off by default:
 # - finder-whitespace-trust: see above.
-# - policy-statements (steward's decision, 13/11/2026): not safe for release decisions; a rule-based genericity test
-#   misses sentence shapes (second review RC-01, RC-03). A model-based check with abstain-to-hold is the planned
-#   replacement.
-OPT_IN_DETECTION_FIXES = ("finder-whitespace-trust", "policy-statements")
+# - policy-statements and negative-statements-general-exemption (steward's decision, 13/11/2026): not safe for
+#   release decisions; a rule-based genericity test misses sentence shapes (second review RC-01, RC-02, RC-03). A
+#   model-based check with abstain-to-hold is the planned replacement.
+OPT_IN_DETECTION_FIXES = ("finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption")
 DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(
     name for name in DETECTION_FIXES if name not in OPT_IN_DETECTION_FIXES
 )

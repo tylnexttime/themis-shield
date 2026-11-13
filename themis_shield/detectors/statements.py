@@ -25,6 +25,7 @@ import re
 
 from ..types import Label, Span
 from .contracts import DetectionFinding, finding
+from .settings import fix_on
 
 TABLE_STATEMENT_STAGE = "table-statements"
 UNION_ROLE_STAGE = "union-roles"
@@ -189,6 +190,7 @@ def union_role_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
 # from any data. The words "matters" and "outcomes" are criminal only near a police, court, conviction or criminal
 # word, and a form answer counts only when it is the whole answer (never "Yes / No" options on a blank form).
 NEGATIVE_STATEMENT_STAGE = "negative-statements"
+GENERAL_EXEMPTION = "negative-statements-general-exemption"
 _NEGATIVE_PATTERNS = (
     (Label.CRIMINAL, re.compile(
         r"(?ix)\b(?:no|nil|not\s+any)\s+(?:(?:new|further|other|disclosable|recorded|relevant|prior|previous)\s+)*"
@@ -280,6 +282,11 @@ def _sentence_clause(text: str, start: int, end: int) -> tuple[int, int]:
     return left, right
 
 
+# OPT-IN since 13/11/2026 (switch "negative-statements-general-exemption", off by default; steward's decision after the
+# second review, RC-02): not safe for release decisions, a rule-based genericity test misses sentence shapes ("Parents
+# with no criminal record can be considered for kinship care of Jayden." was released). With the default every negative
+# the vocabulary reads is a statement, as in 0.4.0. A model-based check with abstain-to-hold is the planned replacement.
+#
 # DD-26 (from split G's GT-008, development data): a negative inside a general rule about a class of people ("A person
 # with no criminal record at all is treated the same as any other applicant once the check is returned as clear") says
 # nothing about anyone: taxonomy section 3 labels a statement only when it is about a person, section 4 calls this a
@@ -356,7 +363,9 @@ def negative_statement_spans(text: str, tier: int = 1) -> tuple[DetectionFinding
             if _COMPANY.search(text, text.rfind("\n", 0, a) + 1, len(text) if line_end < 0 else line_end):
                 continue
         start, end = _sentence_clause(text, a, b)
-        if start < end and not _generic_subject_statement(text, a, b, end):
+        if start < end and not (
+            fix_on(GENERAL_EXEMPTION) and _generic_subject_statement(text, a, b, end)
+        ):
             out.append(_statement(start, end, label, NEGATIVE_STATEMENT_STAGE, tier))
     for m in _ANSWERED_QUESTION.finditer(text):
         question = text[m.start():m.start(1)]

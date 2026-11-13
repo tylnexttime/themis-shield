@@ -15,6 +15,13 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   RELEASE with the switch on) and RC-03 (its over-strictness on plain policy text). A model-based check with
   abstain-to-hold is the planned replacement. The code and the switch stay (`[detection] fixes` naming it, or `"all"`).
   With the defaults, the three split G clean documents it released are held again (ASK:sensitive), as in 0.4.0.
+- **The general-rule exemption of `negative-statements` is opt-in (off by default)**, under its own switch
+  `negative-statements-general-exemption` (the DD-26 change and its FAB-02 narrowing, split out). Same reason: see
+  RC-02 ("Parents with no criminal record can be considered for kinship care of Jayden." and "Tenants that have no
+  criminal history can stay at 14 Wattle Street." were ASK in 0.4.0 and RELEASE with the exemption). With the defaults
+  every negative the `negative-statements` vocabulary reads is a statement again, as in 0.4.0; split G's GT-008 (a
+  clean FAQ rule) is held again, and the DD-26 split G guard is a strict expected failure once more (it passes with
+  the switch on).
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 
@@ -204,7 +211,8 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
   switch. `negative-statements` no longer matches a negative inside a general rule about a class of people ("A person
   with no criminal record at all is treated the same as any other applicant once the check is returned as clear", in a
   clean FAQ): only a generic subject (a person, any applicant, anyone who, or a plural marked as a class: narrowed by
-  FAB-02 above) before it in its sentence, nothing personal in the sentence and no ":" after it; a name, "He", "I", an appositive ("Priya Nand, a
+  FAB-02 above; **opt-in since the steward's decision above**, switch `negative-statements-general-exemption`) before
+  it in its sentence, nothing personal in the sentence and no ":" after it; a name, "He", "I", an appositive ("Priya Nand, a
   person with no criminal record, ...") and a list under a generic heading still match. `quasi-cells` widens a partial
   finding only to the clause of the cell that holds it, so a ";" inside a cell ends it (GT-081's second clause ended in
   a role title).

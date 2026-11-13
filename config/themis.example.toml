@@ -124,8 +124,9 @@ institution_profile = ""
 # detection, kept as a negative control).
 version = "v0.2"
 # v0.3 friction fixes on top of v0.2. Default: every fix except the opt-in
-# ones, "finder-whitespace-trust" and "policy-statements" (not safe for
-# release decisions; see the CHANGELOG); "all" adds them, "none" is exact
+# ones, "finder-whitespace-trust", "policy-statements" and
+# "negative-statements-general-exemption" (not safe for release decisions; see
+# the CHANGELOG); "all" adds them, "none" is exact
 # v0.2.1 behaviour,
 # or list names: "secret-placeholders", "organisation-contacts",
 # "checksum-context", "rule-completeness", "table-role-words", "title-tokens",
