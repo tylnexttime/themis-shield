@@ -12,9 +12,12 @@ and its document sensitivity score, copied from the reviewer's output ``repro1.o
 that, both finders return nothing, and everything after the tracer is the real code, with the shipped rule packs
 (``core`` only, as in the review; the default-hold test also runs with the regional packs on). Invented text only.
 
-The second half records, honestly, what the opt-in switch still does with the same documents: it releases them.
-That is why it is opt-in. The table is a record of a known hazard, not a target; a statement-level check that reads
-the text is what the switch would need before anyone reconsiders it (DEV-DEBT DD-37).
+The second half records, honestly, what the opt-in switch still does with the same documents. When the review ran
+it released all twelve; since the fixes for HL-05 and HL-06 inside the opt-in path it still releases six of them (a
+name and a health fact in a file path, tags, an SMS call with an HIV result, a spaced-out name, and the sentence
+about the night cook in a procedure, twice). That is why it is opt-in. The table is a record of a known hazard, not
+a target; a statement-level check that reads the text is what the switch would need before anyone reconsiders it
+(DEV-DEBT DD-37).
 """
 
 from __future__ import annotations
@@ -183,7 +186,18 @@ def test_default_switches_hold_it_for_the_operator_as_in_candidate_0_5(case_id, 
 # below leave the gate with the statement in clear. Structured text and a diluted sentence score under the switch's
 # sensitivity limit, and with the finders silent nothing else reads statements.
 # ----------------------------------------------------------------------------------------------------------------------
-RELEASED_WITH_THE_SWITCH_ON = set(CASES)
+# Held even with the switch on since the fixes for HL-05 and HL-06 (inside the opt-in path): the tracer's
+# account-number label is not "a value only" (a ticket number, a Medicare number, a passport number and a surname all
+# arrive as it), and a span that covers part of a quoted value is not either.
+HELD_WITH_THE_SWITCH_ON_SINCE_HL05_HL06 = {
+    "A1-json-ticket": "HL-05", "A5-yaml": "HL-05", "A6-government-ids": "HL-05", "A8-surname-as-identifier": "HL-05",
+    "A9-partial-phone-span": "HL-06",
+    # An accident of where the review cut its sentence into the configuration file: the line it lands on has an open
+    # quote before the phone number, so the number sits in a string that says more. The same shape in prose (B1) is
+    # still released.
+    "B2-prose-in-3000-chars-of-config": "HL-06",
+}
+RELEASED_WITH_THE_SWITCH_ON = set(CASES) - set(HELD_WITH_THE_SWITCH_ON_SINCE_HL05_HL06)
 
 
 @pytest.mark.parametrize("case_id", ALL)
@@ -198,8 +212,9 @@ def test_what_the_opt_in_switch_releases(case_id):
 
 
 def test_the_hazard_is_recorded_for_every_shape_the_review_named():
-    # Structured text (JSON, YAML, code) and a sentence diluted in a long document are both on record as released
-    # with the switch on, and the review's controls as held.
-    assert {case_id[:2] for case_id in RELEASED_WITH_THE_SWITCH_ON} == {"A1", "A2", "A3", "A4", "A5", "A6", "A7",
-                                                                        "A8", "A9", "B1", "B2"}
+    # Structured text (JSON, code) and a sentence diluted in a long document are still on record as released with the
+    # switch on: the HL-05 and HL-06 fixes narrow the switch, they do not make its score a witness. The YAML record
+    # (A5) and the refuge ticket (A1) are held now only because the tracer called the ticket number an account number.
+    assert {case_id[:2] for case_id in RELEASED_WITH_THE_SWITCH_ON} == {"A2", "A3", "A4", "A7", "B1"}
     assert not RELEASED_WITH_THE_SWITCH_ON & set(HELD_EITHER_WAY)
+    assert set(HELD_WITH_THE_SWITCH_ON_SINCE_HL05_HL06) <= set(CASES)

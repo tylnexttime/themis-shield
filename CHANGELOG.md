@@ -30,6 +30,19 @@ later. A leak is worse than friction, so:
   of birth in 43, an address in 22; disability statements in 19, ethnicity in 18, religion in 16, health in 15).
   Under the default switches the same arm releases none. The number is in the test as a record of the hazard, not
   a target; the truth for the real tracer lies between the two arms.
+- **Inside the opt-in path: an account-like number and a partial value keep the hold (HL-05, HL-06).** The tracer's
+  account-number label is what a Medicare number, a passport number and a surname it misread arrive as, so it no
+  longer counts as "a value only": the switch now needs every tracer finding to be an email address or a phone
+  number, and every finding in the document to be a contact or a plain date (an allow-list: a rule-found Medicare,
+  tax file, passport, licence, bank, card, student or national identifier keeps the hold; an organisation's own
+  number does not). A tracer span that is not a whole value keeps the hold too (`detectors/value_span.py`, computed
+  only with the switch on): cut inside a number or an address, half of a quoted string, or inside a quoted string
+  that says more, as in `"+61 (0)491 570 156 ext 22 (ask for the deaf lady)"`, where substitution left the remark
+  in clear. Not seen: an unquoted remark beside a whole value on the same line (DD-37). This narrows the switch and
+  does not repair it: of the reviewer's twelve documents six are still released with it on, and the name-blind
+  guard arm above goes from 127 to 50, not to zero. The switch's effect on friction after the narrowing has not
+  been replayed (some of the four clean documents it had released were held for an identifier only, which it no
+  longer lifts). The default build is untouched by all of this.
 
 ### Friction on clean documents (13/11/2026; development measurements only)
 

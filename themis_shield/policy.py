@@ -104,9 +104,18 @@ def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
 # PII-Tracer found something that both LLM finders did not. When the only doubt is about VALUES the tracer found, and
 # nothing in the document points to a person, the values are substituted (as every finding is) and the document is
 # not held. The hold stays whenever the doubt could be about more than those values:
-# - a tracer label outside contacts and identifiers (a name, an address, a date of birth, a URL, a quasi-identifier);
-# - any finding, from any stage, that needs a person behind it (``PERSON_BOUND_LABELS``): with a person in the text and
-#   both finders silent, a statement about that person may have been missed, and only the finders read statements;
+# - a tracer label other than an email address or a phone number (``SUBSTITUTE_ONLY_TRACER_LABELS``): a name, an
+#   address, a date of birth, a URL, a quasi-identifier, and also the tracer's account-number label (STUDENT_ID
+#   here). That label is what a Medicare number, a passport number and a surname the tracer misread all arrive as, so
+#   it marks one person's record as often as an order reference (review HL-05);
+# - a tracer value that is not whole (``partial_value``, detectors/value_span.py): a span that stops inside a number
+#   or leaves other text in the quoted string it sits in protects part of a value and releases the rest (HL-06);
+# - any finding, from any stage, with a label outside ``VALUE_ONLY_LABELS`` (an allow-list, so a label added later
+#   keeps the hold): a person, an address, a date of birth, a quasi-identifier, anything sensitive, and every
+#   personal identifier a rule can find (Medicare, tax file, passport, licence, bank account, payment card, student
+#   or national identifier, USI, user name). With a person behind a value and both finders silent, a statement about
+#   that person may have been missed, and only the finders read statements. An organisation's own contact or company
+#   number (``organisation_value``) is not a person's;
 # - a document sensitivity score over ``SUBSTITUTE_ONLY_MAX_SENSITIVITY``: the tracer's own sign of sensitive content
 #   is a second, independent witness, and anything above its noise floor keeps the hold. The value was set on
 #   development data (in-sample): under silent finders, tables that key sensitive statements by an identifier and name
@@ -123,25 +132,25 @@ def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
 # default again on a document score: it needs a statement-level check that reads the text (DEV-DEBT DD-37).
 # ----------------------------------------------------------------------------------------------------------------------
 EMPTY_FINDER_SUBSTITUTE = "empty-finder-substitute"
-SUBSTITUTE_ONLY_TRACER_LABELS = frozenset({Label.EMAIL, Label.PHONE, Label.STUDENT_ID})
+SUBSTITUTE_ONLY_TRACER_LABELS = frozenset({Label.EMAIL, Label.PHONE})
 SUBSTITUTE_ONLY_MAX_SENSITIVITY = 0.01
-PERSON_BOUND_LABELS = frozenset({
-    Label.PERSON, Label.QUASI_ID, Label.ADDRESS, Label.DATE_OF_BIRTH, Label.URL_PERSONAL, Label.USERNAME,
-}) | SENSITIVE_LABELS
+VALUE_ONLY_LABELS = frozenset({Label.EMAIL, Label.PHONE, Label.OTHER_DATE})
 
 
 def empty_finder_value_doubt_only(
     evidence: DetectionResult, max_sensitivity: float = SUBSTITUTE_ONLY_MAX_SENSITIVITY,
 ) -> bool:
-    """True when the contrary tracer evidence is only contact or identifier values in a document where no stage
-    found a person, a place of residence, a date of birth or anything sensitive, and the tracer's sensitivity score is
-    at its noise floor (see the block comment above)."""
+    """True when the contrary tracer evidence is only whole email addresses or phone numbers, in a document where no
+    stage found anything but contacts and plain dates, and the tracer's sensitivity score is at most the limit (see
+    the block comment above, and why none of this makes it safe as a default)."""
     if evidence.doc_sensitivity > max_sensitivity:
         return False
     contrary = contrary_tracer_findings(evidence)
     if not contrary or any(not labels <= SUBSTITUTE_ONLY_TRACER_LABELS for _, labels in contrary):
         return False
-    return not any(item.labels & PERSON_BOUND_LABELS for item in evidence.findings)
+    if any(getattr(item, "partial_value", False) for item in evidence.findings):
+        return False
+    return all(item.organisation_value or item.labels <= VALUE_ONLY_LABELS for item in evidence.findings)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

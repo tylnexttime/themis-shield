@@ -193,7 +193,7 @@ Read this section before you rely on anything above.
   - requiring a digit in a USI also drops about 1 in 18 genuine USIs from the rule (the LLM finders remain the
     backstop), in exchange for no longer matching about 1 in 32 ordinary ten-letter words.
 - **`empty-finder-substitute` is opt-in, and not safe as a default** (unreleased, 13/11/2026). With the switch on,
-  when both finders find nothing and PII-Tracer found only contact or identifier values, in a document where no
+  when both finders find nothing and PII-Tracer found only email addresses or phone numbers, in a document where no
   detector found a person and the tracer's sensitivity score is at most 0.01, those values are substituted and the
   document goes on without a person. It was on by default for a few hours (never in a tagged release), on
   development replays alone. An independent review then showed that the score is near zero on structured text
@@ -202,8 +202,9 @@ Read this section before you rely on anything above.
   held, as before. Turn the switch on only for text you know holds no statements about people (a contact
   directory): when the finders are silent nothing else reads the text for statements, so the switch is as safe as
   the tracer's recall of names and no safer. Played against the development sets with silent finders and a tracer
-  that finds contacts and identifiers but no names, it releases 127 of 1,098 held documents with a labelled span
-  unprotected (a guard test records the number).
+  that finds contacts and identifiers but no names, it released 127 of 1,098 held documents with a labelled span
+  unprotected; narrowed to whole email addresses and phone numbers (an account-like number now keeps the hold) it
+  still releases 50 (a guard test records the number).
 - **Quasi-identifiers are substituted, not held.** A found quasi-identifier is replaced, but it doesn't hold the
   document for a human (`[policy] quasi_id_ask = true` changes that). v0.2's table pass finds rare values in
   "anonymised" tables (97.6% recall on our fresh split), but it also flags common job titles, so tables get

@@ -8,9 +8,10 @@ every gold span of ``eval/cases`` under the worst case for the finders (both ret
 switch was adopted as a default on this file and the development replays, and an adversarial review then released a
 person's sensitive statement through it (``tests/test_empty_finder_hold_hl01_hl02.py``). The guard had handed the
 tracer every gold name (HL-03); its second arm, a tracer that misses names, now states what the switch would
-release: 127 development documents with a gold span unprotected. These tests say what the switch does when someone
-turns it on; they are not evidence that it is safe. Synthetic text only in the unit tests; reserved ``.example``
-domains.
+release: 127 development documents with a gold span unprotected when it was a default, 50 since the tracer's
+account-number label and a partial value keep the hold (HL-05, HL-06). These tests say what the switch does when
+someone turns it on; they are not evidence that it is safe. Synthetic text only in the unit tests; reserved
+``.example`` domains.
 """
 
 from __future__ import annotations
@@ -103,18 +104,33 @@ def test_the_switch_is_opt_in():
     assert not fix_on(SWITCH)
 
 
-def test_contact_and_identifier_values_are_substituted_and_the_document_is_not_held():
+def test_contact_values_are_substituted_and_the_document_is_not_held():
     findings = (on(DIRECTORY, "stores.desk@quarrybend.example", Label.EMAIL),
-                on(DIRECTORY, "0491 570 156", Label.PHONE), on(DIRECTORY, "WO-4471902", Label.STUDENT_ID))
+                on(DIRECTORY, "0491 570 156", Label.PHONE))
     off, switched = both(DIRECTORY, findings)
     assert off.decision == Decision.ASK and off.reasons == (HOLD,)
     assert switched.decision == Decision.RELEASE
     # Substituted, not dropped: the same findings as with the hold.
     spans = {(item.start, item.end) for item in switched.findings}
     assert spans == {(item.start, item.end) for item in off.findings}
-    for value in ("stores.desk@quarrybend.example", "0491 570 156", "WO-4471902"):
+    for value in ("stores.desk@quarrybend.example", "0491 570 156"):
         start = DIRECTORY.index(value)
         assert any(a <= start and start + len(value) <= b for a, b in spans)
+    assert not any(item.partial_value for item in switched.findings)
+
+
+# HL-05. The tracer's account-number label is what a Medicare number, a passport number and a misread surname arrive
+# as (the reviewer's values, real tracer): it is not "a value only", even when it is an order reference.
+@pytest.mark.parametrize("text, value", [
+    (DIRECTORY, "WO-4471902"),
+    ('{"medicare": "2123 45670 1", "phone": "0491 570 156", "note": "see file"}', "2123 45670 1"),
+    ('{"passport": "PA1234567", "phone": "0491 570 156", "note": "see file"}', "PA1234567"),
+    ('{"callback": "0491 570 156", "note": "OKAFOR to call back", "priority": 2}', "OKAFOR"),
+])
+def test_an_account_like_value_from_the_tracer_keeps_the_hold(text, value):
+    findings = (on(text, "0491 570 156", Label.PHONE), on(text, value, Label.STUDENT_ID))
+    off, switched = both(text, findings)
+    assert HOLD in off.reasons and HOLD in switched.reasons
 
 
 @pytest.mark.parametrize("value, label", [
@@ -147,6 +163,91 @@ def test_a_person_found_by_another_stage_keeps_the_hold():
     assert not empty_finder_value_doubt_only(Evidence)
     Evidence.findings = (email,)
     assert empty_finder_value_doubt_only(Evidence)
+    # HL-05: so does every personal identifier a rule or name propagation can find, and any label added later (the
+    # test is an allow-list: contacts and plain dates only).
+    allowed = {Label.EMAIL, Label.PHONE, Label.OTHER_DATE}
+    for label in Label:
+        Evidence.findings = (finding(6, 18, label, "rules", 1), email)
+        assert empty_finder_value_doubt_only(Evidence) is (label in allowed), label
+    for label in (Label.MEDICARE, Label.TFN, Label.PASSPORT, Label.DRIVER_LICENCE, Label.BANK_ACCOUNT,
+                  Label.PAYMENT_CARD, Label.NATIONAL_ID, Label.USI, Label.STUDENT_ID, Label.INTERNAL_ID):
+        assert label not in allowed
+    # An organisation's own company number or switchboard is not a person's identifier.
+    from dataclasses import replace
+
+    Evidence.findings = (replace(finding(6, 18, Label.ABN, "rules", 1), organisation_value=True), email)
+    assert empty_finder_value_doubt_only(Evidence)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# HL-06: a tracer span that covers part of a value leaves the rest in clear. Such a finding is marked (only with the
+# switch on) and keeps the hold.
+# ----------------------------------------------------------------------------------------------------------------------
+def _partial(text, value):
+    from themis_shield.detectors.value_span import partial_value
+
+    start = text.index(value)
+    return partial_value(text, start, start + len(value))
+
+
+@pytest.mark.parametrize("text, value", [
+    # The reviewer's case: the span starts on the opening quote and stops before the remark.
+    ('{"contact": "+61 (0)491 570 156 ext 22 (ask for the deaf lady)", "priority": 2}', '"+61 (0)491 570 156 ext 22'),
+    # The whole number, but the quoted string it sits in says more.
+    ('{"contact": "0491 570 156 (ask for the deaf lady)", "priority": 2}', "0491 570 156"),
+    ('note = "ring 0491 570 156 after her dialysis"', "0491 570 156"),
+    # Cut inside a number, a token or an address.
+    ("Rosters: 0491 570 156", "0491 570"),
+    ("Rosters: 0491 570 156", "570 156"),
+    ("Rosters: 0491570156", "0491570"),
+    ("Stores: stores.desk@quarrybend.example", "stores.desk"),
+    ("Stores: mara.quinlan@quarrybend.example", "quinlan@quarrybend.example"),
+    ("Stores: (03) 5550 4410/4411", "(03) 5550 4410"),
+    # Half a bracket pair, or a string that never closes on its line.
+    ("Rosters: (03) 5550 4410", "(03"),
+    ('contact: "0491 570 156', "0491 570 156"),
+])
+def test_a_span_that_is_not_a_whole_value_is_partial(text, value):
+    assert _partial(text, value)
+
+
+@pytest.mark.parametrize("text, value", [
+    ('{"ticket": 7, "contact": "0491 570 156", "status": "open"}', "0491 570 156"),
+    ('send_sms("0491 570 156", "Your parcel is at the depot.")', "0491 570 156"),
+    ("- Rosters: 0491 570 156\n- Stores: stores.desk@quarrybend.example\n", "0491 570 156"),
+    ("- Rosters: 0491 570 156\n- Stores: stores.desk@quarrybend.example\n", "stores.desk@quarrybend.example"),
+    ("Questions to bookings@fernhollow.example or (03) 5550 4410. Program guide out in May.", "(03) 5550 4410"),
+    ("Questions to bookings@fernhollow.example or (03) 5550 4410. Program guide out in May.",
+     "bookings@fernhollow.example"),
+    ("Call +61 (0)491 570 156, or write to <stores.desk@quarrybend.example>.", "+61 (0)491 570 156"),
+    ("Call +61 (0)491 570 156, or write to <stores.desk@quarrybend.example>.", "stores.desk@quarrybend.example"),
+])
+def test_a_whole_value_is_not_partial(text, value):
+    assert not _partial(text, value)
+
+
+def test_a_partial_tracer_value_keeps_the_hold_and_is_marked_only_with_the_switch_on():
+    text = '{"contact": "+61 (0)491 570 156 ext 22 (ask for the deaf lady)", "priority": 2}'
+    findings = (on(text, '"+61 (0)491 570 156 ext 22', Label.PHONE),)
+    off, switched = both(text, findings)
+    assert off.reasons == (HOLD,) and switched.reasons == (HOLD,)
+    assert not any(item.partial_value for item in off.findings)       # the defaults do not compute it
+    marked = [text[item.start:item.end] for item in switched.findings if item.partial_value]
+    assert '"+61 (0)491 570 156 ext 22' in marked
+    # The same number alone in its string is a whole value.
+    whole = '{"contact": "+61 (0)491 570 156", "priority": 2}'
+    _, released = both(whole, (on(whole, "+61 (0)491 570 156", Label.PHONE),))
+    assert released.decision == Decision.RELEASE
+
+
+def test_known_gap_an_unquoted_tail_beside_a_whole_value_is_still_released_with_the_switch_on():
+    # Not a partial span by any delimiter: the remark sits beside a whole number on a YAML line. Reading what is left
+    # beside a value is the statement-level check the switch does not have (DEV-DEBT DD-37). A record, not a target.
+    text = "contact: 0491 570 156 (ask for the deaf lady)\npriority: 2\n"
+    off, switched = both(text, (on(text, "0491 570 156", Label.PHONE),))
+    assert off.reasons == (HOLD,)
+    assert switched.decision == Decision.RELEASE
+    assert not any(item.start <= text.index("deaf lady") < item.end for item in switched.findings)
 
 
 def test_a_sensitivity_score_above_the_noise_floor_keeps_the_hold():
@@ -197,10 +298,12 @@ def test_the_v01_policy_control_ignores_the_switch():
 # 1. no released document holds a gold span that the findings do not cover in full;
 # 2. in particular no released document holds a gold name, address, date of birth, quasi-identifier or sensitive
 #    statement at all.
-# This arm has teeth against the sensitivity limit (at 0.2 instead of 0.01 it finds the tables that key sensitive
-# statements by an identifier). It says NOTHING about a tracer that misses a name: every gold name is handed to the
-# tracer, so every document with a name keeps its hold whatever the switch does. It was read as evidence for a default
-# and should not have been (independent review HL-03).
+# It says NOTHING about a tracer that misses a name: every gold name is handed to the tracer, so every document with
+# a name keeps its hold whatever the switch does. It was read as evidence for a default and should not have been
+# (independent review HL-03). It used to show the sensitivity limit's teeth (at 0.2 instead of 0.01 it found the
+# tables that key sensitive statements by an identifier); since HL-05 the tracer's account-number label keeps the
+# hold on its own, and this arm lifts nothing at any limit: no development document with a gold span holds contacts
+# only.
 #
 # Arm 2, the name-blind tracer (the reviewer's variant). The tracer finds the gold contacts and identifiers but no
 # name, address or date of birth: the worst case for the tracer, as arm 1 is its best case. The real tracer lies
@@ -310,25 +413,27 @@ def test_an_ideal_tracer_and_silent_finders_release_no_unprotected_gold_span_wit
     lifted, bad = out[None]
     assert bad == []
     assert tested >= 1300  # every case with a gold span the tracer can label and an empty-finder hold to lift
-    assert len(lifted) <= 10  # narrow: almost every such document names a person or scores above the noise floor
-    # The guard has teeth. At the escalation threshold: the identifier-keyed tables of sensitive statements, a chat and
-    # the service-desk tickets with a password (11 when written). With no sensitivity condition, more.
-    loose = out[0.2][1]
-    assert len(loose) >= 8 and any("HEALTH" in missing or "SEXUALITY" in missing for _, missing, _ in loose)
-    assert len(out[1.0][1]) >= len(loose)
+    # Since HL-05 nothing is lifted here, at the shipped limit or a looser one: every development document with a gold
+    # span carries a name, an identifier or more, and each of those keeps the hold without the score. (Before HL-05
+    # the arm lifted up to ten documents, and at a limit of 0.2 it released some with an unprotected span: the
+    # identifier-keyed tables of sensitive statements, a chat and service-desk tickets with a password.)
+    assert lifted == []
+    assert out[0.2] == ([], []) and out[1.0] == ([], [])
     assert time.perf_counter() - started < 240
 
 
 # What arm 2 found when it was written (13/11/2026, the suite's rule packs): a record, not a target. If detection
 # changes and the numbers move, find out why and record again; a smaller number is not a licence to make the switch a
 # default (the worst-case tracer is a stand-in, and structured text is not on these sets: HL-01).
-# The reviewer measured the same 1,098 and 127 at 1c044ff (review HL-03, p10.py).
-NAME_BLIND_TESTED = 1098                # development documents with an empty-finder hold under this tracer
-NAME_BLIND_RELEASED_UNPROTECTED = 127   # of those, released by the switch with at least one gold span unprotected
-NAME_BLIND_UNPROTECTED_LABELS = {       # documents per unprotected gold label
-    "PERSON": 127, "DATE_OF_BIRTH": 43, "OTHER_DATE": 41, "ADDRESS": 22, "DISABILITY": 19, "ETHNICITY": 18,
-    "RELIGION": 16, "HEALTH": 15, "SEXUALITY": 7, "UNION": 6, "FAMILY_VIOLENCE": 5, "DRIVER_LICENCE": 2, "PASSPORT": 2,
-    "SECRET": 1, "CRIMINAL": 1,
+# At 1c044ff, when the switch was a default, this arm released 127 of the 1,098 (the reviewer measured the same two
+# numbers: review HL-03, p10.py): a name in all 127, a date of birth in 43, an address in 22, a sensitive statement
+# of eight kinds. Since the fixes for HL-05 and HL-06 (the tracer's account-number label and a partial value keep the
+# hold) it is 50: fewer, and still fifty documents with a name nobody protected.
+NAME_BLIND_TESTED = 1098               # development documents with an empty-finder hold under this tracer
+NAME_BLIND_RELEASED_UNPROTECTED = 50   # of those, released by the switch with at least one gold span unprotected
+NAME_BLIND_UNPROTECTED_LABELS = {      # documents per unprotected gold label
+    "PERSON": 50, "OTHER_DATE": 14, "ETHNICITY": 9, "DATE_OF_BIRTH": 8, "DISABILITY": 6, "HEALTH": 6, "RELIGION": 5,
+    "ADDRESS": 2, "FAMILY_VIOLENCE": 1,
 }
 
 

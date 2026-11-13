@@ -291,6 +291,10 @@ def _finish(document):
         from .tracer_sanity import mark_implausible_tracer_values
 
         findings = mark_implausible_tracer_values(text, findings)
+    if fix_on("empty-finder-substitute"):
+        from .value_span import mark_partial_values
+
+        findings = mark_partial_values(text, findings)
     if fix_on("policy-statements"):
         from .policy_statements import drop_policy_statements
 

@@ -171,11 +171,15 @@ v0.5 detection fixes (from split F, now development data):
 Friction on clean documents (13/11/2026):
 
 - ``empty-finder-substitute`` (**opt-in, off by default**; read by the policy, ``empty_finder_value_doubt_only`` in
-  ``policy.py``): substitute, don't hold. When both LLM finders return nothing and PII-Tracer found only contact or
-  identifier values (an email address, a phone number, an account-like number), in a document where no stage found a
-  person, an address, a date of birth, a quasi-identifier or anything sensitive and whose sensitivity score is at
-  most 0.01, the values are substituted and the document is not held for ``ASK:disagreement-empty-llm``. Any other
-  tracer label, any person, or a higher sensitivity score keeps the hold.
+  ``policy.py``): substitute, don't hold. When both LLM finders return nothing and PII-Tracer found only email
+  addresses or phone numbers, each one a whole value, in a document where no stage found anything but contacts and
+  plain dates (no person, address, date of birth, quasi-identifier, personal identifier or anything sensitive) and
+  whose sensitivity score is at most 0.01, the values are substituted and the document is not held for
+  ``ASK:disagreement-empty-llm``. Any other tracer label keeps the hold, and so does the tracer's account-number
+  label: a Medicare number, a passport number and a surname it misread all arrive as it (HL-05). A tracer span that
+  is not a whole value keeps it too: cut inside a number, or inside a quoted string that says more, as in
+  ``"+61 ... ext 22 (ask for the deaf lady)"`` (HL-06; ``detectors/value_span.py``, computed only with the switch
+  on).
 
   **Not safe as a default** (steward's decision, 13/11/2026 17:50 UTC, after the independent review HL-01 to HL-06;
   it was on by default for a few hours of 13/11/2026, never in a tagged release). Its "value doubt only" test asks the
@@ -187,8 +191,9 @@ Friction on clean documents (13/11/2026):
   (``tests/test_empty_finder_hold_hl01_hl02.py`` keeps both halves on record). The development replay that adopted it
   (four clean documents no longer held on splits C, E, F and G, no measure worse) could not see this: on those sets
   no document with personal information ever had both finders silent, and the guard that stood in for them gave the
-  tracer every gold name (HL-03). Before it is reconsidered it needs a statement-level check that reads the text,
-  not a document score (DD-37).
+  tracer every gold name (HL-03). The HL-05 and HL-06 conditions narrow the switch; they do not repair it (the
+  refuge ticket is held with the switch on only because the tracer called its ticket number an account number).
+  Before it is reconsidered it needs a statement-level check that reads the text, not a document score (DD-37).
 """
 
 from __future__ import annotations

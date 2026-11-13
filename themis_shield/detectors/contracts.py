@@ -43,6 +43,10 @@ class DetectionFinding(Finding):
     # birth, a place without a number called an address). Still substituted; it only stops counting as contrary
     # evidence for the empty-finder hold, exactly like organisation_value.
     implausible_tracer_value: bool = False
+    # Set only with the opt-in "empty-finder-substitute" switch (detectors/value_span.py; review HL-06): a PII-Tracer
+    # span that is not a whole value (it is cut inside a token, holds half of a quoted string, or leaves other text in
+    # the quoted string it sits in). Still substituted; it keeps the empty-finder hold.
+    partial_value: bool = False
 
     @property
     def start(self) -> int:

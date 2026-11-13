@@ -55,7 +55,7 @@ tokens are restored locally (`restore.py`).
 | `detectors/union.py`, `propagate.py`, `allowlist.py`, `profile_adapter.py` | real | Evidence union, propagation across tables, names and initials, a column-aware quasi-identifier pass for identifier-bearing tables (v0.2), institutional allow-list from a profile. |
 | `detectors/markings.py`, `routing.py` | real | Security-marking gate and the marking-based route, applied before any PII decision. |
 | `detectors/contracts.py`, `types.py` | real | Value-free evidence types and the label set. |
-| `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. Substitute, don't hold (`empty-finder-substitute`, **opt-in, off by default**): when both finders are silent and PII-Tracer found only contact or identifier values, in a document where no stage found a person, an address, a date of birth, a quasi-identifier or anything sensitive and the tracer's sensitivity score is at most 0.01, the values are substituted and the document is not held for the disagreement. Not safe as a default (review HL-01, HL-02; see [why below](#why-empty-finder-substitute-is-not-a-default)). |
+| `policy.py` | real | RELEASE / ASK / BLOCK from the evidence. `[policy] version` (`v0.2` default, `v0.1` kept as the negative control) and `quasi_id_ask`. Substitute, don't hold (`empty-finder-substitute`, **opt-in, off by default**): when both finders are silent and PII-Tracer found only whole email addresses or phone numbers, in a document where no stage found anything but contacts and plain dates and the tracer's sensitivity score is at most 0.01, the values are substituted and the document is not held for the disagreement. Not safe as a default (review HL-01, HL-02; see [why below](#why-empty-finder-substitute-is-not-a-default)). |
 | `detectors/settings.py` | real | `[detection] version`: `v0.2` (default) turns on the tier-1 fixes and the column-aware table pass; `v0.1` restores the evaluated v0.1 detection. |
 | `detectors/subject_guard.py` | real, off by default | The deterministic vetoes of the typed tier's subject check: wording that points to someone in particular keeps a sensitive hold whatever the model answers (see [the subject check](#the-subject-check-q-d-and-q-g)). |
 | `detectors/typed.py`, `detectors/typed_tier.py` | real, off by default | v0.3 typed-decision tier (T1.5): multiple-choice questions about what the cheaper tiers found, answered in one forward pass; the policy decides what an answer may change (see [below](#v03-typed-decision-tier-t15)). |
@@ -690,9 +690,9 @@ reading the whole document and then each sentence, says with a clear margin that
 ### Why `empty-finder-substitute` is not a default
 
 `empty-finder-substitute` (`empty_finder_value_doubt_only` in `policy.py`) lifts the empty-finder hold when
-PII-Tracer found only contact or identifier values, no stage found a person, and the tracer's document sensitivity
-score is at most 0.01. It is **opt-in, off by default** (steward's decision, 13/11/2026 17:50 UTC), and it must not
-become a default in this form. The reason is the third condition:
+PII-Tracer found only whole email addresses or phone numbers, no stage found anything but contacts and plain dates,
+and the tracer's document sensitivity score is at most 0.01. It is **opt-in, off by default** (steward's decision,
+13/11/2026 17:50 UTC), and it must not become a default in this form. The reason is the third condition:
 
 - **The score is not a witness.** It is one number per tracer window of up to 3,800 tokens. On structured text
   (JSON, YAML, code) the real model scores 0.0002 to 0.0095 whatever the fields say, and a personal sentence that
@@ -708,9 +708,19 @@ become a default in this form. The reason is the third condition:
   ever had both finders silent, so the replay measured the switch on clean documents only; the guard that stood in
   played the tracer with the gold itself, so every gold name was "found" and kept the hold (HL-03); and the 0.01
   limit was read off tables that score 0.019 and up.
+- **Narrowed inside the opt-in path, not repaired** (HL-05, HL-06). The tracer's account-number label no longer
+  counts as "a value only": a Medicare number, a passport number and a surname it misread all arrive as it. Every
+  finding in the document must be a contact or a plain date (an allow-list, so every personal identifier a rule
+  finds keeps the hold; an organisation's own number does not). And a tracer span that is not a whole value keeps
+  the hold (`detectors/value_span.py`, computed only with the switch on): cut inside a number or an address, half
+  of a quoted string, or inside a quoted string that says more
+  (`"+61 (0)491 570 156 ext 22 (ask for the deaf lady)"`). An unquoted remark beside a whole value on the same
+  line is not seen. With these, six of the reviewer's twelve documents are still released with the switch on.
 - **On record.** `tests/test_empty_finder_hold_hl01_hl02.py` replays the reviewer's documents with the findings and
   scores the real tracer gave: each is ASK under the default switches, and the same file lists which of them the
-  opt-in switch still releases.
+  opt-in switch still releases. `tests/test_empty_finder_substitute.py` plays the development sets with silent
+  finders and a tracer that finds contacts and identifiers but no names: with the switch on, 50 of 1,098 held
+  documents are released with a labelled span unprotected (127 before the narrowing); under the defaults, none.
 - **Before it is reconsidered** (DD-37): a statement-level check that reads the text that would be left (for
   example, release only when nothing remains on the lines that held a tracer value but a field label), not a
   document score; and an adversarial review of the shapes it could release, not development replays alone.
