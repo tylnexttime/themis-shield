@@ -384,6 +384,45 @@ def candidates(text: str, flag: Flag) -> tuple[str, ...]:
     return tuple(found)
 
 
+# RC-06 (second review): FAB-06 keeps short and common words out of the vault, and that stands. But a capitalised whole
+# word the trip-wire flags ("Ng", "Li", "Will", "May", "Page") may be a real name, and leaving it as a highlighted
+# leftover let the package be approved with it in clear. Such a finding of the last round becomes an OPEN point for the
+# Operator (``TRIPWIRE_UNREPLACED``), which blocks approval until it is settled (Not personal, Replace it or Stop): the
+# Operator, not the loop, decides whether to vault it. Lower-case words and spans that cut a word stay listed only
+# (they are the flood an instruction aimed at the trip-wire would produce); more than ``MAX_OPEN_NAMES`` such names
+# become one whole-document point.
+MAX_OPEN_NAMES = 8
+
+
+def unreplaced_name(text: str, flag: Flag) -> bool:
+    """True when the finding is a whole word (or words) that the loop may not vault (FAB-06: short or common) and that
+    starts with a capital letter: a short or common-word name such as "Ng" or "Will" (RC-06)."""
+    if flag.start is None or _cuts_word(text, flag.start, flag.end):
+        return False
+    pieces = [
+        value for fragment in _fragments(text, flag.start, flag.end) for piece in _TOKEN.split(fragment)
+        if (value := unescape_literals(piece).strip(_EDGE))
+    ]
+    return (
+        bool(pieces) and not any(plausible_value(value) for value in pieces)
+        and any(value[0].isupper() for value in pieces)
+    )
+
+
+def open_names(text: str, flags, exact: bool) -> list[dict]:
+    """The last round's unreplaced names (``unreplaced_name``) as value-free open-point records: the category's label
+    and, when the final package is the one this round read (``exact``), the span in it; otherwise no place (a
+    whole-document point). More than ``MAX_OPEN_NAMES`` give one whole-document point."""
+    names = [flag for flag in flags if unreplaced_name(text, flag)]
+    if len(names) > MAX_OPEN_NAMES:
+        return [{"start": None, "end": None, "label": None}]
+    return [
+        {"start": flag.start if exact else None, "end": flag.end if exact else None,
+         "label": category_label(flag.category).value}
+        for flag in names
+    ]
+
+
 class _Overlay:
     """A trial view of the conversation vault: reads the real mappings, keeps new ones aside until committed."""
 
@@ -604,11 +643,13 @@ def _loop(router, job, fresh, identifier, matched, evidence, package, boundary, 
 
     config = router.tripwire
     rounds, cache, converged = [], {}, False
+    last_text, last_flags = None, ()
     for number in range(1, config.max_rounds + 1):
         raw, originals = package[0], package[3]
         digest = hashlib.sha256(raw).hexdigest()
         text = document(raw)
         flags = _ask(router, job, text, originals, marking, digest, number)
+        last_text, last_flags = text, flags
         if not flags:
             router._register_call(
                 "record_tripwire_round", job.job_id, digest, "clear", (), round_number=number, last=True,
@@ -652,6 +693,11 @@ def _loop(router, job, fresh, identifier, matched, evidence, package, boundary, 
         })
         if last:
             break
+    if not converged and last_flags:
+        # RC-06: short or common-word names the loop may not vault become open points for the Operator.
+        opened = open_names(last_text, last_flags, document(package[0]) == last_text)
+        if opened:
+            rounds[-1]["open"] = opened
     outcome = LoopOutcome(converged, tuple(rounds))
     router._register_call(
         "record_tripwire_loop", job.job_id, hashlib.sha256(package[0]).hexdigest(), converged, list(rounds),

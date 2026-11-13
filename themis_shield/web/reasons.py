@@ -145,6 +145,11 @@ FIXED = {
         "Another replacement in this job reuses the placeholder this one added (the same value was replaced there "
         "too). Undo that replacement first, then this one."
     ),
+    "REPLACEMENT_TOO_SHORT": (
+        "The text to replace is too short or too common a word to keep in the codebook (its letters occur in ordinary "
+        "words, so the cloud answer would be refused). Widen the span to take in a neighbouring word, or settle the "
+        "point another way."
+    ),
     "REPLACEMENT_CATEGORY_WEAKER": (
         "The chosen category is weaker than a placeholder inside the span. Pick that placeholder's category or a "
         "stronger one."
@@ -201,6 +206,10 @@ POINT_REASONS = {
         "a finder reported values that are not in the text word for word: read the whole text"
     ),
     "ASK:known-miss-hit": "the text matches an entry in the known-miss register",
+    "TRIPWIRE_UNREPLACED": (
+        "a short or common-word name the cloud trip-wire flagged; the gate never replaces such a word by itself, "
+        "so you decide"
+    ),
     "ASK:known-miss-stale": "the known-miss register snapshot is out of date: read the whole text",
     "ASK:known-miss-deadline": "the known-miss check did not finish in time: read the whole text",
     "ASK:ambiguous-entity": "the gate could not tell which person or thing this refers to",

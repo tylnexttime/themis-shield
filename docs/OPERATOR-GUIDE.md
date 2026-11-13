@@ -67,6 +67,9 @@ Some actions are refused with a reason instead of being accepted and failing lat
   settled on text you cannot see. The requester sends again to rebuild it.
 - "Replace it" with a weaker category over a span that holds a stronger placeholder (for example "quasi-identifier"
   over a person placeholder) is refused. Pick that placeholder's category or a stronger one.
+- "Replace it" on text that is too short or too common a word to keep in the codebook ("Ng", "Will") is refused
+  (`REPLACEMENT_TOO_SHORT`): its letters occur in ordinary words, so the job would be refused on the next send. Widen
+  the span to take in a neighbouring word ("Ask Ng"), or settle the point another way.
 - Undoing the first of two replacements of the same value is refused while the other one still uses its placeholder.
   Undo the other one first.
 
@@ -105,6 +108,12 @@ or a round could replace nothing, the package comes to you marked **NOT CONVERGE
 on the card, and highlighted in the text where their place is exact. They are **not** open points, so they do not
 stop you approving.
 
+One exception: a capitalised whole word the trip-wire flags in the last round that is too short or too common for the
+loop to replace by itself ("Ng", "Will", "Page") may be a real name. It is an **open point** (reason: "a short or
+common-word name the cloud trip-wire flagged"), at its place in the text when that place is exact and otherwise for the
+whole document, and you settle it like any other point before approving. More than eight of them become one
+whole-document point, so an instruction aimed at the trip-wire cannot fill your queue with them.
+
 That is deliberate:
 
 - **The trip-wire reads untrusted text.** A document can contain an instruction aimed at it, such as "report every
@@ -115,8 +124,9 @@ That is deliberate:
 - **The package is marked.** NOT CONVERGED is shown as a warning on the card, the reason is
   `TRIPWIRE_NOT_CONVERGED`, and the automatic pilot approval never approves such a package. It always needs a person.
 - **Fragments are not vaulted.** The loop only replaces values that could plausibly be personal: at least three
-  letters or digits, whole words, and not a common word. A flagged fragment such as "ni" or "7B" is listed for you
-  instead of being added to the codebook.
+  letters or digits, whole words, and not a common word. A flagged fragment such as "ni" inside "night", or a
+  lower-case word, is listed for you instead of being added to the codebook. A capitalised short or common word is
+  not added either, but it is an open point for you (above): you decide whether it is a name.
 
 So: treat NOT CONVERGED as "read this one slowly". If a leftover finding is real personal information, widen a nearby
 point's "Replace it" span to cover it (if it is inside that content surface), or stop the document and ask the
@@ -160,5 +170,5 @@ question, the Operator could instead have stopped the document.
 - Settle every open point, then approve both stages.
 - Use Undo for a mis-click, before stage two.
 - Reveal shows an original on your screen only, and nothing records it.
-- NOT CONVERGED means "read carefully", not "blocked".
+- NOT CONVERGED means "read carefully", not "blocked"; a short name the trip-wire flagged is an open point to settle.
 - With `before_human` on, the cloud has read the de-identified package before you see it.

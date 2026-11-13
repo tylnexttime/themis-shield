@@ -35,6 +35,15 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   the conversation expired or for an older package it is refused with the value-free `REVIEW_UNAVAILABLE`, and the
   console disables the button while the text is unavailable. Before, only an in-memory stale flag was checked, so a
   point could be settled blind (and after a stale undo and a restart the flag was gone too).
+- **RC-06** a capitalised whole word the trip-wire flags in the correction loop's last round that is too short or too
+  common for the loop to vault (FAB-06: "Ng", "Li", "Will", "Page") is no longer left in clear as a leftover highlight:
+  it is an open point for the Operator (new point reason `TRIPWIRE_UNREPLACED`), which blocks approval until it is
+  settled. It is placed exactly when the final package is the one that round read, otherwise it covers the whole
+  document; more than eight become one whole-document point (flood bound). FAB-06 stands: the loop still never vaults
+  a short or common word or a span that cuts a word; lower-case words and fragments stay listed only. "Replace it" on
+  such a value alone is refused when the Operator acts (`REPLACEMENT_TOO_SHORT`, as FAB-07 does): in the codebook its
+  letters made the next send fail the exact-value check and the job be refused (found while checking the guide's
+  example); a span widened to a neighbouring word ("Ask Ng") is accepted.
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 

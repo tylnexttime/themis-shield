@@ -142,15 +142,20 @@ def record_review(router, job, conversation_id, digest, review, raw=None, loop=N
     row = router._register_call("get_details", job.job_id)
     if not review or row["manifest_hash"] != digest or row["package"] != "ready":
         return
+    document = None
+    if raw is not None and getattr(router, "tripwire", None) is not None:
+        document = tripwire.document(raw)
     if loop is not None:
         # Every round of every loop this job ran: a placeholder an earlier loop added stays the trip-wire's after an
         # Operator replacement made the package run the loop again.
         rounds = [item for record in router._register_call("tripwire_loops", job.job_id) for item in record["rounds"]]
         review = mark_tripwire(review, [*rounds, *loop.rounds])
+        opened = loop.rounds[-1].get("open") if loop.rounds and not loop.converged else None
+        if opened:
+            # RC-06: names the loop may not vault are open points for the Operator, not silent leftovers.
+            from .review import open_tripwire_points
+            review = open_tripwire_points(review, opened, document)
     router._register_call("record_review_points", job.job_id, digest, review["points"], now=router.clock())
-    document = None
-    if raw is not None and getattr(router, "tripwire", None) is not None:
-        document = tripwire.document(raw)
     with router._state_lock:
         getattr(router, "_review_stale", set()).discard(job.job_id)
         router._reviews[job.job_id] = ReviewState(

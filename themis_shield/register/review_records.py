@@ -50,7 +50,13 @@ GATE_REASON = "REPLACED_BY_GATE"
 # the gate's own placeholders, and shown as the trip-wire's.
 TRIPWIRE_REASON = "REPLACED_BY_TRIPWIRE"
 SETTLED_BY_GATE = frozenset({GATE_REASON, TRIPWIRE_REASON})
-POINT_REASONS = frozenset(item.value for item in ReasonCode if item.value.startswith("ASK:")) | SETTLED_BY_GATE
+# RC-06: a short or common-word name the correction loop's last round flagged and may not vault itself (FAB-06): an
+# open point the Operator settles, never settled by the gate.
+UNREPLACED_REASON = "TRIPWIRE_UNREPLACED"
+POINT_REASONS = (
+    frozenset(item.value for item in ReasonCode if item.value.startswith("ASK:")) | SETTLED_BY_GATE
+    | {UNREPLACED_REASON}
+)
 KINDS = ("placeholder", "text", "document")
 SETTLERS = ("gate", "operator")
 ACTIONS = ("not-personal", "replaced", "stopped")

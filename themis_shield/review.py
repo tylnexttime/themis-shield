@@ -49,7 +49,7 @@ from .placeholders import (
     SENSITIVE_LABELS, STRICT_TOKEN_PATTERN, TokenAllocator, TokenClass, escape_literals, parse_strict_token,
     unescape_literals,
 )
-from .register.review_records import CATEGORIES, GATE_REASON, TRIPWIRE_REASON, UNDOABLE
+from .register.review_records import CATEGORIES, GATE_REASON, TRIPWIRE_REASON, UNDOABLE, UNREPLACED_REASON
 from .types import Decision, Label, ReasonCode
 
 
@@ -241,6 +241,30 @@ def mark_tripwire(review, rounds):
         if point["reason"] == GATE_REASON and review["tokens"].get(point["id"]) in added:
             point["reason"] = TRIPWIRE_REASON
     return review
+
+
+def open_tripwire_points(review, items, document):
+    """RC-06: the correction loop's unreplaced names (``tripwire.open_names``) become open points the Operator settles
+    (``TRIPWIRE_UNREPLACED``): at their exact place in the review text, or as a whole-document point when the place is
+    not exact (``flag_span``). Value-free like every point."""
+    from types import SimpleNamespace
+    if not review:
+        return review
+    probe = SimpleNamespace(document=document, surfaces=tuple(review.get("surfaces", ())), text=review["text"])
+    points, ids = list(review["points"]), {point["id"] for point in review["points"]}
+    for item in items:
+        label = item.get("label")
+        place = flag_span(probe, item.get("start"), item.get("end"))
+        start, end = place if place is not None else (None, None)
+        identifier = point_id(UNREPLACED_REASON, label, -1 if start is None else start, -1 if end is None else end)
+        if identifier in ids:
+            continue
+        ids.add(identifier)
+        points.append({
+            "id": identifier, "reason": UNREPLACED_REASON, "label": label,
+            "kind": "document" if start is None else "text", "start": start, "end": end, "settled_by": "operator",
+        })
+    return dict(review, points=points)
 
 
 # -- the Operator's view and actions ---------------------------------------------------------------------------
@@ -611,6 +635,12 @@ def _replace(router, job_id, point_id, start, end, category, *, actor):
         original = _original(router, state, start, end)
         if len(original) > MAX_REPLACEMENT or not original.strip():
             raise GateFailure("INVALID_REPLACEMENT_SPAN", 400)
+        from .catalogues.tripwire import plausible_value
+        if not plausible_value(original.strip()):
+            # RC-06: a short or common word ("Ng", "Will") in the codebook would make every later package or answer
+            # holding those letters fail the exact-value check, and the job be refused on the next send. Refuse it
+            # here instead (as FAB-07 does), so the Operator can widen the span ("Ask Ng") or settle it another way.
+            raise GateFailure("REPLACEMENT_TOO_SHORT", 400)
         created = original not in router.vault.mapping(state.conversation_id).values()
         try:
             token = TokenAllocator(state.conversation_id, router.vault).allocate(original, token_class)
