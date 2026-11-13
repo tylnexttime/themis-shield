@@ -514,6 +514,138 @@ async function openJob(id) {
   ]), node("h3", "Finding counts"), counts(job.counts));
   if (!$("job-drawer").open) $("job-drawer").showModal();
 }
+/* Operator review, point by point. The review payload is value-free (placeholders stand where values were). An
+   original is fetched only when the Operator asks for one point, shown in that point's element only, and never kept
+   anywhere else: re-rendering the queue, a reload or leaving the page drops it. */
+const REVIEW_CATEGORIES = {
+  person: "A person's name", contact: "A contact detail", address: "An address", identifier: "An identifier",
+  date: "A date", statement: "A sensitive statement", "quasi-identifier": "A detail that could identify someone"
+};
+const SETTLED = { "not-personal": "Not personal: left as shown", replaced: "Replaced with a placeholder", stopped: "Document stopped here" };
+const sentence = text => text ? text.charAt(0).toUpperCase() + text.slice(1) + "." : "";
+function settledText(resolution) {
+  const category = resolution.action === "replaced" && resolution.category
+    ? ` (${REVIEW_CATEGORIES[resolution.category] || resolution.category})` : "";
+  return `${SETTLED[resolution.action] || "Settled"}${category}, by ${resolution.by || "the Operator"}, ${date(resolution.at)}`;
+}
+function reviewText(review) {
+  const block = node("pre", null, "review-text");
+  const located = review.points.filter(point => point.kind !== "document" && Number.isInteger(point.start)
+    && Number.isInteger(point.end)).sort((a, b) => a.start - b.start);
+  let cursor = 0;
+  for (const point of located) {
+    if (point.start < cursor) continue;
+    block.append(document.createTextNode(review.text.slice(cursor, point.start)));
+    const mark = node("mark", review.text.slice(point.start, point.end), point.resolution ? "settled" : "");
+    mark.title = `Point ${point.number}: ${point.why}`;
+    mark.append(node("sup", String(point.number)));
+    block.append(mark);
+    cursor = point.end;
+  }
+  block.append(document.createTextNode(review.text.slice(cursor)));
+  return block;
+}
+function nextWordEnd(text, end) {
+  let index = end;
+  while (index < text.length && /\s/.test(text[index]) && text[index] !== "\n") index++;
+  while (index < text.length && !/\s/.test(text[index])) index++;
+  return index;
+}
+function replaceForm(review, point, base) {
+  const form = node("form", null, "replace-form");
+  form.hidden = true;
+  const number = (label, value) => {
+    const wrapper = node("label", label), input = node("input");
+    input.type = "number"; input.min = "0"; input.max = String(review.text.length); input.value = String(value);
+    wrapper.append(input);
+    return [wrapper, input];
+  };
+  const [startLabel, start] = number("From character", point.start ?? 0);
+  const [endLabel, end] = number("To character", point.end ?? 0);
+  const categoryLabel = node("label", "Category"), category = node("select");
+  for (const name of review.categories || Object.keys(REVIEW_CATEGORIES)) {
+    const option = node("option", REVIEW_CATEGORIES[name] || name);
+    option.value = name; category.append(option);
+  }
+  category.value = point.category || "person";
+  categoryLabel.append(category);
+  const preview = node("p", "", "muted");
+  const update = () => {
+    const a = Number(start.value), b = Number(end.value);
+    preview.textContent = b > a ? `Becomes one placeholder: “${review.text.slice(a, b)}”` : "Choose a span that covers the point.";
+  };
+  start.addEventListener("input", update); end.addEventListener("input", update); update();
+  const widen = button("Extend to the next word", () => { end.value = String(nextWordEnd(review.text, Number(end.value))); update(); });
+  const confirm = node("button", "Confirm replacement", "primary");
+  confirm.type = "submit";
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    action(async () => {
+      await api(`${base}/replace`, { method: "POST", body: {
+        start: Number(start.value), end: Number(end.value), category: category.value
+      } });
+      notice("Replacement recorded in this job's codebook. The clean package is rebuilt when the requester sends again.");
+      await loadOperator();
+    });
+  });
+  form.append(startLabel, endLabel, widen, categoryLabel, preview, confirm);
+  return form;
+}
+function reviewPoint(id, review, point) {
+  const item = node("li", null, "review-point");
+  item.append(node("p", `${point.location}: ${sentence(point.why)}`));
+  if (point.resolution) { item.append(node("p", settledText(point.resolution), "settled-note")); return item; }
+  const base = `/api/operator/${idPath(id)}/points/${idPath(point.id)}`;
+  const original = node("p", "", "original");
+  original.hidden = true;
+  const reveal = button("Show original", () => action(async () => {
+    if (!original.hidden) { original.textContent = ""; original.hidden = true; reveal.textContent = "Show original"; return; }
+    const data = await api(`${base}/reveal`, { method: "POST", body: {} });
+    if (typeof data?.original !== "string") throw new GateError("The original could not be shown.");
+    original.textContent = `Original, on this screen only and never recorded: ${data.original}`;
+    original.hidden = false; reveal.textContent = "Hide original";
+  }), { disabled: point.kind === "document" || !review.text_available });
+  const form = replaceForm(review, point, base);
+  const actions = node("div", null, "actions");
+  actions.append(reveal,
+    button("Not personal: leave it", () => action(async () => {
+      await api(`${base}/not-personal`, { method: "POST", body: {} });
+      notice("Recorded: not personal. The text stays as shown; the gate itself does not change.");
+      await loadOperator();
+    })),
+    button("Replace it", () => { form.hidden = !form.hidden; }, { disabled: !review.text_available }),
+    button("Stop the document", () => action(async () => {
+      if (!window.confirm("Stop this document? The job is refused and nothing is sent.")) return;
+      await api(`${base}/stop`, { method: "POST", body: {} });
+      notice("Document stopped. Nothing was sent.");
+      await loadOperator();
+    })));
+  item.append(actions, original, form);
+  return item;
+}
+function reviewSection(id, review) {
+  const section = node("section", null, "review");
+  if (!review) return section;
+  section.append(node("h4", review.total
+    ? `Highlighted points: ${review.total - review.unresolved} of ${review.total} settled`
+    : "No highlighted points: nothing held this job for a person"));
+  if (review.package === "building") section.append(node("p", "An Operator replacement changed the clean package. It is "
+    + "rebuilt and bound again when the requester sends again; the text below is the earlier version.", "muted"));
+  if (review.text_available) section.append(reviewText(review));
+  else if (review.total) section.append(node("p", why("REVIEW_UNAVAILABLE"), "muted"));
+  if (review.total) {
+    const list = node("ol", null, "review-points");
+    for (const point of review.points) list.append(reviewPoint(id, review, point));
+    section.append(list);
+  }
+  if (review.gate_settled?.length) {
+    const details = node("details"), list = node("ul"), count = review.gate_settled.length;
+    details.append(node("summary", `Settled by the gate: ${count} placeholder${count === 1 ? "" : "s"}`));
+    for (const item of review.gate_settled) list.append(node("li", `${item.location}: ${sentence(item.why)}`));
+    details.append(list); section.append(details);
+  }
+  return section;
+}
 const operatorEnabled = () => state.settings.operator_console_enabled === true || state.settings.pilot_flags?.operator_console_enabled === true;
 async function loadOperator() {
   if (!operatorEnabled()) throw new GateError("The Operator console is disabled.");
@@ -527,7 +659,8 @@ async function loadOperator() {
         ["Size", `${numeric(job.size?.documents)} documents · ${numeric(job.size?.words)} words`],
         ["Major flags", job.major_flags?.length ? job.major_flags.map(why).join(" ") : "None assessed"],
         ["Due", date(job.due)]
-      ]), stageIndicators(job));
+      ]), stageIndicators(job), reviewSection(id, job.review));
+    const open = job.review?.unresolved > 0;
     const label = node("label", "Decision reason — controlled safe code"), reason = node("select");
     for (const [code, text] of [
       ["ROUTINE_APPROVED", "Routine scope approved"], ["REFUSED", "Requested processing refused"],
@@ -545,11 +678,12 @@ async function loadOperator() {
       } finally { for (const control of actions.querySelectorAll("button")) control.disabled = false; }
     }
     actions.append(
-      button("Approve stage 1", () => action(() => decide("approve", 1)), { disabled: !id || job.stage1 !== "requested" }),
-      button("Approve stage 2", () => action(() => decide("approve", 2)), { disabled: !id || job.package !== "ready" || job.stage2 !== "pending" }),
+      button("Approve stage 1", () => action(() => decide("approve", 1)), { disabled: !id || open || job.stage1 !== "requested" }),
+      button("Approve stage 2", () => action(() => decide("approve", 2)), { disabled: !id || open || job.package !== "ready" || job.stage2 !== "pending" }),
       button("Refuse", () => action(() => decide("refuse")), { disabled: !id }),
       button("Escalate to review board", () => action(() => decide("escalate")), { disabled: !id })
     );
+    if (open) actions.append(node("span", "Settle every highlighted point before approving.", "muted"));
     card.append(label, actions); $("operator-queue").append(card);
   }
   if (!queue.length) $("operator-queue").append(node("p", "No jobs awaiting an Operator decision."));
@@ -679,6 +813,7 @@ window.addEventListener("pagehide", () => {
   for (const record of state.calibrations.values()) clearTimeout(record.timer);
   state.held.clear(); state.calibrations.clear(); state.turns = []; state.attachments = [];
   state.preview = null; state.retry = null; $("messages").replaceChildren(); $("handover-result").replaceChildren(); $("prompt").value = "";
+  $("operator-queue").replaceChildren();
 });
 window.addEventListener("pageshow", event => { if (event.persisted) location.reload(); });
 async function boot() {
