@@ -187,6 +187,12 @@ document's miss has already left the machine. The job stops, the Operator decide
 known-miss register. It is prompted to flag residual identifiers, never to guess who someone is, and its flag
 precision is tracked so we know whether it earns its round trip. Never on BLOCK or local-only work.
 
+**Built (unreleased, development, unmeasured), 13/11/2026:** the trip-wire now runs before approval as a correction
+loop (Chris's revised design): every finding of a round is replaced by a placeholder, the package is checked again,
+at most three rounds, then the usual approval; a package still flagged after the last round goes to the Operator
+marked NOT CONVERGED, and every finding becomes a pending known-miss proposal. Still off by default. See
+[ARCHITECTURE.md, "Cloud trip-wire"](ARCHITECTURE.md#cloud-trip-wire). The design above is kept as written.
+
 ### 6. Smaller items
 
 - Restore safety (done in v0.3): tests that a placeholder one character away from another never restores the wrong
