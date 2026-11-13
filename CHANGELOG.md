@@ -44,7 +44,8 @@ false and may be on together. `enabled` is deprecated: read only when neither to
 - **Three actions per point:** "Not personal: leave it", "Replace it" (the span becomes a placeholder in the job's
   codebook marked `de-identified-by-operator`; the package is rebuilt on the next send and must contain it) and
   "Stop the document" (the job is refused). No stage is approved while a point is unsettled; the register enforces
-  this on every approval path. Two-stage approval, refusal and escalation are otherwise unchanged.
+  this on every approval path for jobs that have points: the web and `/v1` path. Jobs from the Claude Code hooks
+  path record no points yet and are approved as a whole, as in 0.4.0 (FAB-13). Two-stage approval, refusal and escalation are otherwise unchanged.
 - **End states.** Jobs report `end_state`: `stopped`, `de-identified-and-released` or `released-as-is` (`null` while
   open).
 - **No learning by itself.** Replacements stay in their job's codebook. "Not personal" verdicts are counted per hold

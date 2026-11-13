@@ -122,7 +122,8 @@ themis-shield builds that idea into a complete, open, auditable round trip that 
   profile, so a process running as that user can read both: this separates credentials, it does not prove that a
   second human approved. For a held job, the Operator tab shows the de-identified text with each hold highlighted
   and a one-line reason beside it; the Operator settles each point (not personal, replace it, or stop the document)
-  and may reveal one point's original on screen, never recorded. Approval needs every point settled. The app also
+  and may reveal one point's original on screen, never recorded. Approval needs every point settled (on the web and
+  `/v1` path; jobs from the Claude Code hooks path have no points yet and are approved as a whole). The app also
   serves OpenAI-compatible `/v1/chat/completions` and
   `/v1/models` endpoints on loopback, so tools like [Kilo Code](examples/kilo.example.json) can use it as their
   provider.
