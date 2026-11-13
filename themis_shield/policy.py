@@ -99,7 +99,8 @@ def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# "empty-finder-substitute" (detection fix, on by default; substitute, don't hold). The empty-finder hold asks a person because
+# "empty-finder-substitute" (detection fix, OPT-IN, off by default; substitute, don't hold). NOT SAFE AS A DEFAULT, see
+# the end of this block. The empty-finder hold asks a person because
 # PII-Tracer found something that both LLM finders did not. When the only doubt is about VALUES the tracer found, and
 # nothing in the document points to a person, the values are substituted (as every finding is) and the document is
 # not held. The hold stays whenever the doubt could be about more than those values:
@@ -111,6 +112,15 @@ def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
 #   development data (in-sample): under silent finders, tables that key sensitive statements by an identifier and name
 #   nobody score 0.019 and up, and the guard in tests/test_empty_finder_substitute.py finds them at any higher limit.
 # It never touches the hold raised by the sensitivity score itself, and no finding is removed.
+#
+# Why it is opt-in (steward's decision, 13/11/2026 17:50 UTC; independent review HL-01, HL-02). The third condition is
+# false: the score is NOT an independent witness. It is one number per tracer window, and it is near zero for
+# structured text (JSON, YAML, code: 0.0002 to 0.0095 with the real model) and for a personal sentence inside a long
+# ordinary document (0.0575 alone, 0.0028 in 1,500 characters of procedure text). So "value doubt only" cannot see a
+# sensitive statement there: with the finders silent, '{"contact": "<phone>", "summary": "... staying at a refuge
+# ..."}' leaves this function as "values only" and the statement is released in clear. With the switch off the
+# document is held, as in candidate 0.5 (tests/test_empty_finder_hold_hl01_hl02.py records both). Do not make this a
+# default again on a document score: it needs a statement-level check that reads the text (DEV-DEBT DD-37).
 # ----------------------------------------------------------------------------------------------------------------------
 EMPTY_FINDER_SUBSTITUTE = "empty-finder-substitute"
 SUBSTITUTE_ONLY_TRACER_LABELS = frozenset({Label.EMAIL, Label.PHONE, Label.STUDENT_ID})
@@ -406,7 +416,7 @@ def decide(
                 (tracer.finding_count > 0 if v01 else bool(surviving_tracer_labels(evidence)))
                 or evidence.doc_sensitivity >= EMPTY_LLM_SENSITIVITY_THRESHOLD
             ) and not (
-                # Substitute, don't hold: doubt about contact or identifier values only (never under v0.1).
+                # Substitute, don't hold: doubt about contact or identifier values only (opt-in; never under v0.1).
                 not v01 and fix_on(EMPTY_FINDER_SUBSTITUTE) and empty_finder_value_doubt_only(evidence)
             ):
                 reasons.append(ReasonCode.DISAGREEMENT_EMPTY_LLM)

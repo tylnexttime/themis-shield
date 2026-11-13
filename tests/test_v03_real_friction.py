@@ -350,5 +350,8 @@ def test_default_has_every_fix_but_the_ones_still_off():
     # decision; so is removing from it (the v0.4 readers left it on 30/10/2026 after a live measurement).
     # policy-statements and negative-statements-general-exemption: off by the steward's decision of 13/11/2026
     # (second review RC-01, RC-02, RC-03): a rule-based genericity test is not safe for release decisions.
-    off = {"finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption"}
+    # empty-finder-substitute: off by the steward's decision of 13/11/2026 17:50 UTC (review HL-01, HL-02): it
+    # releases on the tracer's document score, which cannot see a sensitive statement in structured or long text.
+    off = {"finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption",
+           "empty-finder-substitute"}
     assert set(selected) == set(DETECTION_FIXES) - off

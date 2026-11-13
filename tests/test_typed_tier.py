@@ -447,9 +447,7 @@ def test_only_liftable_reasons_are_ever_removed():
 CONTACTS = "Questions to bookings@fernhollow.example or (03) 5550 4410. Program guide out in May."
 
 
-def contacts_evidence(answers, sensitivity=0.1, labels=(Label.EMAIL, Label.PHONE)):
-    # A sensitivity score above the tracer's noise floor: at the floor, contact values alone no longer hold a document
-    # at all (``empty-finder-substitute``, tests/test_empty_finder_substitute.py), so there would be no hold to lift.
+def contacts_evidence(answers, sensitivity=0.0, labels=(Label.EMAIL, Label.PHONE)):
     items = [finding(CONTACTS.index(v), CONTACTS.index(v) + len(v), label, "pii-tracer", 1)
              for v, label in zip(("bookings@fernhollow.example", "(03) 5550 4410"), labels)]
     return evidence_with(CONTACTS, items, sensitivity=sensitivity, answers=answers)

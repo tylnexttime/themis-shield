@@ -4,13 +4,34 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Steward's decision after the hold-lift review (HL-01 to HL-10, 13/11/2026 17:50 UTC)
+
+An independent adversarial review of the three changes below that remove a hold ran the real PII-Tracer on invented
+documents with both finders silent. A JSON ticket that says a caller is staying at a refuge, and an SMS line with an
+HIV result, were held (ASK) in candidate 0.5 and released, statement in clear, by the default build of a few hours
+later. A leak is worse than friction, so:
+
+- **`empty-finder-substitute` is opt-in (off by default).** Not safe as a default. It released on the tracer's
+  document sensitivity score, read as a sign that the text holds no sensitive statement. The score cannot carry
+  that: it is near zero on structured text (JSON, YAML, code: 0.0002 to 0.0095 with the real model, HL-01) and on a
+  personal sentence diluted in a long document (0.0575 for the sentence alone, 0.0028 inside 1,500 characters of
+  procedure text, HL-02), so the "value doubt only" test cannot see a sensitive statement there. The code and the
+  switch stay (`[detection] fixes` naming it, or `"all"`). With the defaults every such document is held again for
+  `ASK:disagreement-empty-llm`, as in candidate 0.5, and the four clean documents the switch had released are held
+  again too (clean documents held: split C 13 of 95, split E 5 of 60, split F 12 of 80, split G 16 of 65, 0.246).
+  It is listed as DD-37 with what it would need before anyone reconsiders it: a statement-level check that reads
+  the text, not a document score.
+
 ### Friction on clean documents (13/11/2026; development measurements only)
+
+**Read the section above first: `empty-finder-substitute` was on by default when this was written and is opt-in
+now.** The friction figures quoted for the subject check below were measured on top of that switch.
 
 Measured by replaying captured finder answers on the seven development sets (the v0.1 set, split C, split D halves Q
 and C, splits E, F and G; split G against its sealed gold), each against candidate 0.5 as it stood (`62b5865`). None
 of this has met a fresh split.
 
-- **`empty-finder-substitute` (new switch, on by default): substitute, don't hold.** When both finders find nothing
+- **`empty-finder-substitute` (new switch; opt-in, off by default, see above): substitute, don't hold.** When both finders find nothing
   and PII-Tracer found only email addresses, phone numbers or account-like numbers, in a document where no detector
   found a person, an address, a date of birth, a quasi-identifier or anything sensitive and the tracer's sensitivity
   score is at its noise floor (at most 0.01), the values are substituted and the document is no longer held for

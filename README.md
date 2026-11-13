@@ -192,14 +192,15 @@ Read this section before you rely on anything above.
   - a date of birth that falls on one of the organisation's public dates is cancelled;
   - requiring a digit in a USI also drops about 1 in 18 genuine USIs from the rule (the LLM finders remain the
     backstop), in exchange for no longer matching about 1 in 32 ordinary ten-letter words.
-- **An empty-finder hold about values only is not a hold any more** (`empty-finder-substitute`, unreleased,
-  13/11/2026). When both finders find nothing and PII-Tracer found only email addresses, phone numbers or
-  account-like numbers, in a document where no detector found a person, an address or a date of birth and the
-  tracer's sensitivity score is at most 0.01, those values are substituted and the document goes on without a
-  person. That limit was read off the development sets: with silent finders, a table that keys sensitive statements
-  by an identifier and names nobody scores 0.019 and up, so it stays held, but nothing between 0.01 and 0.019 has
-  been tested on fresh data. On the seven development sets no document with personal information has ever had both
-  finders silent, so the rule's safety there is measured on zero cases.
+- **`empty-finder-substitute` is opt-in, and not safe as a default** (unreleased, 13/11/2026). With the switch on,
+  when both finders find nothing and PII-Tracer found only contact or identifier values, in a document where no
+  detector found a person and the tracer's sensitivity score is at most 0.01, those values are substituted and the
+  document goes on without a person. It was on by default for a few hours (never in a tagged release), on
+  development replays alone. An independent review then showed that the score is near zero on structured text
+  (JSON, YAML, code) and on a sentence diluted in a long document: in the reviewer's tests a ticket export saying a
+  caller is staying at a refuge passed the gate with the statement in clear. With the defaults such a document is
+  held, as before. Turn the switch on only for text you know holds no statements about people (a contact
+  directory): when the finders are silent nothing else reads the text for statements.
 - **Quasi-identifiers are substituted, not held.** A found quasi-identifier is replaced, but it doesn't hold the
   document for a human (`[policy] quasi_id_ask = true` changes that). v0.2's table pass finds rare values in
   "anonymised" tables (97.6% recall on our fresh split), but it also flags common job titles, so tables get

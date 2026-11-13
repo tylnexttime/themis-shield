@@ -10,8 +10,8 @@ Set at start-up from ``[detection] version`` (or the evaluation runner's ``--det
 v0.3 friction fixes (lane 1) are named switches on top of v0.2, each measured alone and together by replay on the
 development sets. ``[detection] fixes`` (a list of names, ``"all"`` or ``"none"``) or the runner's
 ``--detection-fixes`` selects them; ``version = "v0.1"`` switches every one of them off as well. All are on by
-default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust``, ``policy-statements`` and
-``negative-statements-general-exemption``);
+default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust``, ``policy-statements``,
+``negative-statements-general-exemption`` and ``empty-finder-substitute``);
 ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte and ``"all"`` turns the opt-in ones on too.
 
 - ``secret-placeholders``: a secret assignment whose whole value is a template placeholder or a reference to a
@@ -170,16 +170,25 @@ v0.5 detection fixes (from split F, now development data):
 
 Friction on clean documents (13/11/2026):
 
-- ``empty-finder-substitute`` (on by default; read by the policy, ``empty_finder_value_doubt_only`` in ``policy.py``):
-  substitute, don't hold. When both LLM finders return nothing and PII-Tracer found only contact or identifier values
-  (an email address, a phone number, an account-like number), in a document where no stage found a person, an
-  address, a date of birth, a quasi-identifier or anything sensitive and whose sensitivity score is at the tracer's
-  noise floor (at most 0.01), the values are substituted and the document is not held for
-  ``ASK:disagreement-empty-llm``. Any other tracer label, any person, or a higher sensitivity score keeps the hold.
-  Measured by replay on the seven development sets (13/11/2026, against candidate 0.5): released leaks, R_any, R_full,
-  sensitive and quasi-identifier recall and over-redaction identical on every set; four clean documents no longer
-  held (split C 13 -> 12 of 95, split E 5 -> 4 of 60, split F 12 -> 11 of 80, split G 16 -> 15 of 65). The noise-floor
-  limit was read off the same sets (in-sample); a fresh split has to confirm it.
+- ``empty-finder-substitute`` (**opt-in, off by default**; read by the policy, ``empty_finder_value_doubt_only`` in
+  ``policy.py``): substitute, don't hold. When both LLM finders return nothing and PII-Tracer found only contact or
+  identifier values (an email address, a phone number, an account-like number), in a document where no stage found a
+  person, an address, a date of birth, a quasi-identifier or anything sensitive and whose sensitivity score is at
+  most 0.01, the values are substituted and the document is not held for ``ASK:disagreement-empty-llm``. Any other
+  tracer label, any person, or a higher sensitivity score keeps the hold.
+
+  **Not safe as a default** (steward's decision, 13/11/2026 17:50 UTC, after the independent review HL-01 to HL-06;
+  it was on by default for a few hours of 13/11/2026, never in a tagged release). Its "value doubt only" test asks the
+  tracer's document sensitivity score to witness that the text holds no sensitive statement, and the score cannot do
+  that: it is near zero on structured text (JSON, YAML, code: 0.0002 to 0.0095 with the real model, HL-01) and
+  on a personal sentence diluted in a long document (0.0575 alone, 0.0028 inside 1,500 characters of procedure text,
+  HL-02). With the finders silent, a ticket export that says a caller is staying at a refuge, or an SMS line with an
+  HIV result, was released with the statement in clear; with the switch off both are held, as in candidate 0.5
+  (``tests/test_empty_finder_hold_hl01_hl02.py`` keeps both halves on record). The development replay that adopted it
+  (four clean documents no longer held on splits C, E, F and G, no measure worse) could not see this: on those sets
+  no document with personal information ever had both finders silent, and the guard that stood in for them gave the
+  tracer every gold name (HL-03). Before it is reconsidered it needs a statement-level check that reads the text,
+  not a document score (DD-37).
 """
 
 from __future__ import annotations
@@ -215,7 +224,8 @@ DETECTION_FIXES = (
     "indirect-statements",
     # DD-26 / FAB-02, split out of negative-statements on 13/11/2026 (second review RC-02); opt-in, see below.
     "negative-statements-general-exemption",
-    # Friction, 13/11/2026 (policy.py): substitute, don't hold, for an empty-finder hold about values only.
+    # Friction, 13/11/2026 (policy.py): substitute, don't hold, for an empty-finder hold about values only. Opt-in,
+    # see below: not safe as a default (review HL-01, HL-02).
     "empty-finder-substitute",
 )
 SECRET_CONTEXT_FIXES = (
@@ -234,7 +244,14 @@ SECRET_CONTEXT_FIXES = (
 # - policy-statements and negative-statements-general-exemption (steward's decision, 13/11/2026): not safe for
 #   release decisions; a rule-based genericity test misses sentence shapes (second review RC-01, RC-02, RC-03). A
 #   model-based check with abstain-to-hold is the planned replacement.
-OPT_IN_DETECTION_FIXES = ("finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption")
+# - empty-finder-substitute (steward's decision, 13/11/2026 17:50 UTC; review HL-01, HL-02): not safe as a default.
+#   It releases on the tracer's document sensitivity score, which is near zero on structured text (JSON, YAML, code)
+#   and on a sentence diluted in a long document, so a sensitive statement there is released in clear when both
+#   finders are silent. Adopted on development replays alone, on by default for a few hours, withdrawn after an
+#   adversarial review. Needs a statement-level check that reads the text before it is reconsidered (DD-37).
+OPT_IN_DETECTION_FIXES = (
+    "finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption", "empty-finder-substitute",
+)
 DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(
     name for name in DETECTION_FIXES if name not in OPT_IN_DETECTION_FIXES
 )
