@@ -10,8 +10,8 @@ Set at start-up from ``[detection] version`` (or the evaluation runner's ``--det
 v0.3 friction fixes (lane 1) are named switches on top of v0.2, each measured alone and together by replay on the
 development sets. ``[detection] fixes`` (a list of names, ``"all"`` or ``"none"``) or the runner's
 ``--detection-fixes`` selects them; ``version = "v0.1"`` switches every one of them off as well. All are on by
-default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust``, ``policy-statements`` and
-``negative-statements-general-exemption``);
+default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust``, ``policy-statements``,
+``negative-statements-general-exemption`` and ``empty-finder-substitute``);
 ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte and ``"all"`` turns the opt-in ones on too.
 
 - ``secret-placeholders``: a secret assignment whose whole value is a template placeholder or a reference to a
@@ -167,6 +167,15 @@ v0.5 detection fixes (from split F, now development data):
   violence indicators on file``, and a ``Yes`` or ``No`` after a form line that ends with ":" and speaks of a person
   (``I do not identify as Aboriginal or Torres Strait Islander: No``). See ``indirect_statement_spans`` and
   ``negative_statement_spans`` in ``detectors/statements.py``.
+
+Friction on clean documents (13/11/2026):
+
+- ``empty-finder-substitute`` (**opt-in**; read by the policy, ``empty_finder_value_doubt_only`` in ``policy.py``):
+  substitute, don't hold. When both LLM finders return nothing and PII-Tracer found only contact or identifier values
+  (an email address, a phone number, an account-like number), in a document where no stage found a person, an
+  address, a date of birth, a quasi-identifier or anything sensitive and whose sensitivity score is at the tracer's
+  noise floor (at most 0.01), the values are substituted and the document is not held for
+  ``ASK:disagreement-empty-llm``. Any other tracer label, any person, or a higher sensitivity score keeps the hold.
 """
 
 from __future__ import annotations
@@ -202,6 +211,8 @@ DETECTION_FIXES = (
     "indirect-statements",
     # DD-26 / FAB-02, split out of negative-statements on 13/11/2026 (second review RC-02); opt-in, see below.
     "negative-statements-general-exemption",
+    # Friction, 13/11/2026 (policy.py): substitute, don't hold, for an empty-finder hold about values only. Opt-in.
+    "empty-finder-substitute",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
@@ -219,7 +230,10 @@ SECRET_CONTEXT_FIXES = (
 # - policy-statements and negative-statements-general-exemption (steward's decision, 13/11/2026): not safe for
 #   release decisions; a rule-based genericity test misses sentence shapes (second review RC-01, RC-02, RC-03). A
 #   model-based check with abstain-to-hold is the planned replacement.
-OPT_IN_DETECTION_FIXES = ("finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption")
+# - empty-finder-substitute: new on 13/11/2026; opt-in until its replay on every development set is recorded.
+OPT_IN_DETECTION_FIXES = (
+    "finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption", "empty-finder-substitute",
+)
 DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(
     name for name in DETECTION_FIXES if name not in OPT_IN_DETECTION_FIXES
 )

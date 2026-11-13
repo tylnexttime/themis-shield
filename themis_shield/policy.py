@@ -11,6 +11,7 @@ from __future__ import annotations
 from .config import UseCasePolicy
 from .detectors.contracts import DetectionResult, Status
 from .detectors.engine import FINAL_STAGES, LLM_STAGES, TIER1_STAGES
+from .detectors.settings import fix_on
 from .types import Decision, DecisionResult, Label, ReasonCode
 
 
@@ -93,6 +94,42 @@ def contrary_tracer_findings(evidence: DetectionResult) -> list[tuple]:
 def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
     """Labels PII-Tracer attached to findings that are still present after the final allow-list (value-free)."""
     return frozenset(label for _, labels in contrary_tracer_findings(evidence) for label in labels)
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# "empty-finder-substitute" (opt-in detection fix; substitute, don't hold). The empty-finder hold asks a person because
+# PII-Tracer found something that both LLM finders did not. When the only doubt is about VALUES the tracer found, and
+# nothing in the document points to a person, the values are substituted (as every finding is) and the document is
+# not held. The hold stays whenever the doubt could be about more than those values:
+# - a tracer label outside contacts and identifiers (a name, an address, a date of birth, a URL, a quasi-identifier);
+# - any finding, from any stage, that needs a person behind it (``PERSON_BOUND_LABELS``): with a person in the text and
+#   both finders silent, a statement about that person may have been missed, and only the finders read statements;
+# - a document sensitivity score over ``SUBSTITUTE_ONLY_MAX_SENSITIVITY``: the tracer's own sign of sensitive content
+#   is a second, independent witness, and anything above its noise floor keeps the hold. The value was set on
+#   development data (in-sample): under silent finders, tables that key sensitive statements by an identifier and name
+#   nobody score 0.019 and up, and the guard in tests/test_empty_finder_substitute.py finds them at any higher limit.
+# It never touches the hold raised by the sensitivity score itself, and no finding is removed.
+# ----------------------------------------------------------------------------------------------------------------------
+EMPTY_FINDER_SUBSTITUTE = "empty-finder-substitute"
+SUBSTITUTE_ONLY_TRACER_LABELS = frozenset({Label.EMAIL, Label.PHONE, Label.STUDENT_ID})
+SUBSTITUTE_ONLY_MAX_SENSITIVITY = 0.01
+PERSON_BOUND_LABELS = frozenset({
+    Label.PERSON, Label.QUASI_ID, Label.ADDRESS, Label.DATE_OF_BIRTH, Label.URL_PERSONAL, Label.USERNAME,
+}) | SENSITIVE_LABELS
+
+
+def empty_finder_value_doubt_only(
+    evidence: DetectionResult, max_sensitivity: float = SUBSTITUTE_ONLY_MAX_SENSITIVITY,
+) -> bool:
+    """True when the contrary tracer evidence is only contact or identifier values in a document where no stage
+    found a person, a place of residence, a date of birth or anything sensitive, and the tracer's sensitivity score is
+    at its noise floor (see the block comment above)."""
+    if evidence.doc_sensitivity > max_sensitivity:
+        return False
+    contrary = contrary_tracer_findings(evidence)
+    if not contrary or any(not labels <= SUBSTITUTE_ONLY_TRACER_LABELS for _, labels in contrary):
+        return False
+    return not any(item.labels & PERSON_BOUND_LABELS for item in evidence.findings)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -270,6 +307,9 @@ def decide(
             if llm_count == 0 and (
                 (tracer.finding_count > 0 if v01 else bool(surviving_tracer_labels(evidence)))
                 or evidence.doc_sensitivity >= EMPTY_LLM_SENSITIVITY_THRESHOLD
+            ) and not (
+                # Substitute, don't hold: doubt about contact or identifier values only (never under v0.1).
+                not v01 and fix_on(EMPTY_FINDER_SUBSTITUTE) and empty_finder_value_doubt_only(evidence)
             ):
                 reasons.append(ReasonCode.DISAGREEMENT_EMPTY_LLM)
             if (
