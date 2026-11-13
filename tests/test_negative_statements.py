@@ -213,3 +213,45 @@ def test_no_negative_statement_of_the_evaluation_sets_overlaps_a_hard_negative(p
     assert hits == [] and clean == [] and wrong == []
     assert made >= floor[0] and covered >= floor[1]  # 42 statements covering 56 gold spans when written
     assert time.perf_counter() - started < 30
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# FAB-02 (independent review of candidate 0.5): the DD-26 exemption read any bare plural at the start of a sentence as
+# a general rule, so a case note's "Parents have no criminal record." (two identifiable people) was released. A bare
+# plural is specific unless an explicit generic marker is present: a quantifier ("any", "every", "all") or a
+# "with/who/that" class followed by a modal rule ("may", "can", "are not required", "need not"). 0.4.0 held every one
+# of these; the development sets passed with the bug present, so these cases are the guard. Invented sentences.
+FAB_02_MUST_HOLD = [
+    "Home visit completed. Parents have no criminal record. Child settled at school.",
+    "Parents have no criminal record.",
+    "Parents have no criminal convictions and no child protection history.",
+    "Carers have never been charged.",
+    "Tenants have no criminal history.",
+    "Clients have never been convicted.",
+    "Students have no criminal record",
+    "Both crew members have no criminal record.",
+    "Parents with no criminal record were interviewed on Tuesday.",
+    "Parents have no criminal record and may collect the child.",
+]
+
+
+@pytest.mark.parametrize("text", FAB_02_MUST_HOLD)
+def test_fab_02_a_bare_plural_subject_is_not_a_general_rule(text):
+    from themis_shield.detectors.statements import negative_statement_spans
+
+    assert any(Label.CRIMINAL in f.labels for f in negative_statement_spans(text))
+    assert (Label.CRIMINAL in {label for label, _ in sensitive(text)})
+
+
+@pytest.mark.parametrize("text", FAB_02_MUST_HOLD[:2] + FAB_02_MUST_HOLD[3:4])
+def test_fab_02_the_whole_gate_holds_it_as_in_v0_4(text):
+    from themis_shield.config import DeploymentProfile, UseCasePolicy
+    from themis_shield.detectors import DetectionTargets, detect_batch
+    from themis_shield.types import Decision, ReasonCode
+    from test_policy_statements import Finder, Tracer
+
+    policy = UseCasePolicy("s", ("cloud",), approved_for_cloud=True, requires_in_region_inference=False)
+    profile = DeploymentProfile("s", "1", (), (policy,))
+    result = detect_batch([text], profile, DetectionTargets(tracer=Tracer(), llm_client=Finder()), thorough=True)[0]
+    assert result.policy_result.decision == Decision.ASK
+    assert ReasonCode.SENSITIVE in result.policy_result.reasons

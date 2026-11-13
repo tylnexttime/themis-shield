@@ -283,8 +283,8 @@ def _sentence_clause(text: str, start: int, end: int) -> tuple[int, int]:
 # DD-26 (from split G's GT-008, development data): a negative inside a general rule about a class of people ("A person
 # with no criminal record at all is treated the same as any other applicant once the check is returned as clear") says
 # nothing about anyone: taxonomy section 3 labels a statement only when it is about a person, section 4 calls this a
-# policy_statement. By fixed wording: only a generic subject (a person, any applicant, applicants, staff, people,
-# anyone, those: the words of ``policy-statements``), with "with", "who" or "that" after it, stands before the negative
+# policy_statement. By fixed wording: only a generic subject (a person, any applicant, anyone, those, or a plural such
+# as applicants, staff or people only when marked as a class: see FAB-02 below), stands before the negative
 # in its sentence, after at most a numbering and some lead-in words ("if", "what happens if", "and"); nothing personal
 # is in the sentence (``policy_statements._personal``: a pronoun, "the only", a speech verb ...) and no ":" follows the
 # negative in its clause (a list under a generic heading is about the people it lists). A name, "He", "I", an
@@ -302,9 +302,17 @@ def _generic_subject() -> re.Pattern:
 
     return re.compile(
         r"(?i)[\s\"'“‘(]*(?:\d+(?:\.\d+)*\.?\s+)?" + _GENERIC_LEAD_IN
-        + r"(?:a\s+person|(?:any|every|each)\s+(?:(?:new|current|permanent|casual|eligible)\s+)?" + _SINGULAR
-        + r"|" + _PLURAL + r"|anyone|anybody|everyone|those)"
-        + r"(?:\s+(?:with|who|that))?(?:\s+(?:currently|already|still|also|ever|really))*(?:\s+(?:has|have|had))?\s*$")
+        + r"(?:(?P<marked>a\s+person|(?:any|every|each)\s+(?:(?:new|current|permanent|casual|eligible)\s+)?" + _SINGULAR
+        + r"|anyone|anybody|everyone|those)|(?:(?P<quantified>all|any)\s+)?(?P<bare>" + _PLURAL + r"))"
+        + r"(?:\s+(?P<relative>with|who|that))?(?:\s+(?:currently|already|still|also|ever|really))*"
+        + r"(?:\s+(?:has|have|had))?\s*$")
+
+
+# FAB-02 (independent review): a bare plural subject ("Parents have no criminal record.", "Carers have never been
+# charged.") is two or more identifiable people in a case note, not a rule. A plural subject is generic only with an
+# explicit marker: "with", "who" or "that" after it, and then either a quantifier before it ("all", "any") or a modal
+# rule after the negative in its clause ("may", "can", "are not required", "need not"). In doubt the statement stays.
+_RULE_AFTER = re.compile(r"\b(?:need\s+not|needn[’']t|(?:does|do)\s+not\s+need)\b")
 
 
 def _generic_subject_statement(text: str, a: int, b: int, end: int) -> bool:
@@ -312,8 +320,16 @@ def _generic_subject_statement(text: str, a: int, b: int, end: int) -> bool:
     above)."""
     ends = [m.end() for m in _STATEMENT_END.finditer(text, 0, a)]
     sentence = ends[-1] if ends else 0
-    if _generic_subject().match(text, sentence, a) is None or ":" in text[b:end]:
+    subject = _generic_subject().match(text, sentence, a)
+    if subject is None or ":" in text[b:end]:
         return False
+    if subject.group("bare") is not None:
+        from .policy_statements import _VERB
+
+        if subject.group("relative") is None:
+            return False
+        if subject.group("quantified") is None and not (_VERB.search(text, b, end) or _RULE_AFTER.search(text, b, end)):
+            return False
     from .policy_statements import _personal
 
     return not _personal(text[sentence:end])

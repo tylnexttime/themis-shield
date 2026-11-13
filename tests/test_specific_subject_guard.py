@@ -63,3 +63,23 @@ def test_policy_statements_never_drops_a_gold_statement_about_a_named_person_or_
     assert dropped == []
     assert tested >= 1000
 
+
+def test_negative_statements_never_exempts_a_gold_statement_about_a_named_person_or_a_definite_role():
+    from themis_shield.detectors import statements as module
+
+    patterns = module._NEGATIVE_PATTERNS + module._NEGATIVE_RECORDS
+    tested, exempted = 0, []
+    for case_id, text, gold, (left, right) in _specific_sentences():
+        for label, pattern in patterns:
+            for m in pattern.finditer(text, left, right):
+                if not (m.start() < gold["end"] and gold["start"] < m.end()):
+                    continue
+                tested += 1
+                a = m.start()
+                while a < m.end() and text[a].isspace():
+                    a += 1
+                _, end = module._sentence_clause(text, a, m.end())
+                if module._generic_subject_statement(text, a, m.end(), end):
+                    exempted.append((case_id, gold["label"], text[left:right][:120]))
+    assert exempted == []
+    assert tested >= 15  # 20 negative matches inside such gold spans when written
