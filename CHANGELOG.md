@@ -4,6 +4,28 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Friction on clean documents (13/11/2026; development measurements only)
+
+Measured by replaying captured finder answers on the seven development sets (the v0.1 set, split C, split D halves Q
+and C, splits E, F and G; split G against its sealed gold), each against candidate 0.5 as it stood (`62b5865`). None
+of this has met a fresh split.
+
+- **`empty-finder-substitute` (new switch, on by default): substitute, don't hold.** When both finders find nothing
+  and PII-Tracer found only email addresses, phone numbers or account-like numbers, in a document where no detector
+  found a person, an address, a date of birth, a quasi-identifier or anything sensitive and the tracer's sensitivity
+  score is at its noise floor (at most 0.01), the values are substituted and the document is no longer held for
+  `ASK:disagreement-empty-llm`. Any other tracer label, any person or a higher score keeps the hold; the hold raised
+  by the sensitivity score itself is untouched; no finding is removed. Replay: released leaks, R_any, R_full,
+  sensitive-statement recall, quasi-identifier recall and over-redaction identical on all seven sets; clean
+  documents held: split C 13 -> 12 of 95, split E 5 -> 4 of 60, split F 12 -> 11 of 80, split G 16 -> 15 of 65 (0.246
+  -> 0.231), the others unchanged. A guard runs the switch over every gold span of `eval/cases` with both finders
+  silent and the gold as the tracer: no document leaves the hold with an unprotected gold span (at a limit of 0.2
+  instead of 0.01 it finds ten: tables that key sensitive statements by an identifier, a chat, service-desk tickets
+  with a password). The limit was read off these sets, so it is in-sample; and no document with personal information
+  on these sets ever had both finders silent, so the hold it relaxes has not yet caught a real double miss either.
+  The two public-figure news items of split C (a name is the tracer's only finding) stay held: a name both finders
+  missed is the case the hold is for.
+
 ### Steward's decision after the second review (RC-01 to RC-08, 13/11/2026)
 
 Two rounds of independent review showed that judging "general rule or statement about a specific person" with rules

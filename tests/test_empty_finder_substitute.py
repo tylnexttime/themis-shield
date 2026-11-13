@@ -1,5 +1,6 @@
-"""Friction switch ``empty-finder-substitute`` (opt-in): substitute, don't hold, for an empty-finder hold that exists
-only because of doubt about contact or identifier VALUES PII-Tracer found.
+"""Friction switch ``empty-finder-substitute`` (on by default since its replay on the seven development sets,
+13/11/2026): substitute, don't hold, for an empty-finder hold that exists only because of doubt about contact or
+identifier VALUES PII-Tracer found.
 
 The known danger of lifting a hold: a span nobody protected, in a document that was held anyway, becomes a released
 leak. So the switch is narrow (``policy.empty_finder_value_doubt_only``) and the guard at the end runs it over every
@@ -25,7 +26,8 @@ from themis_shield.types import Decision, Label, ReasonCode
 
 ROOT = Path(__file__).resolve().parents[1]
 SWITCH = "empty-finder-substitute"
-ON = [*DEFAULT_DETECTION_FIXES, SWITCH]
+ON = list(DEFAULT_DETECTION_FIXES)
+OFF = [name for name in DEFAULT_DETECTION_FIXES if name != SWITCH]
 HOLD = ReasonCode.DISAGREEMENT_EMPTY_LLM
 
 
@@ -74,8 +76,8 @@ def run(text, findings, *, sensitivity=0.0, client=None):
 
 
 def both(text, findings, **kwargs):
-    """(decision result with the default switches, decision result with the switch on)."""
-    configure_detection_fixes(None)
+    """(decision result with the switch off, decision result with the default switches)."""
+    configure_detection_fixes(OFF)
     off = run(text, findings, **kwargs)
     configure_detection_fixes(ON)
     try:
@@ -88,8 +90,10 @@ DIRECTORY = ("Who to contact at the depot\n- Stores: stores.desk@quarrybend.exam
              "Order reference WO-4471902. These are shared lines, not anyone's own.\n")
 
 
-def test_the_switch_is_opt_in():
-    assert SWITCH in OPT_IN_DETECTION_FIXES and SWITCH not in DEFAULT_DETECTION_FIXES and not fix_on(SWITCH)
+def test_the_switch_is_on_by_default_and_can_be_left_out():
+    assert SWITCH in DEFAULT_DETECTION_FIXES and SWITCH not in OPT_IN_DETECTION_FIXES and fix_on(SWITCH)
+    configure_detection_fixes(OFF)
+    assert not fix_on(SWITCH)
 
 
 def test_contact_and_identifier_values_are_substituted_and_the_document_is_not_held():
@@ -249,7 +253,7 @@ def _guard(limits=(None,)):
             findings = _ideal_tracer_findings(case)
             if not findings:
                 continue  # nothing the tracer could have found: no empty-finder hold from tracer values to lift
-            configure_detection_fixes(None)
+            configure_detection_fixes(OFF)
             evidence = run(case["text"], findings, sensitivity=scores[case["id"]])
             if HOLD not in evidence.reasons:
                 continue  # no empty-finder hold to lift (the stub's span was refused, or the hold has another form)

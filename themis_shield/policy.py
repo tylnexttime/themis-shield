@@ -99,7 +99,7 @@ def surviving_tracer_labels(evidence: DetectionResult) -> frozenset[Label]:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# "empty-finder-substitute" (opt-in detection fix; substitute, don't hold). The empty-finder hold asks a person because
+# "empty-finder-substitute" (detection fix, on by default; substitute, don't hold). The empty-finder hold asks a person because
 # PII-Tracer found something that both LLM finders did not. When the only doubt is about VALUES the tracer found, and
 # nothing in the document points to a person, the values are substituted (as every finding is) and the document is
 # not held. The hold stays whenever the doubt could be about more than those values:
