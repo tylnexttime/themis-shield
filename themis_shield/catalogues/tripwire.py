@@ -1,30 +1,45 @@
-"""The optional cloud trip-wire (v0.3; off unless ``[tripwire] enabled = true``).
+"""The optional cloud trip-wire (v0.3; off unless ``[tripwire] enabled = true``), with its correction loop.
 
-After the Operator has approved the de-identified package, and before the real task turn, the same cloud model is
-sent the same approved de-identified text behind a fixed first instruction: list any personal information still
-visible, by placeholder id or character span, and say stop if there is any. It sees exactly what it was about to
-see anyway, so there is no new exposure. **It detects; it does not prevent**: a flag means that text has already
-been read by the cloud model once.
+Once the gate has de-identified a cloud-bound package, and **before** any person confirms or approves it, the same
+cloud model is sent the whole de-identified package behind a fixed first instruction: list any personal information
+still visible, by character span or placeholder id. Every finding of a round is collected (it never stops at the
+first), then:
 
-- A flag stops the job (Held-Offline, audited). Only spans and placeholder ids are recorded, never text. An
-  Operator confirms or rejects each flag (``themis tripwire review``), which tracks flag precision; a confirmed
-  flag is offered as a known-miss proposal.
-- The reply must be strict JSON in a fixed shape, bare or as the only content of one fenced block (```json or
-  ```). Anything else, including a reply that obeys an instruction injected into the document, stops the job
-  (fail closed).
-- Silence never upgrades a decision: a clear reply changes nothing the gate decided. The trip-wire is itself an
-  LLM reading untrusted text, so an injection can suppress its flags; that only weakens an extra layer.
-- It never runs for BLOCK or local-only work (those never reach the cloud at all).
+- **Correction round.** Each flagged span is replaced by a placeholder of the category the trip-wire reported (any
+  other category becomes a quasi-identifier placeholder). The original goes into the conversation vault like any
+  other value, and the package is rebuilt from the same scan, so the outbound text, the restore map and the counts
+  stay consistent. The register records which placeholder ids each round added (source ``cloud_tripwire``).
+- **Repeat** on the corrected package until a round finds nothing, at most ``max_rounds`` (3) rounds. If the last
+  round still finds something, or a round could replace nothing, the package goes to the Operator marked NOT
+  CONVERGED (``TRIPWIRE_NOT_CONVERGED``). The cap also bounds a document whose injected instruction makes the
+  trip-wire flag everything.
+- **Then** the usual human steps: the Operator sees the corrected package and the per-round list (categories,
+  counts, placeholder ids and proposal ids; never an original value).
+- **Proposals.** Every finding with text becomes a *proposed* known-miss entry (source ``cloud_tripwire``): a keyed
+  fingerprint for a high-entropy value, otherwise a rule for its shape, never the value. A proposal changes nothing
+  until a person verifies it and puts it in the sweep (``themis kmr``). ``themis tripwire review`` still records a
+  verdict per flagged round, for flag precision.
+
+Unchanged: the reply must be strict JSON in a fixed shape, bare or as the only content of one fenced block; anything
+else refuses the job (``TRIPWIRE_MALFORMED``), and so does a transport failure or a reply containing an original
+value (``TRIPWIRE_UNAVAILABLE``). Over-redaction is accepted: the loop only ever adds placeholders, and silence never
+upgrades a decision. The trip-wire is an LLM reading untrusted text, so an injection can suppress its findings; that
+only weakens an extra layer. It never runs for BLOCK or local-only work. **It detects; it does not prevent**: the
+package is read by the cloud model before a person has approved it, so a finding means that text has already been
+read once.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 import hashlib
+import json
 import re
+import sqlite3
 
 from ..cloud.openai_compat import CloudFailure, Outbound, canonical, strict_json, verify_json
-from ..placeholders import STRICT_TOKEN_PATTERN
+from ..placeholders import STRICT_TOKEN_PATTERN, TokenAllocator, token_class_for, unescape_literals
 from ..register.client import JobStatus as S
 from ..types import Label
 
@@ -44,6 +59,8 @@ INSTRUCTION = (
     'If nothing is visible, reply {"residual": [], "stop": false}.'
 )
 MAX_FLAGS = 64
+MAX_ROUNDS = 3
+PROPOSER = "cloud-tripwire"
 MAX_REPLY_CHARACTERS = 65536
 _TOKEN = re.compile(STRICT_TOKEN_PATTERN)
 _LABELS = {item.value for item in Label}
@@ -58,6 +75,13 @@ class TripwireMalformed(ValueError):
 class Tripwire:
     max_completion_tokens: int = 2048
     instruction_version: str = INSTRUCTION_VERSION
+    max_rounds: int = MAX_ROUNDS
+    # The known-miss register that receives the trip-wire's proposals (None: no proposals are made).
+    proposals: object = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self):
+        if type(self.max_rounds) is not int or not 1 <= self.max_rounds <= MAX_ROUNDS:
+            raise ValueError(f"[tripwire] max_rounds must be between 1 and {MAX_ROUNDS}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,11 +204,17 @@ def _collect(stream) -> str:
 
 
 def pending_response(router, job):
-    """A job stopped by a flag stays stopped until an Operator reviews it."""
+    """A job stopped by a flag of the earlier stop-on-flag trip-wire stays stopped until an Operator reviews it.
+
+    Correction-loop rounds never stop a job, so only a record without round numbers (written before the loop
+    existed) can hold one here.
+    """
     if getattr(router, "tripwire", None) is None or job.status != S.HELD_OFFLINE:
         return None
     state = router._register_call("tripwire_state", job.job_id)
     if state is None or state["outcome"] != "flagged" or state["verdict"] is not None:
+        return None
+    if state["flags"] and all("round" in item for item in state["flags"]):
         return None
     return router._response(
         job, "held", "TRIPWIRE_REVIEW_REQUIRED",
@@ -193,70 +223,315 @@ def pending_response(router, job):
     )
 
 
-def run(router, job, raw: bytes, digest: str, originals, marking, timings):
-    """Run the trip-wire once per approved package. Returns a held response on a flag, else None to continue."""
+# -- the correction loop ----------------------------------------------------------------------------------------
+
+
+def category_label(category: str) -> Label:
+    """The gate label a finding's placeholder is made for: the trip-wire's own label, else a quasi-identifier."""
+    return Label(category) if category in _LABELS else Label.QUASI_ID
+
+
+_LITERAL = re.compile(r'"(?:[^"\\]|\\.)*"', re.S)
+_UNIT = re.compile(r"\\u[0-9a-fA-F]{4}|\\.|[^\\]", re.S)
+_EDGE = " \t\r\n\"'()[]{}.,;:!?"
+
+
+def _fragments(text: str, start: int, end: int):
+    """The decoded text of every JSON string value the span ``[start, end)`` touches (keys are skipped). The span
+    is widened to whole escape sequences, never cut inside one."""
+    for literal in _LITERAL.finditer(text):
+        inner_start, inner_end = literal.start() + 1, literal.end() - 1
+        if inner_start >= end:
+            break
+        if inner_end <= start or text[literal.end():literal.end() + 1] == ":":
+            continue
+        low, high = max(inner_start, start), min(inner_end, end)
+        units = [
+            unit.group() for unit in _UNIT.finditer(text, inner_start, inner_end)
+            if unit.end() > low and unit.start() < high
+        ]
+        try:
+            yield json.loads('"' + "".join(units) + '"')
+        except ValueError:
+            continue
+
+
+def candidates(text: str, flag: Flag) -> tuple[str, ...]:
+    """The original values a finding's span covers: its decoded text, split around the gate's own placeholders,
+    with the gate's literal escapes undone and surrounding spaces and punctuation trimmed. A value needs at least
+    two characters, one of them a letter or digit. A finding with no span (a placeholder only) has none."""
+    if flag.start is None:
+        return ()
+    found: list[str] = []
+    for fragment in _fragments(text, flag.start, flag.end):
+        for piece in _TOKEN.split(fragment):
+            value = unescape_literals(piece).strip(_EDGE)
+            if len(value) >= 2 and any(character.isalnum() for character in value) and value not in found:
+                found.append(value)
+    return tuple(found)
+
+
+class _Overlay:
+    """A trial view of the conversation vault: reads the real mappings, keeps new ones aside until committed."""
+
+    def __init__(self, base):
+        self.base = base
+        self.allocation_lock = base.allocation_lock
+        self.pending: dict[str, str] = {}
+
+    def mapping(self, conversation_id: str) -> dict[str, str]:
+        values = self.base.mapping(conversation_id)
+        values.update(self.pending)
+        return values
+
+    def put(self, conversation_id: str, token: str, value: str) -> None:
+        self.pending[token] = value
+
+
+_SHAPE = re.compile(r"[^\W\d_]+|\d+|\s+|.", re.S)
+
+
+def shape_pattern(value: str) -> str:
+    """A rule pattern for a value's shape, never the value: letters, digits and spaces become counted classes,
+    other characters stay. ``Mara Lindahl`` becomes ``[^\\W\\d_]{4}\\s[^\\W\\d_]{7}``."""
+    parts = []
+    for run in _SHAPE.finditer(value):
+        text = run.group()
+        count = "" if len(text) == 1 else "{%d}" % len(text)
+        if text[0].isspace():
+            parts.append(r"\s" + count)
+        elif text[0].isdigit():
+            parts.append(r"\d" + count)
+        elif text[0].isalpha():
+            parts.append(r"[^\W\d_]" + count)
+        else:
+            parts.append(re.escape(text))
+    return "".join(parts)
+
+
+def propose(register, job_id: str, category: str, value: str | None, cache: dict) -> str | None:
+    """Propose one known-miss entry for a finding: a keyed fingerprint for a high-entropy value, otherwise a rule
+    for its shape. Never the value itself. The entry is ``proposed`` (source ``cloud_tripwire``) and changes nothing
+    until a person verifies it and puts it in the sweep. Returns the entry id, or None (no register, no text, or the
+    register refused it)."""
+    from .known_miss import check_fingerprint_value
+    from .store import CatalogueError
+
+    if register is None or not value:
+        return None
+    if value in cache:  # in memory for this loop only: one proposal per value
+        return cache[value]
+    entity = category_label(category).value
+    common = {"entity_type": entity, "source": "cloud_tripwire", "proposed_by": PROPOSER, "job_id": job_id}
+    entry = None
+    try:
+        check_fingerprint_value(value)
+        entry = register.add_fingerprint(value, **common)
+    except Exception:
+        entry = None
+    if entry is None:
+        try:
+            entry = register.add_pattern("rule", shape_pattern(value), **common)
+        except (CatalogueError, OSError, ValueError, sqlite3.Error):
+            entry = None
+    cache[value] = entry
+    return entry
+
+
+@dataclass(frozen=True)
+class LoopOutcome:
+    """Value-free: whether a round came back clean, and per round what it found and added."""
+
+    converged: bool
+    rounds: tuple[dict, ...]
+
+    def describe(self) -> str:
+        last = self.rounds[-1]["round"]
+        if self.converged:
+            lines = [f"Cloud trip-wire: the package came back clean in round {last}."]
+        else:
+            lines = [
+                f"Cloud trip-wire: NOT CONVERGED. Round {last}, the last, still reported personal information. "
+                "Check the package before approving it."
+            ]
+        for item in self.rounds:
+            if item["outcome"] == "clear":
+                lines.append(f"- Round {item['round']}: nothing found.")
+                continue
+            categories = ", ".join(f"{name} {count}" for name, count in sorted(item["categories"].items()))
+            added = ", ".join(item["added"]) or "no placeholder (nothing it could replace)"
+            line = f"- Round {item['round']}: {item['findings']} finding(s) ({categories}); added {added}"
+            if item["proposals"]:
+                line += "; known-miss proposals " + ", ".join(item["proposals"])
+            lines.append(line + ".")
+        return "\n".join(lines)
+
+
+def protect(router, job, working, identifier, matched, marking):
+    """The router's ``_protect`` with the trip-wire on: scan once, substitute, then (while the package is still being
+    built) run the correction loop. Returns ``(package, boundary, outcome)``; ``outcome`` is None only when a ready
+    package no longer matches (the router then refuses it as changed).
+
+    A ready package is never re-checked: its loop already ran and its final package is what was approved. A ready
+    package with no loop record was built while the trip-wire was off, and is refused (``TRIPWIRE_NOT_RUN``).
+    """
+    from ..chat_boundary import ChatBoundary
+    from ..router import GateFailure
+
+    def fresh():
+        return ChatBoundary(working, router.allowed_tools, router.cloud_model)
+
+    boundary = fresh()
+    evidence = router._scan_package(boundary)
+    package = router._protect_package(boundary, identifier, matched, evidence)
+    digest = hashlib.sha256(package[0]).hexdigest()
+    row = router._register_call("get_details", job.job_id)
+    if row["package"] == "building":
+        return _loop(router, job, fresh, identifier, matched, evidence, package, boundary, marking)
+    if row["package"] == "ready" and row["manifest_hash"] != digest:
+        return package, boundary, None
+    record = router._register_call("tripwire_loop", job.job_id, digest)
+    if record is None:
+        raise GateFailure("TRIPWIRE_NOT_RUN", 200)
+    return package, boundary, LoopOutcome(record["converged"], tuple(record["rounds"]))
+
+
+def _payload(router, text: str) -> bytes:
+    settings = router.cloud.settings
+    return canonical(request_body(
+        settings.model, text, min(router.tripwire.max_completion_tokens, settings.max_tokens),
+    ))
+
+
+def _ask(router, job, text, originals, marking, digest, number):
+    """One trip-wire request on the package text; the parsed findings. Fails closed as before."""
     from ..router import GateFailure
 
     config = router.tripwire
-    state = router._register_call("tripwire_state", job.job_id, digest)
-    if state is not None:
-        if state["outcome"] == "clear":
-            return None
-        if state["outcome"] == "flagged" and state["verdict"] == "rejected":
-            # The Operator ruled the flag false for exactly this package: no second round trip.
-            return None
-        if state["outcome"] == "flagged" and state["verdict"] is None:
-            return router._response(
-                job, "held", "TRIPWIRE_REVIEW_REQUIRED",
-                f"Stopped: the cloud trip-wire flagged {job.job_id}; an Operator review is pending.",
-                timings=timings,
-            )
-        raise GateFailure("TRIPWIRE_UNAVAILABLE" if state["outcome"] == "failed" else "TRIPWIRE_MALFORMED", 200)
-    text = document(raw)
-    settings = router.cloud.settings
-    payload = canonical(request_body(settings.model, text, min(config.max_completion_tokens, settings.max_tokens)))
+    payload = _payload(router, text)
     verify_json(payload, originals)
     outbound = Outbound(job.job_id, marking, payload, hashlib.sha256(payload).hexdigest(), True, originals)
     stream = None
-    try:
-        with router.register.tripwire_guard(job.job_id, digest, now=router.clock()):
-            stream = router.cloud.open(outbound)
-        flags = parse_reply(_collect(stream), text)
-    except TripwireMalformed:
+
+    def failed(outcome):
         router._register_call(
-            "record_tripwire", job.job_id, digest, "malformed", (),
+            "record_tripwire_round", job.job_id, digest, outcome, (), round_number=number, last=True,
             instruction_version=config.instruction_version, now=router.clock(),
         )
+
+    try:
+        with router.register.tripwire_round_guard(job.job_id, now=router.clock()):
+            stream = router.cloud.open(outbound)
+        return parse_reply(_collect(stream), text)
+    except TripwireMalformed:
+        failed("malformed")
         raise GateFailure("TRIPWIRE_MALFORMED", 200) from None
     except CloudFailure:
-        router._register_call(
-            "record_tripwire", job.job_id, digest, "failed", (),
-            instruction_version=config.instruction_version, now=router.clock(),
-        )
+        failed("failed")
         raise GateFailure("TRIPWIRE_UNAVAILABLE", 503) from None
     finally:
         if stream is not None:
             stream.close()
-    if not flags:
+
+
+def _correct(router, fresh, identifier, matched, evidence, package, text, flags):
+    """Replace each finding's values with placeholders of the reported category.
+
+    Each value is tried on a vault overlay: it is kept only if the whole package still builds (substitution, the
+    exact-value check on the package and on the next trip-wire request) and the outbound text changes. A value that cannot be replaced safely, or that changes
+    nothing, is left; the finding stays visible to the next round. Kept values then go into the conversation vault
+    and the package is rebuilt from the same scan, so text, restore map and counts come from one code path.
+    """
+    overlay = _Overlay(router.vault)
+    allocator = TokenAllocator(identifier, overlay)
+    current = package[0]
+    corrections = []
+    for flag in flags:
+        values = candidates(text, flag)
+        added = []
+        for value in values:
+            if value in overlay.mapping(identifier).values():
+                continue
+            kept = dict(overlay.pending)
+            try:
+                token = allocator.allocate(value, token_class_for(category_label(flag.category)))
+                trial = router._protect_package(fresh(), identifier, matched, evidence, vault=overlay, sweep=False)
+                # The next round's request carries the fixed instruction too: no kept value may appear in it.
+                verify_json(_payload(router, document(trial[0])), trial[3])
+            except Exception:
+                overlay.pending = kept
+                continue
+            if trial[0] == current:
+                overlay.pending = kept
+                continue
+            current = trial[0]
+            added.append(token)
+        corrections.append((flag, values, tuple(added)))
+    if not overlay.pending:
+        return package, None, corrections
+    for token, value in overlay.pending.items():
+        router.vault.put(identifier, token, value)
+    boundary = fresh()
+    return router._protect_package(boundary, identifier, matched, evidence), boundary, corrections
+
+
+def _loop(router, job, fresh, identifier, matched, evidence, package, boundary, marking):
+    """Check the whole package, correct every finding, check again; at most ``max_rounds`` rounds."""
+    from ..router import GateFailure
+
+    config = router.tripwire
+    rounds, cache, converged = [], {}, False
+    for number in range(1, config.max_rounds + 1):
+        raw, originals = package[0], package[3]
+        digest = hashlib.sha256(raw).hexdigest()
+        text = document(raw)
+        flags = _ask(router, job, text, originals, marking, digest, number)
+        if not flags:
+            router._register_call(
+                "record_tripwire_round", job.job_id, digest, "clear", (), round_number=number, last=True,
+                instruction_version=config.instruction_version, now=router.clock(),
+            )
+            rounds.append({
+                "round": number, "outcome": "clear", "findings": 0, "categories": {}, "added": [], "proposals": [],
+            })
+            converged = True
+            break
+        secret = any(flag.category == Label.SECRET.value for flag in flags)
+        if secret:
+            # A secret is never replaced by a placeholder anywhere in the gate: it refuses the job.
+            corrections, progress = [(flag, candidates(text, flag), ()) for flag in flags], False
+        else:
+            updated, rebuilt, corrections = _correct(
+                router, fresh, identifier, matched, evidence, package, text, flags,
+            )
+            progress = rebuilt is not None
+        last = secret or not progress or number == config.max_rounds
+        records = []
+        for flag, values, added in corrections:
+            proposal = propose(
+                config.proposals, job.job_id, flag.category, max(values, key=len) if values else None, cache,
+            )
+            records.append(dict(flag.as_record(), round=number, added=list(added), proposal=proposal))
         router._register_call(
-            "record_tripwire", job.job_id, digest, "clear", (),
+            "record_tripwire_round", job.job_id, digest, "flagged", records, round_number=number, last=last,
             instruction_version=config.instruction_version, now=router.clock(),
         )
-        return None
+        if secret:
+            raise GateFailure("BLOCK:secret", 200)
+        before = package[2]
+        if progress:
+            package, boundary = updated, rebuilt
+        rounds.append({
+            "round": number, "outcome": "not_converged" if last else "corrected", "findings": len(flags),
+            "categories": dict(Counter(flag.category for flag in flags)),
+            "added": sorted(set(package[2]) - set(before)),
+            "proposals": list(dict.fromkeys(item["proposal"] for item in records if item["proposal"])),
+        })
+        if last:
+            break
+    outcome = LoopOutcome(converged, tuple(rounds))
     router._register_call(
-        "record_tripwire", job.job_id, digest, "flagged", [flag.as_record() for flag in flags],
-        instruction_version=config.instruction_version, now=router.clock(),
+        "record_tripwire_loop", job.job_id, hashlib.sha256(package[0]).hexdigest(), converged, list(rounds),
+        now=router.clock(),
     )
-    from ..router_flow import refresh
-    job = refresh(router, job.job_id)
-    listing = "\n".join("- " + flag.describe() for flag in flags)
-    return router._response(
-        job, "held", "TRIPWIRE_FLAGGED",
-        f"Stopped: the cloud trip-wire flagged possible residual personal information in the approved package "
-        f"{job.job_id}. The task was not sent. The flagged text has already been read by the cloud model once.\n"
-        f"{listing}\n"
-        f"An Operator reviews it: `themis tripwire review {job.job_id} --confirm` (a real miss: the job is "
-        f"refused; propose it to the known-miss register with `themis kmr add --source cloud_tripwire "
-        f"--job {job.job_id}`) or `--reject` (a false flag: the job may be re-sent).",
-        timings=timings,
-    )
+    return package, boundary, outcome

@@ -1,4 +1,5 @@
-"""Optional cloud trip-wire (v0.3), against the fake cloud endpoint. Synthetic data only."""
+"""Optional cloud trip-wire (v0.3): the reply contract and the clear and fail-closed paths through the router, against
+the fake cloud endpoint. The correction loop is in test_tripwire_loop.py. Synthetic data only."""
 
 from __future__ import annotations
 
@@ -6,7 +7,6 @@ import json
 
 import pytest
 
-from themis_shield.catalogues.cli import tripwire_main
 from themis_shield.catalogues.tripwire import INSTRUCTION, TripwireMalformed, document, parse_reply
 from themis_shield.cloud.openai_compat import canonical
 
@@ -22,16 +22,6 @@ def approve_and_send(h, body, headers=None):
     assert held.route == "held"
     h.register.approve(held.job_id)
     return held, h.router.handle(body, headers)
-
-
-def flag_reply(body):
-    text = body["messages"][1]["content"]
-    start = text.index("synthetic")
-    token = next(part for part in text.split('"') if part.startswith("⟦P:"))[:10]
-    return json.dumps({"residual": [
-        {"start": start, "end": start + 9, "placeholder": None, "category": "quasi id"},
-        {"placeholder": token, "category": "person"},
-    ], "stop": True})
 
 
 # -- the reply contract -----------------------------------------------------------------------------------------
@@ -76,12 +66,14 @@ def test_flags_keep_spans_placeholders_and_fixed_categories_only():
 # -- through the router -----------------------------------------------------------------------------------------
 
 
-def test_clear_trip_wire_runs_after_approval_with_the_fixed_instruction_first(tmp_path):
+def test_clear_trip_wire_runs_before_approval_with_the_fixed_instruction_first(tmp_path):
     h = tripwire_harness(tmp_path, CLEAR)
     try:
         body = request()
         held = h.router.handle(body)
-        assert held.reason == "OPERATOR_APPROVAL_REQUIRED" and h.fake.requests == []
+        # The trip-wire ran while the package was being built, before any person approved it.
+        assert held.reason == "OPERATOR_APPROVAL_REQUIRED" and len(h.fake.tripwire_requests) == 1
+        assert "the package came back clean in round 1" in held.body["choices"][0]["message"]["content"]
         h.register.approve(held.job_id)
         sent = h.router.handle(body)
         assert sent.route == "cloud-tokenised"
@@ -94,80 +86,24 @@ def test_clear_trip_wire_runs_after_approval_with_the_fixed_instruction_first(tm
         assert INSTRUCTION not in json.dumps(task, ensure_ascii=False)
         (record,) = h.register.tripwire_records(held.job_id)
         assert record["outcome"] == "clear" and record["flags"] == []
+        (loop,) = h.register.tripwire_loops(held.job_id)
+        assert loop["converged"] is True and loop["manifest_hash"] == h.register.get_details(held.job_id)["manifest_hash"]
         events = [row["event"] for row in h.register.audit_rows(held.job_id)]
-        assert events.index("TRIPWIRE_SENT") < events.index("SEND_AUTHORISED")
-    finally:
-        h.cloud.close()
-
-
-def test_flag_stops_the_job_and_records_only_spans(tmp_path):
-    h = tripwire_harness(tmp_path, flag_reply)
-    try:
-        body = request("Mara Lindahl is the only synthetic night-desk lead.")
-        held, stopped = approve_and_send(h, body)
-        assert stopped.route == "held" and stopped.reason == "TRIPWIRE_FLAGGED"
-        message = stopped.body["choices"][0]["message"]["content"]
-        assert "themis tripwire review" in message and "themis kmr add --source cloud_tripwire" in message
-        assert "Mara" not in message and "night-desk" not in message
-        assert len(h.fake.requests) == 1  # the trip-wire only; the task was never sent
-        assert h.register.get_job(held.job_id).status.value == "Held-Offline"
-        (record,) = h.register.tripwire_records(held.job_id)
-        assert record["outcome"] == "flagged"
-        assert {tuple(sorted(flag)) for flag in record["flags"]} == {("category", "end", "placeholder", "start")}
-        assert "synthetic" not in record["flags_json"] and "Mara" not in record["flags_json"]
-        again = h.router.handle(body)
-        assert again.reason == "TRIPWIRE_REVIEW_REQUIRED" and len(h.fake.requests) == 1
-    finally:
-        h.cloud.close()
-
-
-def test_rejected_flag_lets_the_same_package_go_without_a_second_trip_wire(tmp_path):
-    h = tripwire_harness(tmp_path, flag_reply)
-    try:
-        body = request("Mara Lindahl is the only synthetic night-desk lead.")
-        held, _ = approve_and_send(h, body)
-        with pytest.raises(PermissionError):
-            h.register.review_tripwire(held.job_id, "rejected", reviewer_identity="synthetic-requester")
-        assert tripwire_main(
-            ["review", held.job_id, "--reject", "--identity", "synthetic-operator"], register=h.register,
-        ) == 0
-        assert h.register.get_job(held.job_id).status.value == "Approved"
-        sent = h.router.handle(body)
-        assert sent.route == "cloud-tokenised"
-        assert len(h.fake.tripwire_requests) == 1 and len(h.fake.requests) == 2
-        stats = h.register.tripwire_stats()
-        assert stats["flags_rejected"] == 1 and stats["flag_precision"] == 0.0
-    finally:
-        h.cloud.close()
-
-
-def test_confirmed_flag_refuses_the_job_and_offers_a_known_miss_proposal(tmp_path, capsys):
-    h = tripwire_harness(tmp_path, flag_reply)
-    try:
-        body = request("Mara Lindahl is the only synthetic night-desk lead.")
-        held, _ = approve_and_send(h, body)
-        assert tripwire_main(
-            ["review", held.job_id, "--confirm", "--identity", "synthetic-operator"], register=h.register,
-        ) == 0
-        assert f"themis kmr add --source cloud_tripwire --job {held.job_id}" in capsys.readouterr().out
-        assert h.register.get_job(held.job_id).status.value == "Refused"
-        assert h.router.handle(body).reason == "APPROVAL_NOT_ACTIVE"
-        assert h.register.tripwire_stats()["flag_precision"] == 1.0
-        assert tripwire_main(["stats"], register=h.register) == 0
-        assert '"flags_confirmed": 1' in capsys.readouterr().out
+        assert events.index("TRIPWIRE_SENT") < events.index("PACKAGE_READY") < events.index("SEND_AUTHORISED")
     finally:
         h.cloud.close()
 
 
 @pytest.mark.parametrize("reply", ["I found nothing personal.", '{"residual": [], "stop": true}'])
-def test_malformed_reply_stops_the_job(tmp_path, reply):
+def test_malformed_reply_refuses_the_job(tmp_path, reply):
     h = tripwire_harness(tmp_path, reply)
     try:
-        held, stopped = approve_and_send(h, request())
+        stopped = h.router.handle(request())
         assert stopped.route == "blocked" and stopped.reason == "TRIPWIRE_MALFORMED"
         assert len(h.fake.requests) == 1
-        assert h.register.get_job(held.job_id).status.value == "Refused"
-        assert h.register.tripwire_records(held.job_id)[0]["outcome"] == "malformed"
+        assert h.register.get_job(stopped.job_id).status.value == "Refused"
+        assert h.register.tripwire_records(stopped.job_id)[0]["outcome"] == "malformed"
+        assert h.register.tripwire_loops(stopped.job_id) == ()
     finally:
         h.cloud.close()
 
@@ -176,13 +112,13 @@ def test_reply_echoing_an_original_value_fails_closed(tmp_path):
     reply = '{"residual": [{"start": 0, "end": 5, "category": "Mara Lindahl"}], "stop": true}'
     h = tripwire_harness(tmp_path, reply)
     try:
-        held, stopped = approve_and_send(h, request())
+        stopped = h.router.handle(request())
         assert stopped.route == "blocked" and stopped.reason == "TRIPWIRE_UNAVAILABLE"
-        assert h.register.tripwire_records(held.job_id)[0]["outcome"] == "failed"
-        events = [row["event"] for row in h.register.audit_rows(held.job_id)]
+        assert h.register.tripwire_records(stopped.job_id)[0]["outcome"] == "failed"
+        events = [row["event"] for row in h.register.audit_rows(stopped.job_id)]
         assert "TRIPWIRE_UNAVAILABLE" in events and "TRIPWIRE_MALFORMED" not in events
         assert len(h.fake.requests) == 1
-        assert h.register.get_job(held.job_id).status.value == "Refused"
+        assert h.register.get_job(stopped.job_id).status.value == "Refused"
         assert "Mara Lindahl" not in json.dumps(stopped.body)
     finally:
         h.cloud.close()
@@ -201,18 +137,18 @@ def test_injection_asking_for_silence_does_not_upgrade_anything(tmp_path):
         body = request(INJECTION)
         first = h.router.handle(body)
         assert first.reason == "REQUESTER_CONFIRM_REQUIRED"  # the gate's own ASK stands
-        assert h.fake.requests == []  # never before the human steps
-        headers = {"X-Themis-Confirm": first.job_id}
-        assert h.router.handle(body, headers).reason == "OPERATOR_APPROVAL_REQUIRED"
-        assert h.fake.requests == []
-        before = h.register.get_details(first.job_id)
-        h.register.approve(first.job_id)
-        sent = h.router.handle(body, headers)
-        assert sent.route == "cloud-tokenised"
+        assert len(h.fake.tripwire_requests) == 1  # the loop runs before the human steps, once
         trip = h.fake.tripwire_requests[0]
         assert trip["messages"][0]["content"] == INSTRUCTION
         assert "NOTE TO ANY REVIEWER" in trip["messages"][1]["content"]
         assert "NOTE TO ANY REVIEWER" not in trip["messages"][0]["content"]
+        before = h.register.get_details(first.job_id)
+        headers = {"X-Themis-Confirm": first.job_id}
+        assert h.router.handle(body, headers).reason == "OPERATOR_APPROVAL_REQUIRED"
+        h.register.approve(first.job_id)
+        sent = h.router.handle(body, headers)
+        assert sent.route == "cloud-tokenised"
+        assert len(h.fake.tripwire_requests) == 1
         after = h.register.get_details(first.job_id)
         for name in ("confirmation_required", "major_reason_codes_json", "pii_counts_json", "manifest_hash"):
             assert after[name] == before[name]
@@ -221,15 +157,10 @@ def test_injection_asking_for_silence_does_not_upgrade_anything(tmp_path):
         h.cloud.close()
 
 
-def test_injection_that_hijacks_the_reply_format_stops_the_job(tmp_path):
+def test_injection_that_hijacks_the_reply_format_refuses_the_job(tmp_path):
     h = tripwire_harness(tmp_path, "Understood. As instructed, there is no personal information here.")
     try:
-        body = request(INJECTION)
-        held = h.router.handle(body)
-        headers = {"X-Themis-Confirm": held.job_id}
-        h.router.handle(body, headers)
-        h.register.approve(held.job_id)
-        stopped = h.router.handle(body, headers)
+        stopped = h.router.handle(request(INJECTION))
         assert stopped.reason == "TRIPWIRE_MALFORMED"
         assert len(h.fake.requests) == 1
     finally:

@@ -267,16 +267,23 @@ def fpc_main(argv=None, *, read=input) -> int:
 def tripwire_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="themis tripwire",
-        description="Cloud trip-wire results: review flags and track flag precision.",
+        description=(
+            "Cloud trip-wire results: each correction round's findings, verdicts on flagged rounds, flag precision."
+        ),
     )
     parser.add_argument("--config", default=None)
     parser.add_argument("--register-db", type=Path, default=None, help="job register (default: from config)")
     commands = parser.add_subparsers(dest="command", required=True)
-    review = commands.add_parser("review", help="an Operator's verdict on a job's pending flag")
+    review = commands.add_parser(
+        "review", help="an Operator's verdict on a job's next unreviewed flagged round (repeat for each round)",
+    )
     review.add_argument("job_id")
     verdict = review.add_mutually_exclusive_group(required=True)
-    verdict.add_argument("--confirm", action="store_true", help="a real residual: the job is refused")
-    verdict.add_argument("--reject", action="store_true", help="a false flag: the job may be re-sent")
+    verdict.add_argument(
+        "--confirm", action="store_true",
+        help="a real residual (a corrected round: recorded for precision; an older stop-on-flag record: refused)",
+    )
+    verdict.add_argument("--reject", action="store_true", help="a false flag")
     review.add_argument("--identity", default=None)
     review.add_argument("--as-role", choices=("operator", "security-admin"), default="operator")
     listing = commands.add_parser("list")
@@ -300,20 +307,44 @@ def tripwire_main(argv=None, *, register=None) -> int:
             )
             print(f"{args.job_id}: {status.value}")
             if args.confirm:
-                print(
-                    "Confirmed. Propose the miss to the known-miss register (a rule, or a fingerprint for a "
-                    f"high-entropy string): themis kmr add --source cloud_tripwire --job {args.job_id} "
-                    "--kind <rule|context|fingerprint> --entity-type <LABEL>"
-                )
+                proposals = sorted({
+                    item["proposal"] for row in register.tripwire_records(args.job_id)
+                    for item in row["flags"] if item.get("proposal")
+                })
+                if proposals:
+                    print(
+                        "Confirmed. The trip-wire already proposed " + ", ".join(proposals) + " to the known-miss "
+                        "register; a person other than the proposer checks each with `themis kmr verify` "
+                        "(or `themis kmr reject`)."
+                    )
+                else:
+                    print(
+                        "Confirmed. Propose the miss to the known-miss register (a rule, or a fingerprint for a "
+                        f"high-entropy string): themis kmr add --source cloud_tripwire --job {args.job_id} "
+                        "--kind <rule|context|fingerprint> --entity-type <LABEL>"
+                    )
         elif args.command == "list":
-            print("Record\tJob\tOutcome\tVerdict\tFlags (spans and placeholder ids only)")
+            print("Record\tJob\tOutcome\tVerdict\tFlags (spans, placeholder ids and proposals only)")
             for row in register.tripwire_records(args.job):
                 flags = "; ".join(
-                    (f"{item['start']}-{item['end']}" if item["start"] is not None else "")
+                    (f"round {item['round']} " if "round" in item else "")
+                    + (f"{item['start']}-{item['end']}" if item["start"] is not None else "")
                     + (f" {item['placeholder']}" if item["placeholder"] else "") + f" {item['category']}"
+                    + (" added " + ",".join(item["added"]) if item.get("added") else "")
+                    + (f" proposal {item['proposal']}" if item.get("proposal") else "")
                     for item in row["flags"]
                 ) or "-"
                 print(f"{row['record_id']}\t{row['job_id']}\t{row['outcome']}\t{row['verdict'] or '-'}\t{flags}")
+            loops = register.tripwire_loops(args.job)
+            if loops:
+                print("Loop\tJob\tConverged\tRounds (round outcome: findings, placeholders added)")
+                for loop in loops:
+                    rounds = "; ".join(
+                        f"{item['round']} {item['outcome']}: {item['findings']}, {len(item['added'])}"
+                        for item in loop["rounds"]
+                    )
+                    converged = "yes" if loop["converged"] else "NOT CONVERGED"
+                    print(f"{loop['loop_id']}\t{loop['job_id']}\t{converged}\t{rounds}")
         elif args.command == "stats":
             print(json.dumps(register.tripwire_stats(), indent=2, sort_keys=True))
         return 0

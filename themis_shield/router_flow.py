@@ -133,12 +133,12 @@ def local_due(value):
         return "not available"
 
 
-def held(router, job, reason, timings):
+def held(router, job, reason, timings, extra=""):
     row = router._register_call("get_details", job.job_id)
     return router._response(
         job, "held", reason,
         f"Held for operator approval {job.job_id}, due {local_due(row.get('due_utc'))}. "
-        "Re-send when both stages are approved.", timings=timings,
+        "Re-send when both stages are approved." + extra, timings=timings,
     )
 
 
@@ -242,10 +242,18 @@ def handle(router, request, headers=None, *, source_document_count=1):
         messages, matched = router._canonical_messages(identifier, original_messages)
         working = deepcopy(request)
         working["messages"] = messages
-        boundary = ChatBoundary(working, router.allowed_tools, router.cloud_model)
-        raw, mapping, sent, originals, policy, timings, counts = router._protect(
-            boundary, identifier, matched,
-        )
+        loop = None
+        if getattr(router, "tripwire", None) is None:
+            boundary = ChatBoundary(working, router.allowed_tools, router.cloud_model)
+            raw, mapping, sent, originals, policy, timings, counts = router._protect(
+                boundary, identifier, matched,
+            )
+        else:
+            # The cloud trip-wire's correction loop runs here, before any person confirms or approves the package.
+            package, boundary, loop = tripwire.protect(
+                router, job, working, identifier, matched, state.marking_class,
+            )
+            raw, mapping, sent, originals, policy, timings, counts = package
         digest = hashlib.sha256(raw).hexdigest()
         row = router._register_call("get_details", job.job_id)
         if row["package"] == "ready" and row["manifest_hash"] != digest:
@@ -299,8 +307,9 @@ def handle(router, request, headers=None, *, source_document_count=1):
         confirmed = cloud_confirm if routing.local_alternative_offered else headers.get("x-themis-confirm") == job.job_id
         if policy.decision == Decision.ASK:
             confirmed = confirmed and headers.get("x-themis-confirm") == job.job_id
+        rounds = "\n" + loop.describe() if loop is not None else ""
         if row["confirmation_required"] and not confirmed:
-            shown = sweep_findings_text(policy)
+            shown = sweep_findings_text(policy) + rounds
             return router._response(
                 job, "held", (sweep.reason if sweep is not None and sweep.needs_ask else None)
                 or "REQUESTER_CONFIRM_REQUIRED",
@@ -311,17 +320,16 @@ def handle(router, request, headers=None, *, source_document_count=1):
                 "confirm_payload", job.job_id, requester_identity=router.identity,
                 revision=row["approval_revision"], manifest_hash=digest, now=router.clock(),
             )
-        if router.pilot_fixture_enabled and router.pilot_approve:
+        # A package the trip-wire left NOT CONVERGED is never approved by the automatic pilot fixture: a person sees it.
+        if router.pilot_fixture_enabled and router.pilot_approve and (loop is None or loop.converged):
             router.pilot_approve(job)
         router._register_call("finalize_stages", job.job_id, now=router.clock())
         job = refresh(router, job.job_id)
         if router._register_call("get_approval", job.job_id) is None:
-            return held(router, job, "OPERATOR_APPROVAL_REQUIRED", timings)
+            if loop is not None and not loop.converged:
+                return held(router, job, "TRIPWIRE_NOT_CONVERGED", timings, rounds)
+            return held(router, job, "OPERATOR_APPROVAL_REQUIRED", timings, rounds)
         verify_json(raw, originals)
-        if getattr(router, "tripwire", None) is not None:
-            stopped = tripwire.run(router, job, raw, digest, originals, state.marking_class, timings)
-            if stopped is not None:
-                return stopped
         outbound = Outbound(job.job_id, state.marking_class, raw, digest, True, originals)
         with router.register.release_guard(job.job_id, digest, now=router.clock()):
             stream = router.cloud.open(outbound)

@@ -194,12 +194,18 @@ enabled = false
 scope = ""
 
 [tripwire]
-# Optional cloud trip-wire: after Operator approval and before the task turn, the cloud model
-# is asked (fixed first instruction, strict JSON reply) to list residual personal information
-# by placeholder or span. A flag or a malformed reply stops the job. It detects; it does not
-# prevent. Review flags with `themis tripwire review`.
+# Optional cloud trip-wire, run BEFORE requester confirmation and Operator approval: once the
+# gate has de-identified a package, the cloud model is asked (fixed first instruction, strict JSON
+# reply) to list residual personal information by placeholder or span. Every finding is replaced
+# by a placeholder of the reported category and the package is checked again, until a round finds
+# nothing. It detects; it does not prevent: the cloud model reads the package before a person does.
+# A malformed reply, a reply containing an original value or a transport failure refuses the job.
+# Every finding becomes a proposed known-miss entry (pending until a person verifies it); the
+# proposals go to the [known_miss] path even when the sweep is off. See docs/ARCHITECTURE.md.
 enabled = false
 max_completion_tokens = 2048
+# Rounds before the package goes to the Operator marked NOT CONVERGED (1 to 3; 3 is the cap).
+max_rounds = 3
 
 # --- v0.3 detector canary: ON by default -------------------------------------------------------
 # Known-answer checks against silent detector failure (wrong weights, a tokenizer mismatch, an
