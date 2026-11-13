@@ -724,9 +724,15 @@ def not_personal(router, job_id, point_id, *, actor):
     """"Not personal: leave it": the text stays as shown (a placeholder the gate already put in stays a placeholder;
     this never sends an original). Recorded and counted per hold reason; never promoted automatically. Refused while
     the review text is stale after an undo (FAB-03): the text the Operator would be confirming no longer exists.
-    Never runs inside an undo of the same job (RC-04)."""
+    Refused too when the review text is not on screen at all (RC-05: after a restart, once the conversation expired,
+    or for an older package): like "Replace it" and reveal it needs the current review text, so no point is settled
+    on text the Operator cannot see. The reason is value-free (``REVIEW_UNAVAILABLE``). Never runs inside an undo of
+    the same job (RC-04)."""
+    from .router import GateFailure
     with _job_lock(router, job_id):
-        _not_stale(router, job_id)
+        state = _state(router, job_id)  # REVIEW_REBUILD_REQUIRED when stale, REVIEW_UNAVAILABLE when not in memory
+        if state.manifest_hash != router.register.get_details(job_id)["manifest_hash"]:
+            raise GateFailure("REVIEW_UNAVAILABLE", 404)
         router.register.resolve_point(job_id, point_id, "not-personal", actor_identity=actor, now=router.clock())
         return view(router, job_id)
 

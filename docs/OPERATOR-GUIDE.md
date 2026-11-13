@@ -62,6 +62,9 @@ Some actions are refused with a reason instead of being accepted and failing lat
 - After an Undo that removed a placeholder, the text on screen is out of date. Every point action is refused
   (`REVIEW_REBUILD_REQUIRED`) until the requester sends again and the package is rebuilt. Then settle the point on the
   new text.
+- When the highlighted text is not on screen (the gate restarted, or the conversation expired), "Not personal",
+  "Replace it" and "Show original" are refused (`REVIEW_UNAVAILABLE`) and their buttons are disabled: no point is
+  settled on text you cannot see. The requester sends again to rebuild it.
 - "Replace it" with a weaker category over a span that holds a stronger placeholder (for example "quasi-identifier"
   over a person placeholder) is refused. Pick that placeholder's category or a stronger one.
 - Undoing the first of two replacements of the same value is refused while the other one still uses its placeholder.

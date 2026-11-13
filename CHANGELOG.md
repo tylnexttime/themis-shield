@@ -31,6 +31,10 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   the write fails). A replace from a second tab that arrived inside the undo was taken as "confirm as it is" and the
   value later went out in clear; it now waits for the undo and is refused (`REVIEW_REBUILD_REQUIRED`). Tested with a
   forced interleave from another thread and inside the register write.
+- **RC-05** "Not personal" needs the current review text on screen, like "Replace it" and reveal: after a restart, once
+  the conversation expired or for an older package it is refused with the value-free `REVIEW_UNAVAILABLE`, and the
+  console disables the button while the text is unavailable. Before, only an in-memory stale flag was checked, so a
+  point could be settled blind (and after a stale undo and a restart the flag was gone too).
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 

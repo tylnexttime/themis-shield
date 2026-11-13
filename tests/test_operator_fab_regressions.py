@@ -253,3 +253,61 @@ def test_rc_04_a_failed_undo_leaves_the_review_as_it_was(tmp_path):
         assert (await operator.post(f"{base}/undo", json={})).status_code == 200  # and it can be retried
 
     _run(h, exercise)
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# RC-05 (second review): "Not personal" needed no review text on screen, only an in-memory stale flag, so after a
+# restart (or once the conversation expired) a point was settled blind. It now needs the current review text, like
+# "Replace it" and reveal, and the refusal is value-free. The restart is simulated by clearing what lives in memory.
+def _restart(router):
+    with router._state_lock:
+        for name in ("_reviews", "_review_stale", "_operator_points", "_operator_tokens", "_review_locks"):
+            getattr(router, name).clear()
+
+
+def test_rc_05_not_personal_is_refused_when_the_review_text_is_not_on_screen(tmp_path):
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, view = await _held(client, operator)
+        base = f"/api/operator/{job}/points/{view['points'][0]['id']}"
+        _restart(h.router)
+        view = await _review(operator, job)
+        assert view["text"] is None and view["text_available"] is False and view["unresolved"] == 1
+        refused = await operator.post(f"{base}/not-personal", json={})
+        assert refused.status_code == 404
+        assert refused.json() == {"error": refused.json()["error"]}  # nothing but the error
+        assert refused.json()["error"]["code"] == "REVIEW_UNAVAILABLE"
+        assert "Blake" not in refused.text and "Morrison" not in refused.text
+        assert (await _review(operator, job))["unresolved"] == 1
+        # The requester sends again: the text is rebuilt, on screen, and the point can be settled.
+        await client.post("/v1/chat/completions", json=request(TEXT), headers={"X-Themis-Confirm": job})
+        assert (await _review(operator, job))["text_available"] is True
+        settled = await operator.post(f"{base}/not-personal", json={})
+        assert settled.status_code == 200 and settled.json()["unresolved"] == 0
+
+    _run(h, exercise)
+
+
+def test_rc_05_the_reviewers_stale_undo_then_restart_is_refused(tmp_path):
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator):
+        job, point_id, base, token = await _replaced_and_rebuilt(h, client, operator)
+        assert (await operator.post(f"{base}/undo", json={})).status_code == 200
+        _restart(h.router)  # the stale flag is gone with the rest of the memory
+        refused = await operator.post(f"{base}/not-personal", json={})
+        assert refused.status_code == 404 and refused.json()["error"]["code"] == "REVIEW_UNAVAILABLE"
+        await _never_sent_in_clear(h, client, operator, job)
+
+    _run(h, exercise)
+
+
+def test_rc_05_the_console_disables_not_personal_without_the_text():
+    from pathlib import Path
+
+    script = (Path(__file__).resolve().parents[1] / "themis_shield" / "web" / "static" / "app.js").read_text(
+        encoding="utf-8")
+    start = script.index('button("Not personal: leave it"')
+    end = script.index('button("Replace it"', start)
+    assert "{ disabled: !review.text_available }" in script[start:end]

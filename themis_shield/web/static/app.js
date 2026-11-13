@@ -661,7 +661,7 @@ function reviewPoint(id, review, point) {
       await api(`${base}/not-personal`, { method: "POST", body: {} });
       notice("Recorded: not personal. The text stays as shown; the gate itself does not change.");
       await loadOperator();
-    })),
+    }), { disabled: !review.text_available }),
     button("Replace it", () => { form.hidden = !form.hidden; }, { disabled: !review.text_available }),
     button("Stop the document", () => action(async () => {
       if (!window.confirm("Stop this document? The job is refused and nothing is sent.")) return;
