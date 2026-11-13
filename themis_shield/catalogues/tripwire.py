@@ -504,6 +504,12 @@ def protect(router, job, working, identifier, matched, marking, *, review=None):
     digest = hashlib.sha256(package[0]).hexdigest()
     row = router._register_call("get_details", job.job_id)
     if row["package"] == "building":
+        # FAB-14: a placeholder the Operator added must be in the first build, before the loop sends anything to the
+        # trip-wire (the router checks it again after the loop).
+        with router._state_lock:
+            added = set(router._operator_tokens.get(job.job_id, ()))
+        if added - set(package[2]):
+            raise GateFailure("OPERATOR_REPLACEMENT_NOT_APPLIED", 200)
         return _loop(router, job, fresh, identifier, matched, evidence, package, boundary, marking, review)
     if row["package"] == "ready" and row["manifest_hash"] != digest:
         return package, boundary, None

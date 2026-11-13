@@ -486,3 +486,18 @@ def test_fab_09_shape_patterns_never_hold_a_value_that_starts_with_an_unusual_le
     for run in re.findall(r"[^\W\d_]{2,}", value):
         assert run not in pattern
 
+
+# FAB-14: a placeholder the Operator added must be in the first build before the loop sends anything to the trip-wire.
+def test_fab_14_the_operator_replacement_check_runs_before_the_loop(tmp_path):
+    class Always(dict):
+        def get(self, key, default=None):
+            return {"\u27e6P:000000\u27e7"}
+
+    h = tripwire_harness(tmp_path, scripted([("Ward 7B", "quasi id")]))
+    try:
+        h.router._operator_tokens = Always()
+        held = h.router.handle(two_documents(), source_document_count=2)
+        assert held.reason == "OPERATOR_REPLACEMENT_NOT_APPLIED"
+        assert h.fake.tripwire_requests == []
+    finally:
+        h.cloud.close()
