@@ -259,3 +259,28 @@ def test_both_on_what_the_loop_missed_is_caught_after_approval_and_not_replaced(
         assert not any(value == "Birdie Okonkwo" for value in h.router.vault.mapping(conversation(h, body)).values())
     finally:
         h.cloud.close()
+
+
+# FAB-05 (independent review of candidate 0.5): `enabled = true` silently changed meaning on upgrade, from a check after
+# approval (0.3, 0.4) to the correction loop before any person. The meaning stays (the owner's decision), but every
+# start says so, value-free.
+def test_fab_05_the_deprecated_alias_warns_at_start_up_and_in_the_log(caplog, tmp_path):
+    import logging
+
+    from themis_shield import startup
+    from themis_shield.catalogues.gate import TRIPWIRE_ALIAS_NOTICE, configure, tripwire_alias_used
+
+    alias = {"tripwire": {"enabled": True}}
+    assert tripwire_alias_used(alias)
+    for explicit in ({"enabled": True, "before_human": True}, {"enabled": True, "after_human": True},
+                     {"enabled": False}, {"before_human": True}, {}):
+        assert not tripwire_alias_used({"tripwire": explicit})
+        assert startup.config_notices({"tripwire": explicit}) == []
+    (notice,) = startup.config_notices(alias)
+    assert TRIPWIRE_ALIAS_NOTICE in notice and "before_human" in notice and "after_human" in notice
+    router = SimpleNamespace(clock=lambda: NOW)
+    with caplog.at_level(logging.WARNING, logger="themis_shield"):
+        configure(router, {"tripwire": {"enabled": True, "before_human": False, "after_human": False}})
+        assert TRIPWIRE_ALIAS_NOTICE not in caplog.text
+        configure(router, {"tripwire": {"enabled": True}, "known_miss": {"path": str(tmp_path / "k.db")}})
+    assert TRIPWIRE_ALIAS_NOTICE in caplog.text

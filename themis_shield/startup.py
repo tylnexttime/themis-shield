@@ -128,6 +128,16 @@ def check_config(path: Path) -> dict:
     return config
 
 
+def config_notices(config: Mapping[str, Any]) -> list[str]:
+    """Value-free start-up warnings that do not refuse the start (FAB-05: the deprecated trip-wire alias)."""
+    from .catalogues.gate import TRIPWIRE_ALIAS_NOTICE, TRIPWIRE_ALIAS_TEXT, tripwire_alias_used
+
+    notices = []
+    if tripwire_alias_used(config):
+        notices.append(f"Themis startup warning [{TRIPWIRE_ALIAS_NOTICE}]: {TRIPWIRE_ALIAS_TEXT}")
+    return notices
+
+
 def check_token(path: Path, reader) -> str:
     try:
         return reader(path)

@@ -102,7 +102,8 @@ def main(argv=None):
         return
     router = None
     try:
-        startup.check_config(args.config)
+        for notice in startup.config_notices(startup.check_config(args.config)):
+            print(notice, file=sys.stderr)
         token = (
             provision_token() if args.open
             else startup.check_token(default_token_path(), read_gate_token)

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
+import logging
 from pathlib import Path
 import time
 from typing import Any, Iterator, Mapping
@@ -285,6 +286,22 @@ def _path(section: Mapping[str, Any], default: str) -> Path:
     return Path(value).expanduser() if value else app_data_dir() / default
 
 
+TRIPWIRE_ALIAS_NOTICE = "TRIPWIRE_ENABLED_ALIAS"
+TRIPWIRE_ALIAS_TEXT = (
+    "[tripwire] enabled is deprecated and now means before_human: the cloud trip-wire reads the de-identified package "
+    "BEFORE any person approves it. In 0.3 and 0.4 it ran after approval; for that placement set after_human = true. "
+    "Set before_human and after_human explicitly to silence this warning."
+)
+
+
+def tripwire_alias_used(config: Mapping[str, Any]) -> bool:
+    """FAB-05: True when the deprecated ``[tripwire] enabled = true`` decides the trip-wire's mode (neither toggle set),
+    so its meaning changed on upgrade from "after approval" to "before any person"."""
+    trip = (config or {}).get("tripwire") or {}
+    return (isinstance(trip, Mapping) and trip.get("enabled") is True
+            and "before_human" not in trip and "after_human" not in trip)
+
+
 def settings(config: Mapping[str, Any]) -> dict:
     """Validated catalogue settings. Every feature is off unless its section says ``enabled = true``."""
     known = _section(config, "known_miss", KNOWN_MISS_KEYS)
@@ -334,6 +351,9 @@ def configure(router, config: Mapping[str, Any], *, protector_factory=None) -> d
     from .tripwire import Tripwire
 
     values = settings(config)
+    if tripwire_alias_used(config):
+        # FAB-05: value-free, a fixed code and text; also printed by `themis serve` at start-up.
+        logging.getLogger("themis_shield").warning("%s: %s", TRIPWIRE_ALIAS_NOTICE, TRIPWIRE_ALIAS_TEXT)
     router.known_miss = router.fp_catalogue = router.tripwire = None
     known, trip = values["known_miss"], values["tripwire"]
     register = None

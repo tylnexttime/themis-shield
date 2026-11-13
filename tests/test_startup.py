@@ -196,3 +196,18 @@ def test_serve_prints_reason_and_exits_non_zero(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert "[GATE_TOKEN_MISSING]" in captured.err
     assert SECRET_LOOKING not in captured.err + captured.out
+
+
+def test_fab_05_serve_warns_about_the_deprecated_trip_wire_alias(tmp_path, monkeypatch, capsys):
+    # The warning is printed before any refusal, value-free; a configuration with the toggles set prints none.
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    path = _config(tmp_path, requester=SECRET_LOOKING, extra="[tripwire]\nenabled = true\n")
+    with pytest.raises(SystemExit):
+        serve(["--config", str(path)])
+    captured = capsys.readouterr()
+    assert "[TRIPWIRE_ENABLED_ALIAS]" in captured.err and "before_human" in captured.err
+    assert SECRET_LOOKING not in captured.err + captured.out
+    path = _config(tmp_path, extra="[tripwire]\nenabled = true\nafter_human = true\n")
+    with pytest.raises(SystemExit):
+        serve(["--config", str(path)])
+    assert "TRIPWIRE_ENABLED_ALIAS" not in capsys.readouterr().err

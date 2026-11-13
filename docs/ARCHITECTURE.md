@@ -486,7 +486,9 @@ Both on: the loop corrects, then the check after approval double-checks the appr
 the final package twice, once as the loop's clean round and once after approval). Both off, or nothing set: the router
 takes exactly the path it took before (the golden comparison in `tests/test_catalogues_off.py`). `enabled` is
 **deprecated**: it is read only when neither toggle is present, and `enabled = true` then means `before_human` only.
-In 0.3 and 0.4 `enabled = true` ran the check after approval; for that placement set `after_human = true`. Neither
+In 0.3 and 0.4 `enabled = true` ran the check after approval; for that placement set `after_human = true`. Because
+the meaning changed on upgrade, a configuration that relies on the alias gets a value-free warning at every start
+(`TRIPWIRE_ENABLED_ALIAS`, printed by `themis serve` and logged when the catalogues are configured; FAB-05). Neither
 mode runs for BLOCK or local-only work (they never reach the cloud), nor on the hooks path. Every finding with text
 becomes a pending known-miss proposal in both modes (below), and both fail closed the same way.
 
