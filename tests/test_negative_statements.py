@@ -105,6 +105,47 @@ def test_look_alikes_are_not_statements(text):
     assert statements(text) == []
 
 
+# DD-26 (split G's GT-008, a clean FAQ; invented words): a general rule about a class of people that mentions a
+# negative ("a person with no criminal record is treated the same as ...") is policy, not a statement about anyone.
+@pytest.mark.parametrize("text", [
+    "A person with no convictions is treated the same as any other volunteer once the check is returned.",
+    "Any applicant with no criminal history may skip the second interview.",
+    "Anyone who has no criminal record pays the standard fee.",
+    "Employees with no criminal record are not required to repeat the check.",
+    "Staff with no police record can start on the same day.",
+    "People who have no convictions need not attend the briefing.",
+    "3.2 What happens if a person has no criminal record? Nothing changes.",
+    "Does any applicant with no criminal record need a second check?",
+])
+def test_a_general_rule_about_a_class_of_people_is_not_a_statement(text):
+    assert statements(text) == []
+
+
+# The same words said of someone (a name, a pronoun, "I", an appositive) keep matching.
+@pytest.mark.parametrize("text, value", [
+    ("He has no criminal record, so the sign-off can proceed.", "He has no criminal record"),
+    ("Theo has never been charged with anything.", "Theo has never been charged with anything"),
+    ("I have no convictions.", "I have no convictions"),
+    ("Mira is a person with no criminal record.", "Mira is a person with no criminal record"),
+    ("Priya Nand, a person with no criminal record, applied on Friday.", "a person with no criminal record"),
+    ("She said that any person with no criminal record would pass, and that she has no criminal record.",
+     "and that she has no criminal record"),
+    ("The applicant, who has no criminal record, was told to wait.", "who has no criminal record"),
+])
+def test_a_negative_about_a_named_or_pronoun_subject_still_matches(text, value):
+    assert (Label.CRIMINAL, value) in statements(text)
+
+
+def test_a_list_under_a_generic_heading_and_a_form_answer_still_match():
+    text = "Staff with no criminal record: Dana Smith, Ravi Patel.\n"
+    assert statements(text) and all(label is Label.CRIMINAL for label, _ in statements(text))
+    text = ("Applicants with no criminal record are treated as any other applicant.\n"
+            "Has the worker any criminal convictions? None\n")
+    assert statements(text) == [(Label.CRIMINAL, "None")]
+    text = "A person with no convictions is treated as any other volunteer. Rhys has no criminal record."
+    assert statements(text) == [(Label.CRIMINAL, "Rhys has no criminal record")]
+
+
 def test_matters_need_a_criminal_word_nearby_and_the_statement_is_the_clause():
     tail = "06:10 HR-2231 note: the renewed check shows no new matters, and access can go ahead."
     assert statements(tail) == []
@@ -136,14 +177,15 @@ def test_the_switch_turns_the_pass_off():
 # Guard (in the spirit of DD-16): the pass was written from split F, so run it over every evaluation case. A statement
 # it makes must never overlap a hard negative, never land in a document without personal information (that would hold
 # a clean document), and each must cover a gold sensitive span of its own category.
-# Split G (published 12/11/2026 with eval/RESULTS-v0.6.md) came after this switch shipped in 0.4.0 and breaks the
-# guard: 3 of its 12 statements on split G cover no gold span of their category, one in a clean document (DEV-DEBT DD-26). The guard stays strict on the sets it was written from; on split G it is a strict
-# expected failure, so it fails loudly once the switch is fixed.
+# Split G (published 12/11/2026 with eval/RESULTS-v0.6.md) came after this switch shipped in 0.4.0 and broke the guard
+# (DEV-DEBT DD-26): of its statements, three covered no gold span of their category. Two were gold omissions, now
+# corrected in the adjudicated files (``eval/cases/test-g-*.adjudicated.jsonl``; the sealed ones stay as they were), so
+# split G is read from those; the third was a general rule about "a person with no criminal record" in a clean FAQ,
+# which the switch no longer matches. The guard is strict on every set.
 _CASE_FILES = sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl"))
 _GUARD_SETS = [
     pytest.param([p for p in _CASE_FILES if not p.name.startswith("test-g-")], (40, 50), id="sets-before-split-g"),
-    pytest.param([p for p in _CASE_FILES if p.name.startswith("test-g-")], (0, 0), id="split-g",
-                 marks=pytest.mark.xfail(strict=True, reason="DD-26: 3 of its 12 statements on split G cover no gold span of their category, one in a clean document")),
+    pytest.param(sorted((ROOT / "eval" / "cases").glob("test-g-*.adjudicated.jsonl")), (12, 14), id="split-g"),
 ]
 
 

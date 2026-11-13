@@ -113,6 +113,36 @@ def test_unquoted_commas_that_do_not_explain_the_extra_cells_keep_cells_apart():
     assert widened(text, given(text, "nigh")) == ["night"]
 
 
+# DD-26 (split G's GT-081, invented words): the widening stops at a ";" inside the cell. The clause after it said nothing
+# about who the person is and ended in a role title (a hard negative), which the whole-cell widening swept up.
+SEMICOLON = (
+    "record,learner,course,notes\n"
+    "R1,L-1,Certificate III in Hospitality,Enrolled full time; attendance above 90 percent\n"
+    "R2,L-2,Diploma of Nursing,the only left-handed glazier trainee at the Wimmera depot; follow-up requested by "
+    "Welfare Liaison Officer\n"
+)
+
+
+def test_a_cell_is_widened_only_to_the_clause_that_holds_the_finding():
+    clause = "the only left-handed glazier trainee at the Wimmera depot"
+    assert widened(SEMICOLON, given(SEMICOLON, "the only left-handed glazier")) == [clause]
+    assert "Welfare Liaison Officer" not in " ".join(quasi(SEMICOLON, given(SEMICOLON, "the only left-handed glazier")))
+
+
+def test_a_finding_in_a_later_clause_widens_that_clause_and_one_across_a_semicolon_widens_both():
+    later = "Enrolled full time; the only left-handed glazier trainee at the Wimmera depot; follow-up booked"
+    text = "record,learner,notes\nR1,L-1," + later + "\n"
+    assert widened(text, given(text, "left-handed glazier")) == ["the only left-handed glazier trainee at the Wimmera depot"]
+    assert widened(text, given(text, "full time; the only left")) == [
+        "Enrolled full time; the only left-handed glazier trainee at the Wimmera depot"]
+    assert widened(text, given(text, "Enrolled full time")) == []  # already the whole clause
+
+
+def test_a_semicolon_in_a_quoted_cell_ends_the_clause_too():
+    text = 'row,role,site\n1,"Night porter; the last one hired before the freeze; keys held",Kell Bay\n'
+    assert widened(text, given(text, "the last one hired")) == ["the last one hired before the freeze"]
+
+
 def test_the_switch_turns_the_pass_off():
     part = "Longest-standing tenant"
     try:
@@ -130,14 +160,14 @@ def test_the_switch_turns_the_pass_off():
 # Guard (in the spirit of DD-16): the pass widens findings, so give it the first half of every gold QUASI_ID span of
 # every evaluation case (a finder's partial answer) and check that no widened cell overlaps a hard negative and that
 # the widened cells cover the gold spans they were cut from.
-# Split G (published 12/11/2026 with eval/RESULTS-v0.6.md) came after this switch shipped in 0.4.0 and breaks the
-# guard: 1 of its 54 widened cells on split G overlaps a hard negative (a role title) (DEV-DEBT DD-26). The guard stays strict on the sets it was written from; on split G it is a strict
-# expected failure, so it fails loudly once the switch is fixed.
+# Split G (published 12/11/2026 with eval/RESULTS-v0.6.md) came after this switch shipped in 0.4.0 and broke the guard
+# (DEV-DEBT DD-26): 1 of its 54 widened cells ran past a ";" into a role title (a hard negative). The switch now widens
+# only within the clause. Split G is read from its adjudicated files (``eval/cases/test-g-*.adjudicated.jsonl``; the
+# sealed ones stay as they were). The guard is strict on every set.
 _CASE_FILES = sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl"))
 _GUARD_SETS = [
     pytest.param([p for p in _CASE_FILES if not p.name.startswith("test-g-")], (300, 300), id="sets-before-split-g"),
-    pytest.param([p for p in _CASE_FILES if p.name.startswith("test-g-")], (0, 0), id="split-g",
-                 marks=pytest.mark.xfail(strict=True, reason="DD-26: 1 of its 54 widened cells on split G overlaps a hard negative (a role title)")),
+    pytest.param(sorted((ROOT / "eval" / "cases").glob("test-g-*.adjudicated.jsonl")), (50, 50), id="split-g"),
 ]
 
 

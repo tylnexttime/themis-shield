@@ -73,6 +73,32 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
   Measured by replay as development evidence only (written from split G): split G sensitive R_any 0.939 -> 0.967
   (308 -> 317 of 328), R_any 0.9915 -> 0.9948, R_full 0.954 -> 0.957; friction, over-redaction and decisions unchanged.
 
+### Three 0.4.0 switches that overreached on split G (DD-26)
+
+- Split G's guards of `negative-statements`, `quasi-cells` and `unique-roles` failed on five cases, adjudicated against
+  the taxonomy (`eval/generator_g/adjudication/decisions-dd26.jsonl`): three were gold omissions (corrected in
+  `test-g-*.adjudicated.jsonl`; the sealed files stay as they were) and two were switch errors, fixed here with no new
+  switch. `negative-statements` no longer matches a negative inside a general rule about a class of people ("A person
+  with no criminal record at all is treated the same as any other applicant once the check is returned as clear", in a
+  clean FAQ): only a generic subject (a person, any applicant, applicants, staff, people, anyone who) before it in its
+  sentence, nothing personal in the sentence and no ":" after it; a name, "He", "I", an appositive ("Priya Nand, a
+  person with no criminal record, ...") and a list under a generic heading still match. `quasi-cells` widens a partial
+  finding only to the clause of the cell that holds it, so a ";" inside a cell ends it (GT-081's second clause ended in
+  a role title).
+- `unique-roles`: a "who" clause that was cut at 50 characters ("the only apprentice in this cycle's hairdressing cohort
+  who grew up", gold "... speaking Mandarin at home") now runs to the auxiliary verb that follows it ("has requested") or
+  to the end of its cell or line, within 120 characters. Prose punctuation does not end it: that cannot tell a clause
+  from the main verb the list does not know ("who started in February in the back office signed up with the union."),
+  and a first version that ended at it ran into four such main clauses on the older sets. Over every evaluation set it
+  changes two spans (GT-027 and GR-090, a table cell that now ends at its tab). "-" and "—" were not made clause ends: no
+  widened cell on any set holds one.
+- The three split G guards read the adjudicated files and are strict (they were strict expected failures); the
+  floors of the earlier sets are unchanged (41 statements covering 56 gold spans, 329 cells completing 329 gold spans,
+  124 spans on 124 gold spans), and split G's now hold at 15 / 17, 54 / 54 and 20 / 20. Measured by replay as development
+  evidence only (split G, from the frozen candidate's captures): friction 0.200 -> 0.185 (GT-008 released), over-redaction
+  611 -> 610 (GT-081's role title); released leaks 0, R_any 0.9948, R_full 0.9569, sensitive R_any 0.9665 and
+  QUASI_ID R_any 1.000 all unchanged.
+
 ## 0.4.0 (12/11/2026)
 
 **Preview, like every release before it.** Split F, the frozen test of this release's candidate (0.3.4 plus

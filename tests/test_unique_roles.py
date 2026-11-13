@@ -90,6 +90,45 @@ def test_the_span_stops_at_a_cell_separator_or_an_auxiliary_verb():
     assert roles(text) == ["the only welder at the Corran yard"]
 
 
+# DD-26 (split G's GT-027, invented words): a "who" clause that was cut at 50 characters runs to its end, which is the
+# main verb ("has requested") or a punctuation mark, never into it.
+@pytest.mark.parametrize("text, value", [
+    ("The panel noted that the only apprentice in this intake's welding cohort who grew up speaking Greek at home "
+     "has requested a bilingual assessor for her exams.",
+     "the only apprentice in this intake's welding cohort who grew up speaking Greek at home"),
+    ("We were told the only trainee at the Carrow Street kitchen who learned to cook in a refugee camp in Kenya "
+     "will take leave.", "the only trainee at the Carrow Street kitchen who learned to cook in a refugee camp in Kenya"),
+    ("Note: the sole technician on the northern line who moved here from Perth last winter with her two children "
+     "will not be rostered on Sunday.",
+     "the sole technician on the northern line who moved here from Perth last winter with her two children"),
+])
+def test_a_who_clause_runs_to_its_end(text, value):
+    assert roles(text) == [value]
+
+
+def test_a_who_clause_in_a_cell_runs_to_the_end_of_the_cell():
+    cell = "the only forklift driver at the Bunderra Logistics Park who speaks four languages and mentors new starters"
+    text = "row\tsite\trole\n7\tBunderra\t" + cell + "\t7\n"
+    assert roles(text) == [cell]
+
+
+@pytest.mark.parametrize("text, value", [
+    # Prose punctuation after the cut is no proof that the clause ended before the main verb, so it is cut as before.
+    ("The only female forklift driver who started in February in the Copperleaf back office signed up with the union.",
+     "The only female forklift driver who started in February in the Copperleaf back office"),
+    ("The one trainee who commutes from Marrowgate by ferry left after a long dispute at home.",
+     "The one trainee who commutes from Marrowgate by ferry left after a"),
+])
+def test_a_who_clause_followed_by_a_main_verb_the_list_does_not_know_is_cut_as_before(text, value):
+    assert roles(text) == [value]
+
+
+def test_a_who_clause_with_no_end_in_sight_is_cut_as_before():
+    text = ("the only apprentice in this intake's welding cohort who grew up speaking Greek at home requested a "
+            "bilingual assessor for her practical exams and a quiet room for the written papers afterwards")
+    assert roles(text) == ["the only apprentice in this intake's welding cohort who grew up speaking"]
+
+
 def test_the_switch_turns_the_pass_off():
     text = "Ask the only pharmacist at the Gannet Bay clinic to call me."
     try:
@@ -106,14 +145,14 @@ def test_the_switch_turns_the_pass_off():
 # ----------------------------------------------------------------------------------------------------------------
 # Guard (in the spirit of DD-16): the pass was written from split F, so run it over every evaluation case. A span it
 # makes must never overlap a hard negative (a site, a business address) and each must cover a gold QUASI_ID span.
-# Split G (published 12/11/2026 with eval/RESULTS-v0.6.md) came after this switch shipped in 0.4.0 and breaks the
-# guard: 1 of its 20 spans on split G covers no gold QUASI_ID span (DEV-DEBT DD-26). The guard stays strict on the sets it was written from; on split G it is a strict
-# expected failure, so it fails loudly once the switch is fixed.
+# Split G (published 12/11/2026 with eval/RESULTS-v0.6.md) came after this switch shipped in 0.4.0 and broke the guard
+# (DEV-DEBT DD-26): 1 of its 20 spans covered no gold QUASI_ID span, a gold omission (GT-027, "the only apprentice ...
+# who grew up speaking Mandarin at home") now corrected in the adjudicated files (``eval/cases/test-g-*.adjudicated.jsonl``;
+# the sealed ones stay as they were), so split G is read from those. The guard is strict on every set.
 _CASE_FILES = sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl"))
 _GUARD_SETS = [
     pytest.param([p for p in _CASE_FILES if not p.name.startswith("test-g-")], (120, 120), id="sets-before-split-g"),
-    pytest.param([p for p in _CASE_FILES if p.name.startswith("test-g-")], (0, 0), id="split-g",
-                 marks=pytest.mark.xfail(strict=True, reason="DD-26: 1 of its 20 spans on split G covers no gold QUASI_ID span")),
+    pytest.param(sorted((ROOT / "eval" / "cases").glob("test-g-*.adjudicated.jsonl")), (18, 18), id="split-g"),
 ]
 
 

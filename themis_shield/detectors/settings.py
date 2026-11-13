@@ -113,18 +113,23 @@ v0.5 detection fixes (from split F, now development data):
   matters`` (CRIMINAL; "matters" and "outcomes" only near a police, court, conviction or criminal word, and never in a
   paragraph about a company); ``is not experiencing family violence``; ``am not a member of any union``; and a ``No``
   (or other whole answer) after a question about Aboriginal or Torres Strait Islander origin, ethnicity, criminal
-  history, union membership or disability. The span is the clause; see ``negative_statement_spans`` in
-  ``detectors/statements.py``.
+  history, union membership or disability. The span is the clause. A negative in a general rule about a class of
+  people is not one (DD-26): ``A person with no criminal record is treated the same as any other applicant ...``,
+  with a generic subject (a person, any applicant, applicants, staff, anyone who) before it and nothing personal in the
+  sentence; ``He has no criminal record`` and ``Theo has never been charged`` still match. See
+  ``negative_statement_spans`` in ``detectors/statements.py``.
 - ``unique-roles`` (from split F): a role the text says only one person holds (``the only analyst on the overnight
   roster``, ``the one contractor seconded from ...``, ``Sole night-shift pharmacist at ...``) is a QUASI_ID: "the
   only", "only", "sole", "the sole" or "the one", up to three describing words (no function word or number: "only one
   manager on duty" is not one), a role word (the last words of the common-role list, generic ones such as staff,
   member or employee left out), then "on", "at", "in", "from", "for", "with", "based", "seconded" or "who"; the span
-  ends at punctuation, a cell separator, an auxiliary verb or 50 characters. See ``unique_role_spans`` in
+  ends at punctuation, a cell separator, an auxiliary verb or 50 characters (a "who" clause still running at 50
+  characters goes on to the auxiliary verb or cell end after it, within 120: DD-26). See ``unique_role_spans`` in
   ``detectors/propagate.py``.
 - ``quasi-cells`` (from split F): a QUASI_ID finding inside one table cell that covers only part of it is widened to
   the whole cell (a piece after an unquoted ", " belongs to the cell before it, as for ``location-columns``), so the
-  rest of a role description is not released beside it. A finding across cells, a cell over 160 characters and a
+  rest of a role description is not released beside it; a ";" inside the cell ends a clause, and only the clause
+  that holds the finding is widened (DD-26). A finding across cells, a cell over 160 characters and a
   QUASI_ID label given only by PII-Tracer (it calls single sensitive words quasi-identifiers) are left as they are;
   see ``quasi_cell_spans`` in ``detectors/propagate.py``.
 - ``policy-statements`` (from split G's friction): a sensitive finding, from any detector, is dropped when the clause it

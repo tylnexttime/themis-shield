@@ -547,11 +547,14 @@ def table_location_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ..
 # singles that person out, in prose as in a table cell. Matched: "the only", "only", "sole", "the sole" or "the one",
 # up to three describing words, a role word, then where or who ("on", "at", "in", "from", "for", "with", "based",
 # "seconded", "who"); the span runs to the end of that phrase (punctuation, a cell separator, an auxiliary verb or
-# ``UNIQUE_ROLE_MAX_TAIL`` characters). The role words are the last words of ``COMMON_ROLES`` without the generic ones
-# below; a describing word may not be a function word or a number ("only by the screening officer", "only one manager
-# on duty" are not matched), and "one of the nurses" never is. Fixed vocabulary only, nothing learned from any data.
+# ``UNIQUE_ROLE_MAX_TAIL`` characters; a "who" clause that is still running at that cut goes on to the auxiliary verb
+# or the end of the cell or line that follows it, if within ``UNIQUE_ROLE_MAX_RELATIVE`` characters). The role words
+# are the last words of ``COMMON_ROLES`` without the generic ones below; a describing word may not be a function word
+# or a number ("only by the screening officer", "only one manager on duty" are not matched), and "one of the nurses"
+# never is. Fixed vocabulary only, nothing learned from any data.
 UNIQUE_ROLE_STAGE = "unique-roles"
 UNIQUE_ROLE_MAX_TAIL = 50
+UNIQUE_ROLE_MAX_RELATIVE = 120
 _GENERIC_ROLE_HEADS = frozenset({
     "casual", "full-time", "part-time", "permanent", "temporary", "hand", "staff", "member", "employee", "student",
     "volunteer",
@@ -567,6 +570,7 @@ _NOT_DESCRIBING = frozenset({
     "from", "as", "if", "when", "be", "been", "is", "was", "are", "were", "one", "two", "each", "every", "any", "more",
     "than", "other", "per", "our", "your", "their", "his", "her", "my",
 })
+_RELATIVE = re.compile(r"(?i)\bwho\b")
 _ROLE_TAIL_END = re.compile(
     r"[.,;:!?|\t\r\n\"()]|\s(?:is|was|are|were|has|had|have|will|would|can|cannot|could|should|may|might|must|does"
     r"|did|said|says|told)\b"
@@ -580,6 +584,15 @@ def unique_role_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
             continue
         limit = min(len(text), match.end() + UNIQUE_ROLE_MAX_TAIL)
         stop = _ROLE_TAIL_END.search(text, match.end(), limit)
+        if stop is None and _RELATIVE.search(text, match.start(), limit):
+            # DD-26: a "who" clause still running at the cut goes on to the auxiliary verb that opens the main verb
+            # ("... who grew up speaking Mandarin at home | has requested ...") or to the end of its cell or line, if
+            # one is within ``UNIQUE_ROLE_MAX_RELATIVE`` characters. Prose punctuation there is no sign that the clause
+            # ended before a main verb the list does not know ("who started in March in the back office signed up
+            # with the union."), so then it is cut as before.
+            longer = _ROLE_TAIL_END.search(text, match.end(), min(len(text), match.end() + UNIQUE_ROLE_MAX_RELATIVE))
+            if longer is not None and (longer.group()[0].isspace() or longer.group() == "|"):
+                stop = longer
         if stop is not None:
             end = stop.start()
         elif limit < len(text):
@@ -598,9 +611,12 @@ def unique_role_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
 # marked half of two such cells and the other half was released beside it. Cells are found as in
 # ``table_location_spans``: a header line without digits, then rows; a piece after an unquoted comma followed by a space
 # belongs to the cell before it when that accounts for every extra cell. A finding that crosses a cell boundary, and a
-# cell longer than ``QUASI_CELL_MAX_CHARS``, are left as they are. PII-Tracer's QUASI_ID label is not widened: it
-# marks single sensitive words ("chemo", "EpiPen") as quasi-identifiers, and on split D half C widening those took
-# case numbers and site names in free-text cells. Document structure only; no vocabulary.
+# cell longer than ``QUASI_CELL_MAX_CHARS``, are left as they are. A ";" inside a cell ends a clause (DD-26, split G):
+# the finding is widened to the clause (or clauses) it touches, not to the whole cell, so "the only female apprentice
+# boilermaker enrolled at the Ararat trades workshop; welfare check requested by Youth Engagement Officer" keeps its
+# second clause. PII-Tracer's QUASI_ID label is not widened: it marks single sensitive words ("chemo", "EpiPen") as
+# quasi-identifiers, and on split D half C widening those took case numbers and site names in free-text cells.
+# Document structure only; no vocabulary.
 QUASI_CELL_STAGE = "quasi-cells"
 QUASI_CELL_MAX_CHARS = 160
 QUASI_CELL_NOT_FROM = "pii-tracer"
@@ -665,8 +681,20 @@ def quasi_cell_spans(
                 if not a < b <= a + QUASI_CELL_MAX_CHARS:
                     continue
                 start, end = offsets[row_index] + a, offsets[row_index] + b
-                if any(start <= s and e <= end and (s, e) != (start, end) for s, e in quasi):
-                    out.append(finding(start, end, Label.QUASI_ID, QUASI_CELL_STAGE, tier))
+                inside = [(s, e) for s, e in quasi if start <= s and e <= end and (s, e) != (start, end)]
+                stops = [at for at in range(start, end) if text[at] == ";"] if inside else []
+                widened = set()
+                for s, e in inside:
+                    # Only the clause of the cell that holds the finding (DD-26): a ";" inside a cell ends it.
+                    lo = max([at + 1 for at in stops if at < s], default=start)
+                    hi = min([at for at in stops if at >= e], default=end)
+                    while lo < hi and text[lo].isspace():
+                        lo += 1
+                    while hi > lo and text[hi - 1].isspace():
+                        hi -= 1
+                    if (lo, hi) != (s, e):
+                        widened.add((lo, hi))
+                out.extend(finding(lo, hi, Label.QUASI_ID, QUASI_CELL_STAGE, tier) for lo, hi in sorted(widened))
             row_index += 1
         index = row_index if row_index > index + 1 else index + 1
     return tuple(out)

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import replace
+from functools import lru_cache
 import re
 
 from ..types import Label, Span
@@ -279,6 +280,45 @@ def _sentence_clause(text: str, start: int, end: int) -> tuple[int, int]:
     return left, right
 
 
+# DD-26 (from split G's GT-008, development data): a negative inside a general rule about a class of people ("A person
+# with no criminal record at all is treated the same as any other applicant once the check is returned as clear") says
+# nothing about anyone: taxonomy section 3 labels a statement only when it is about a person, section 4 calls this a
+# policy_statement. By fixed wording: only a generic subject (a person, any applicant, applicants, staff, people,
+# anyone, those: the words of ``policy-statements``), with "with", "who" or "that" after it, stands before the negative
+# in its sentence, after at most a numbering and some lead-in words ("if", "what happens if", "and"); nothing personal
+# is in the sentence (``policy_statements._personal``: a pronoun, "the only", a speech verb ...) and no ":" follows the
+# negative in its clause (a list under a generic heading is about the people it lists). A name, "He", "I", an
+# appositive after a comma ("Priya Nand, a person with no criminal record, applied") or any other word before the
+# subject keeps the statement. Form answers ("... convictions? No") are another path and are not touched.
+_GENERIC_LEAD_IN = (
+    r"(?:(?:if|when|where|once|whether|because|although|while|and|but|so|then|also|does|do|will|would|can|could|should"
+    r"|is|are|what\s+happens\s+if|note\s+that|generally|usually|normally|typically|in\s+most\s+cases|in\s+practice"
+    r"|for\s+example)\s*,?\s+)*")
+
+
+@lru_cache(maxsize=1)
+def _generic_subject() -> re.Pattern:
+    from .policy_statements import _PLURAL, _SINGULAR  # not at the top: that module imports this one
+
+    return re.compile(
+        r"(?i)[\s\"'“‘(]*(?:\d+(?:\.\d+)*\.?\s+)?" + _GENERIC_LEAD_IN
+        + r"(?:a\s+person|(?:any|every|each)\s+(?:(?:new|current|permanent|casual|eligible)\s+)?" + _SINGULAR
+        + r"|" + _PLURAL + r"|anyone|anybody|everyone|those)"
+        + r"(?:\s+(?:with|who|that))?(?:\s+(?:currently|already|still|also|ever|really))*(?:\s+(?:has|have|had))?\s*$")
+
+
+def _generic_subject_statement(text: str, a: int, b: int, end: int) -> bool:
+    """True when the negative at ``[a, b)``, in the clause that ends at ``end``, is said of a generic subject (see
+    above)."""
+    ends = [m.end() for m in _STATEMENT_END.finditer(text, 0, a)]
+    sentence = ends[-1] if ends else 0
+    if _generic_subject().match(text, sentence, a) is None or ":" in text[b:end]:
+        return False
+    from .policy_statements import _personal
+
+    return not _personal(text[sentence:end])
+
+
 def negative_statement_spans(text: str, tier: int = 1) -> tuple[DetectionFinding, ...]:
     out = []
     found = [(label, m.start(), m.end()) for label, pattern in _NEGATIVE_PATTERNS + _NEGATIVE_RECORDS
@@ -300,7 +340,7 @@ def negative_statement_spans(text: str, tier: int = 1) -> tuple[DetectionFinding
             if _COMPANY.search(text, text.rfind("\n", 0, a) + 1, len(text) if line_end < 0 else line_end):
                 continue
         start, end = _sentence_clause(text, a, b)
-        if start < end:
+        if start < end and not _generic_subject_statement(text, a, b, end):
             out.append(_statement(start, end, label, NEGATIVE_STATEMENT_STAGE, tier))
     for m in _ANSWERED_QUESTION.finditer(text):
         question = text[m.start():m.start(1)]
