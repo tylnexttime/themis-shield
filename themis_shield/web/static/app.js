@@ -664,9 +664,9 @@ function reviewPoint(id, review, point) {
     }), { disabled: !review.text_available }),
     button("Replace it", () => { form.hidden = !form.hidden; }, { disabled: !review.text_available }),
     button("Stop the document", () => action(async () => {
-      if (!window.confirm("Stop this document? The job is refused and nothing is sent.")) return;
+      if (!window.confirm("Stop this document? The job is refused and the task is not sent. (With the cloud trip-wire's before_human mode on, the cloud model has already read the de-identified package.)")) return;
       await api(`${base}/stop`, { method: "POST", body: {} });
-      notice("Document stopped. Nothing was sent.");
+      notice("Document stopped. The task was not sent.");
       await loadOperator();
     })));
   item.append(actions, original, form);

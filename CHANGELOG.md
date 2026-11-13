@@ -50,6 +50,12 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   disagreement placeholder, ends the loop on a short name and a fragment, and walks the settlement the console really
   takes; `tests/test_operator_guide_example.py` runs it step by step. "Every point action is refused" after an undo is
   reworded: Stop and Undo of another point still work.
+- **RC-08** recorded in [DEV-DEBT](docs/DEV-DEBT.md): FAB-05's suggestion not taken (DD-29), the rest of the
+  memory-only review state (DD-31), the stale-undo console text (DD-34). The console's Stop dialog no longer says
+  "nothing is sent" (FAB-04 corrected it everywhere else): with `before_human` on, the cloud has read the package.
+- **The split G friction figures quoted for the fifth push** (0.308 -> 0.246 -> 0.200 -> 0.185, in the sections below)
+  pre-date these defaults (and the FAB-01/FAB-02 narrowing) and will be re-measured; they do not describe the default
+  build (DD-28).
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 
