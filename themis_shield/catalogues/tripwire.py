@@ -1,9 +1,10 @@
-"""The optional cloud trip-wire (v0.3; off unless ``[tripwire] enabled = true``), with its correction loop.
+"""The optional cloud trip-wire (v0.3), in two independent modes, each off unless switched on in ``[tripwire]``.
 
-Once the gate has de-identified a cloud-bound package, and **before** any person confirms or approves it, the same
-cloud model is sent the whole de-identified package behind a fixed first instruction: list any personal information
-still visible, by character span or placeholder id. Every finding of a round is collected (it never stops at the
-first), then:
+The cloud model is sent a de-identified package behind a fixed first instruction: list any personal information still
+visible, by character span or placeholder id. Every finding of a pass is collected; it never stops at the first.
+
+``before_human`` (the correction loop). Once the gate has de-identified a cloud-bound package, and **before** any
+person confirms or approves it, so the cloud model reads the de-identified package before any person has looked at it:
 
 - **Correction round.** Each flagged span is replaced by a placeholder of the category the trip-wire reported (any
   other category becomes a quasi-identifier placeholder). The original goes into the conversation vault like any
@@ -12,21 +13,22 @@ first), then:
 - **Repeat** on the corrected package until a round finds nothing, at most ``max_rounds`` (3) rounds. If the last
   round still finds something, or a round could replace nothing, the package goes to the Operator marked NOT
   CONVERGED (``TRIPWIRE_NOT_CONVERGED``). The cap also bounds a document whose injected instruction makes the
-  trip-wire flag everything.
-- **Then** the usual human steps: the Operator sees the corrected package and the per-round list (categories,
-  counts, placeholder ids and proposal ids; never an original value).
-- **Proposals.** Every finding with text becomes a *proposed* known-miss entry (source ``cloud_tripwire``): a keyed
-  fingerprint for a high-entropy value, otherwise a rule for its shape, never the value. A proposal changes nothing
-  until a person verifies it and puts it in the sweep (``themis kmr``). ``themis tripwire review`` still records a
-  verdict per flagged round, for flag precision.
+  trip-wire flag everything. Then the usual human steps, with the per-round list shown.
 
-Unchanged: the reply must be strict JSON in a fixed shape, bare or as the only content of one fenced block; anything
-else refuses the job (``TRIPWIRE_MALFORMED``), and so does a transport failure or a reply containing an original
-value (``TRIPWIRE_UNAVAILABLE``). Over-redaction is accepted: the loop only ever adds placeholders, and silence never
-upgrades a decision. The trip-wire is an LLM reading untrusted text, so an injection can suppress its findings; that
-only weakens an extra layer. It never runs for BLOCK or local-only work. **It detects; it does not prevent**: the
-package is read by the cloud model before a person has approved it, so a finding means that text has already been
-read once.
+``after_human`` (the check of the approved package). Once, after the requester and the Operator have approved the
+package and just before the task turn, on exactly that package. A person approved it, so nothing is replaced: any
+finding sends the job back to the Operator (Held, audited, ``TRIPWIRE_FLAGGED``) with every finding listed, to
+re-approve the same package or refuse it (``themis tripwire review``). A clean pass sends the task.
+
+Both may be on: the loop corrects, the check after approval double-checks the approved package. In both modes every
+finding with text becomes a *proposed* known-miss entry (source ``cloud_tripwire``): a keyed fingerprint for a
+high-entropy value, otherwise a rule for its shape, never the value; it changes nothing until a person verifies it.
+
+In both modes the reply must be strict JSON in a fixed shape, bare or as the only content of one fenced block;
+anything else refuses the job (``TRIPWIRE_MALFORMED``), and so does a transport failure or a reply containing an
+original value (``TRIPWIRE_UNAVAILABLE``). Silence never upgrades a decision. The trip-wire is an LLM reading untrusted
+text, so an injection can suppress its findings; that only weakens an extra layer. It never runs for BLOCK or
+local-only work. **It detects; it does not prevent**: a finding means that text has already been read once.
 """
 
 from __future__ import annotations
@@ -78,10 +80,17 @@ class Tripwire:
     max_rounds: int = MAX_ROUNDS
     # The known-miss register that receives the trip-wire's proposals (None: no proposals are made).
     proposals: object = field(default=None, repr=False, compare=False)
+    # The two independent modes: the correction loop before the human steps, the check of the approved package.
+    before_human: bool = True
+    after_human: bool = False
 
     def __post_init__(self):
         if type(self.max_rounds) is not int or not 1 <= self.max_rounds <= MAX_ROUNDS:
             raise ValueError(f"[tripwire] max_rounds must be between 1 and {MAX_ROUNDS}")
+        if type(self.before_human) is not bool or type(self.after_human) is not bool:
+            raise ValueError("[tripwire] before_human and after_human must be booleans")
+        if not (self.before_human or self.after_human):
+            raise ValueError("a trip-wire with both modes off is no trip-wire: leave it unset")
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,23 +212,100 @@ def _collect(stream) -> str:
     return "".join(content)
 
 
-def pending_response(router, job):
-    """A job stopped by a flag of the earlier stop-on-flag trip-wire stays stopped until an Operator reviews it.
+def _review_hint(job_id: str) -> str:
+    return (
+        f"An Operator re-approves this exact package with `themis tripwire review {job_id} --reapprove` (it is then "
+        f"sent unchanged, without another check) or refuses the job with `themis tripwire review {job_id} --refuse`."
+    )
 
-    Correction-loop rounds never stop a job, so only a record without round numbers (written before the loop
-    existed) can hold one here.
+
+def pending_response(router, job):
+    """A job sent back by the check after approval stays held until an Operator re-approves or refuses it.
+
+    Correction-loop rounds (``before_human``) never hold a job, so only an ``after_human`` record can hold one here.
     """
     if getattr(router, "tripwire", None) is None or job.status != S.HELD_OFFLINE:
         return None
-    state = router._register_call("tripwire_state", job.job_id)
+    state = router._register_call("tripwire_state", job.job_id, stage="after_human")
     if state is None or state["outcome"] != "flagged" or state["verdict"] is not None:
-        return None
-    if state["flags"] and all("round" in item for item in state["flags"]):
         return None
     return router._response(
         job, "held", "TRIPWIRE_REVIEW_REQUIRED",
-        f"Stopped: the cloud trip-wire flagged {job.job_id}. An Operator reviews it with "
-        f"`themis tripwire review {job.job_id} --confirm` or `--reject`.",
+        f"Held: the cloud trip-wire flagged the approved package of {job.job_id}. " + _review_hint(job.job_id),
+    )
+
+
+def check_approved(router, job, raw: bytes, digest: str, originals, marking, timings):
+    """``after_human``: check the approved package once, just before the task turn. Returns a held response when the
+    job must go back to the Operator, else None to send the task.
+
+    Nothing is replaced: a person approved exactly this package. Every finding is listed (value-free) and proposed to
+    the known-miss register; the job is held until an Operator re-approves the same package (it then goes unchanged,
+    without a second check) or refuses it.
+    """
+    from ..router import GateFailure
+
+    config = router.tripwire
+    state = router._register_call("tripwire_state", job.job_id, digest, stage="after_human")
+    if state is not None:
+        if state["outcome"] == "clear":
+            return None
+        if state["outcome"] == "flagged" and state["verdict"] == "rejected":
+            # The Operator re-approved exactly this package: no second round trip.
+            return None
+        if state["outcome"] == "flagged" and state["verdict"] is None:
+            return router._response(
+                job, "held", "TRIPWIRE_REVIEW_REQUIRED",
+                f"Held: the cloud trip-wire flagged the approved package of {job.job_id}; an Operator review is "
+                "pending.", timings=timings,
+            )
+        raise GateFailure("TRIPWIRE_UNAVAILABLE" if state["outcome"] == "failed" else "TRIPWIRE_MALFORMED", 200)
+    text = document(raw)
+    payload = _payload(router, text)
+    verify_json(payload, originals)
+    outbound = Outbound(job.job_id, marking, payload, hashlib.sha256(payload).hexdigest(), True, originals)
+    stream = None
+
+    def record(outcome, flags=()):
+        return router._register_call(
+            "record_tripwire", job.job_id, digest, outcome, list(flags),
+            instruction_version=config.instruction_version, now=router.clock(),
+        )
+
+    try:
+        with router.register.tripwire_guard(job.job_id, digest, now=router.clock()):
+            stream = router.cloud.open(outbound)
+        flags = parse_reply(_collect(stream), text)
+    except TripwireMalformed:
+        record("malformed")
+        raise GateFailure("TRIPWIRE_MALFORMED", 200) from None
+    except CloudFailure:
+        record("failed")
+        raise GateFailure("TRIPWIRE_UNAVAILABLE", 503) from None
+    finally:
+        if stream is not None:
+            stream.close()
+    if not flags:
+        record("clear")
+        return None
+    cache, records = {}, []
+    for flag in flags:
+        values = candidates(text, flag)
+        proposal = propose(config.proposals, job.job_id, flag.category, max(values, key=len) if values else None, cache)
+        records.append(dict(flag.as_record(), proposal=proposal))
+    record("flagged", records)
+    from ..router_flow import refresh
+    job = refresh(router, job.job_id)
+    listing = "\n".join(
+        "- " + flag.describe() + (f"; known-miss proposal {item['proposal']}" if item["proposal"] else "")
+        for flag, item in zip(flags, records)
+    )
+    return router._response(
+        job, "held", "TRIPWIRE_FLAGGED",
+        f"Held: the cloud trip-wire found {len(flags)} possible residual item(s) of personal information in the "
+        f"approved package {job.job_id}. Nothing was replaced and the task was not sent. The flagged text has already "
+        f"been read by the cloud model once.\n{listing}\n" + _review_hint(job.job_id),
+        timings=timings,
     )
 
 

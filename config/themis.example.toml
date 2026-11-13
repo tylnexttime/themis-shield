@@ -194,17 +194,31 @@ enabled = false
 scope = ""
 
 [tripwire]
-# Optional cloud trip-wire, run BEFORE requester confirmation and Operator approval: once the
-# gate has de-identified a package, the cloud model is asked (fixed first instruction, strict JSON
-# reply) to list residual personal information by placeholder or span. Every finding is replaced
-# by a placeholder of the reported category and the package is checked again, until a round finds
-# nothing. It detects; it does not prevent: the cloud model reads the package before a person does.
-# A malformed reply, a reply containing an original value or a transport failure refuses the job.
-# Every finding becomes a proposed known-miss entry (pending until a person verifies it); the
-# proposals go to the [known_miss] path even when the sweep is off. See docs/ARCHITECTURE.md.
+# Optional cloud trip-wire: the cloud model is asked (fixed first instruction, strict JSON reply)
+# to list residual personal information in a de-identified package, by placeholder or span. Two
+# independent modes; choose either, both or neither. It detects; it does not prevent.
+#
+# before_human: the correction loop. Runs while the package is built, BEFORE requester
+# confirmation and Operator approval, so the cloud model reads the de-identified package before
+# any person has approved it. Every finding is replaced by a placeholder and the package is
+# checked again, up to max_rounds; still flagged after the last round = NOT CONVERGED, and the
+# Operator decides.
+before_human = false
+# after_human: one check of exactly the package the requester and Operator approved, just before
+# the task turn. Nothing is replaced: any finding sends the job back to the Operator with every
+# finding listed, to re-approve the same package or refuse it (`themis tripwire review`).
+after_human = false
+#
+# In both modes a malformed reply, a reply containing an original value or a transport failure
+# refuses the job, and every finding becomes a proposed known-miss entry (pending until a person
+# verifies it; the proposals go to the [known_miss] path even when the sweep is off).
+#
+# enabled: DEPRECATED. Read only when neither toggle above is present; true then means
+# before_human only. (In 0.3 and 0.4 `enabled = true` ran the check after approval: for that
+# placement set after_human = true.)
 enabled = false
 max_completion_tokens = 2048
-# Rounds before the package goes to the Operator marked NOT CONVERGED (1 to 3; 3 is the cap).
+# before_human rounds before the package goes to the Operator marked NOT CONVERGED (1 to 3; 3 is the cap).
 max_rounds = 3
 
 # --- v0.3 detector canary: ON by default -------------------------------------------------------

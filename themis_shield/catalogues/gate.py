@@ -30,7 +30,7 @@ from .store import CatalogueUnavailable
 
 KNOWN_MISS_KEYS = {"enabled", "path", "max_snapshot_age_days", "sweep_deadline_seconds"}
 FALSE_POSITIVE_KEYS = {"enabled", "path", "scope"}
-TRIPWIRE_KEYS = {"enabled", "max_completion_tokens", "max_rounds"}
+TRIPWIRE_KEYS = {"enabled", "before_human", "after_human", "max_completion_tokens", "max_rounds"}
 DEFAULT_TRIPWIRE_TOKENS = 2048
 MAX_TRIPWIRE_ROUNDS = 3
 
@@ -298,6 +298,14 @@ def settings(config: Mapping[str, Any]) -> dict:
     tokens = trip.get("max_completion_tokens", DEFAULT_TRIPWIRE_TOKENS)
     if type(tokens) is not int or not 64 <= tokens <= 32768:
         raise ValueError("[tripwire] max_completion_tokens must be between 64 and 32768")
+    for key in ("before_human", "after_human"):
+        if key in trip and type(trip[key]) is not bool:
+            raise ValueError(f"[tripwire] {key} must be a boolean")
+    if "before_human" in trip or "after_human" in trip:
+        before, after = trip.get("before_human", False), trip.get("after_human", False)
+    else:
+        # Deprecated alias: with neither toggle set, `enabled = true` means the correction loop (before_human) only.
+        before, after = trip.get("enabled", False), False
     rounds = trip.get("max_rounds", MAX_TRIPWIRE_ROUNDS)
     if type(rounds) is not int or not 1 <= rounds <= MAX_TRIPWIRE_ROUNDS:
         raise ValueError(f"[tripwire] max_rounds must be between 1 and {MAX_TRIPWIRE_ROUNDS}")
@@ -314,7 +322,10 @@ def settings(config: Mapping[str, Any]) -> dict:
         "false_positives": {
             "enabled": false.get("enabled", False), "path": _path(false, "false-positives.db"), "scope": scope,
         },
-        "tripwire": {"enabled": trip.get("enabled", False), "max_completion_tokens": tokens, "max_rounds": rounds},
+        "tripwire": {
+            "enabled": before or after, "before_human": before, "after_human": after,
+            "max_completion_tokens": tokens, "max_rounds": rounds,
+        },
     }
 
 
@@ -342,7 +353,10 @@ def configure(router, config: Mapping[str, Any], *, protector_factory=None) -> d
             FalsePositiveCatalogue(false["path"], clock=router.clock, create=True), false["scope"],
         )
     if trip["enabled"]:
-        router.tripwire = Tripwire(trip["max_completion_tokens"], max_rounds=trip["max_rounds"], proposals=register)
+        router.tripwire = Tripwire(
+            trip["max_completion_tokens"], max_rounds=trip["max_rounds"], proposals=register,
+            before_human=trip["before_human"], after_human=trip["after_human"],
+        )
     return values
 
 

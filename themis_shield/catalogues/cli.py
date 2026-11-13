@@ -280,10 +280,13 @@ def tripwire_parser() -> argparse.ArgumentParser:
     review.add_argument("job_id")
     verdict = review.add_mutually_exclusive_group(required=True)
     verdict.add_argument(
-        "--confirm", action="store_true",
-        help="a real residual (a corrected round: recorded for precision; an older stop-on-flag record: refused)",
+        "--confirm", "--refuse", dest="confirm", action="store_true",
+        help="a real residual (a corrected round: recorded for precision; a flag on the approved package: refused)",
     )
-    verdict.add_argument("--reject", action="store_true", help="a false flag")
+    verdict.add_argument(
+        "--reject", "--reapprove", dest="reject", action="store_true",
+        help="a false flag (a flag on the approved package: that exact package is re-approved and sent unchanged)",
+    )
     review.add_argument("--identity", default=None)
     review.add_argument("--as-role", choices=("operator", "security-admin"), default="operator")
     listing = commands.add_parser("list")
@@ -324,7 +327,7 @@ def tripwire_main(argv=None, *, register=None) -> int:
                         "--kind <rule|context|fingerprint> --entity-type <LABEL>"
                     )
         elif args.command == "list":
-            print("Record\tJob\tOutcome\tVerdict\tFlags (spans, placeholder ids and proposals only)")
+            print("Record\tJob\tMode\tOutcome\tVerdict\tFlags (spans, placeholder ids and proposals only)")
             for row in register.tripwire_records(args.job):
                 flags = "; ".join(
                     (f"round {item['round']} " if "round" in item else "")
@@ -334,7 +337,10 @@ def tripwire_main(argv=None, *, register=None) -> int:
                     + (f" proposal {item['proposal']}" if item.get("proposal") else "")
                     for item in row["flags"]
                 ) or "-"
-                print(f"{row['record_id']}\t{row['job_id']}\t{row['outcome']}\t{row['verdict'] or '-'}\t{flags}")
+                print(
+                    f"{row['record_id']}\t{row['job_id']}\t{row['stage']}\t{row['outcome']}\t{row['verdict'] or '-'}"
+                    f"\t{flags}"
+                )
             loops = register.tripwire_loops(args.job)
             if loops:
                 print("Loop\tJob\tConverged\tRounds (round outcome: findings, placeholders added)")

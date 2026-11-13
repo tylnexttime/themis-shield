@@ -243,13 +243,14 @@ def handle(router, request, headers=None, *, source_document_count=1):
         working = deepcopy(request)
         working["messages"] = messages
         loop = None
-        if getattr(router, "tripwire", None) is None:
+        trip = getattr(router, "tripwire", None)
+        if trip is None or not trip.before_human:
             boundary = ChatBoundary(working, router.allowed_tools, router.cloud_model)
             raw, mapping, sent, originals, policy, timings, counts = router._protect(
                 boundary, identifier, matched,
             )
         else:
-            # The cloud trip-wire's correction loop runs here, before any person confirms or approves the package.
+            # [tripwire] before_human: the correction loop runs here, before any person confirms or approves the package.
             package, boundary, loop = tripwire.protect(
                 router, job, working, identifier, matched, state.marking_class,
             )
@@ -330,6 +331,11 @@ def handle(router, request, headers=None, *, source_document_count=1):
                 return held(router, job, "TRIPWIRE_NOT_CONVERGED", timings, rounds)
             return held(router, job, "OPERATOR_APPROVAL_REQUIRED", timings, rounds)
         verify_json(raw, originals)
+        if trip is not None and trip.after_human:
+            # [tripwire] after_human: one check of exactly the approved package; a finding sends it back to the Operator.
+            stopped = tripwire.check_approved(router, job, raw, digest, originals, state.marking_class, timings)
+            if stopped is not None:
+                return stopped
         outbound = Outbound(job.job_id, state.marking_class, raw, digest, True, originals)
         with router.register.release_guard(job.job_id, digest, now=router.clock()):
             stream = router.cloud.open(outbound)
