@@ -342,17 +342,44 @@ def _fragments(text: str, start: int, end: int):
             continue
 
 
+# FAB-06 (independent review): the trip-wire is a cloud model reading untrusted text, and every value it names goes into
+# the conversation vault, after which any cloud answer containing those letters is refused (the exact-value check). So
+# only a plausible personal value is vaulted: at least three letters or digits, not a common word or protocol token,
+# and never a span that cuts a word ("ni" in "night", "ps ba" across "keeps backups"). A finding with no such value is
+# not replaced; it stays listed for the Operator (and may leave the package NOT CONVERGED).
+MIN_VALUE_ALNUM = 3
+_COMMON = frozenset("""
+    the and for with from that this these those was were are has have had not but you your our his her its they them
+    their who whom whose which what when where why how will would can could may might must shall should all any each
+    every some none one two three new old yes nil null true false none user assistant system tool content role text
+    message messages model name type data value values item items page note notes see also via per into onto over
+    under about after before then than there here very more most less only just
+""".split())
+
+
+def _cuts_word(text: str, start: int, end: int) -> bool:
+    """True when the span starts or ends inside a word of the checked document."""
+    inside = lambda at: 0 < at < len(text) and text[at - 1].isalnum() and text[at].isalnum()
+    return inside(start) or inside(end)
+
+
+def plausible_value(value: str) -> bool:
+    """A value the loop may vault: at least ``MIN_VALUE_ALNUM`` letters or digits and not a common word (FAB-06)."""
+    return sum(character.isalnum() for character in value) >= MIN_VALUE_ALNUM and value.casefold() not in _COMMON
+
+
 def candidates(text: str, flag: Flag) -> tuple[str, ...]:
     """The original values a finding's span covers: its decoded text, split around the gate's own placeholders,
-    with the gate's literal escapes undone and surrounding spaces and punctuation trimmed. A value needs at least
-    two characters, one of them a letter or digit. A finding with no span (a placeholder only) has none."""
-    if flag.start is None:
+    with the gate's literal escapes undone and surrounding spaces and punctuation trimmed. A value must be plausible
+    (``plausible_value``: at least three letters or digits, not a common word), and a span that cuts a word gives none
+    (FAB-06). A finding with no span (a placeholder only) has none."""
+    if flag.start is None or _cuts_word(text, flag.start, flag.end):
         return ()
     found: list[str] = []
     for fragment in _fragments(text, flag.start, flag.end):
         for piece in _TOKEN.split(fragment):
             value = unescape_literals(piece).strip(_EDGE)
-            if len(value) >= 2 and any(character.isalnum() for character in value) and value not in found:
+            if plausible_value(value) and value not in found:
                 found.append(value)
     return tuple(found)
 

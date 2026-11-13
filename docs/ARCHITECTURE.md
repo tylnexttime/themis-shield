@@ -509,7 +509,10 @@ becomes a pending known-miss proposal in both modes (below), and both fail close
 - **The correction loop.** A round collects every finding (at most 64); it never stops at the first.
   1. Each finding with a span is mapped back to the original text it covers: the span is widened to whole JSON
      escapes, split around the gate's own placeholders, the gate's literal escapes are undone, and surrounding spaces
-     and punctuation are trimmed (a value needs at least two characters, one a letter or digit). Each value is
+     and punctuation are trimmed. Only a plausible personal value is replaced (FAB-06): at least three letters or
+     digits, not a common word or protocol token, and never from a span that cuts a word ("ni" inside "night"); a
+     finding with no such value is listed for the Operator and not replaced, since every vaulted value also makes the
+     gate refuse any later cloud answer that contains it. Each value is
      replaced by a placeholder of the category the trip-wire reported (`PERSON` gives `P`, an identifier label gives
      `I`, and so on; any other category gives a quasi-identifier placeholder `Q`). The original goes into the
      conversation vault like any other value, and the register records which placeholder ids the round added (source

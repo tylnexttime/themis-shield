@@ -442,3 +442,37 @@ def test_the_new_reasons_have_plain_english_text():
     assert reasons["TRIPWIRE_NOT_CONVERGED"].startswith("NOT CONVERGED:")
     assert "new request" in reasons["TRIPWIRE_NOT_RUN"]
     assert "placeholders" in reasons["TRIPWIRE_CORRECTED"]
+
+
+# -- FAB-06: only plausible personal values are vaulted ----------------------------------------------------------
+# The trip-wire reads untrusted text; a value it names becomes an original, and any later cloud answer holding those
+# letters is refused. A fragment ("ni" inside "night", "7B", a two-letter word, a common word) is listed, not vaulted.
+def test_fab_06_candidates_refuse_fragments_short_values_and_common_words():
+    raw = canonical({"messages": [{"role": "user", "content": "Mara Lindahl keeps the night roster for Ward 7B."}]})
+    text = document(raw)
+
+    def at(value, offset=0, length=None):
+        start = text.index(value) + offset
+        return Flag(start, start + (len(value) if length is None else length), None, "PERSON")
+
+    assert candidates(text, at("night", 0, 2)) == ()  # "ni": inside a word
+    assert candidates(text, at("Lindahl", 0, 3)) == ()  # "Lin": cuts the name
+    assert candidates(text, at("keeps the", 3, 5)) == ()  # "ps th": across two words, cut at both ends
+    assert candidates(text, at("7B")) == ()  # two characters
+    assert candidates(text, at("the")) == ()  # a common word
+    assert candidates(text, at("Mara Lindahl")) == ("Mara Lindahl",)
+    assert candidates(text, at("Ward 7B")) == ("Ward 7B",)
+
+
+def test_fab_06_a_flagged_fragment_is_listed_for_the_operator_not_vaulted(tmp_path):
+    h = tripwire_harness(tmp_path, scripted([("ni", "person"), ("7B", "quasi id")]))
+    try:
+        body = two_documents()
+        held = h.router.handle(body, source_document_count=2)
+        assert held.reason == "TRIPWIRE_NOT_CONVERGED"  # nothing could be replaced: handed over at once
+        values = set(h.router.vault.mapping(conversation(h, body)).values())
+        assert not {"ni", "7B"} & values
+        (loop,) = h.register.tripwire_loops(held.job_id)
+        assert loop["rounds"][0]["added"] == [] and loop["rounds"][0]["findings"] >= 2
+    finally:
+        h.cloud.close()
