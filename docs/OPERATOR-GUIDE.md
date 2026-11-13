@@ -59,9 +59,9 @@ Each open point has these actions.
 
 Some actions are refused with a reason instead of being accepted and failing later:
 
-- After an Undo that removed a placeholder, the text on screen is out of date. Every point action is refused
-  (`REVIEW_REBUILD_REQUIRED`) until the requester sends again and the package is rebuilt. Then settle the point on the
-  new text.
+- After an Undo that removed a placeholder, the text on screen is out of date. "Not personal", "Replace it" and "Show
+  original" are refused (`REVIEW_REBUILD_REQUIRED`) until the requester sends again and the package is rebuilt; then
+  settle the point on the new text. "Stop the document" and Undo of another point still work.
 - When the highlighted text is not on screen (the gate restarted, or the conversation expired), "Not personal",
   "Replace it" and "Show original" are refused (`REVIEW_UNAVAILABLE`) and their buttons are disabled: no point is
   settled on text you cannot see. The requester sends again to rebuild it.
@@ -134,36 +134,43 @@ requester to remove it.
 
 ### Worked example
 
-An invented ticket, sent by the requester to the cloud assistant:
+An invented ticket, sent by the requester to the cloud assistant (the trip-wire's `before_human` mode is on, the
+policy is the default):
 
-> Ticket 4417. Blake Morrison ships the synthetic widget to Ward 7B on Tuesday. He is the only forklift driver on the
-> night roster. Ask Birdie Okonkwo at the Corella depot before 6.
+> Ticket 4417. Blake ships the synthetic widget to Ward 7B on Tuesday. Ask Ng at the Corella depot before 6.
 
-**What the gate found.** It replaced "Blake Morrison" (person) and "Birdie Okonkwo" (person) with placeholders and
-held the job for one point: "the only forklift driver on the night roster" can single someone out (a
-quasi-identifier).
+**What the gate found.** PII-Tracer read "Blake" as a name and the local model finders found no name at all. The gate replaced
+"Blake" with a person placeholder and held the job for that one point: the detectors disagree on whether it is a name
+(a person, or a product?). A held point can be a placeholder like this one, or text left as written.
 
-**Round 1.** The trip-wire flags "Ward 7B" and "Corella depot". Both are whole words and plausible, so the loop
-replaces them (`⟦Q:…⟧` placeholders, marked T1 on the card) and checks again.
+**Round 1.** The trip-wire flags "Ward 7B" and "Corella depot" (addresses). Both are whole words and plausible, so the
+loop replaces them (`⟦A:…⟧` placeholders, marked T1 on the card) and checks again.
 
-**Round 2.** The trip-wire flags "Tuesday" (date). The loop replaces it (T2) and checks again.
+**Round 2.** The trip-wire flags "Tuesday" and "before 6" (it reads them as details that could single someone out).
+The loop replaces both (`⟦Q:…⟧`, marked T2) and checks again.
 
-**Round 3.** The trip-wire flags "before 6" (it reads the time as identifying) and the fragment "ni" inside "night". "before 6" is replaced (T3). "ni" is
-not: it is two letters inside a word, so it is listed only. Round 3 is the last round allowed, and there is no fourth
-check to show the package is now clean, so the loop stops and marks the package **NOT CONVERGED**.
+**Round 3.** The trip-wire flags "Ng" (a person) and the fragment "wi" inside "widget". The loop can replace neither:
+"Ng" is two letters and "wi" cuts a word, and the loop never puts such a value in the codebook. A round that replaces
+nothing ends the loop, so the package is marked **NOT CONVERGED**.
 
-**In the console.** The card shows the warning NOT CONVERGED, the three rounds (what each found, by category and
-count, and the placeholder ids it added; never a value), the placeholders T1 to T3 highlighted as settled by the
-trip-wire, the leftover finding listed under round 3 (category and place only) and highlighted where it falls inside
-"night", and one open point (the forklift driver), numbered 1, with its reason
-and "paragraph 1, line 2".
+**In the console.** The card shows the warning NOT CONVERGED and the three rounds (what each found, by category and
+count, and the placeholder ids it added; never a value). The placeholders T1 and T2 are highlighted as settled by the
+trip-wire. The leftover "wi" is listed under round 3 (category and place only) and highlighted where it falls inside
+"widget"; it is not an open point. There are two open points, both at "paragraph 1, line 1": point 1, the "Blake"
+placeholder (the detectors disagreed on whether this is a name), and point 2, "Ng" in clear (a short or common-word
+name the cloud trip-wire flagged). Approval is refused while either is open.
 
-**Settling it.** The Operator reads the whole package carefully, as the warning asks. "ni" is a false alarm: it needs
-no action. The open point is real, so the Operator clicks "Replace it", keeps the span, and picks "quasi-identifier".
-The requester sends again; the package is rebuilt with the new placeholder, and the trip-wire loop runs again on the
-rebuilt package (its rounds appear on the card, with the earlier loop folded below). With no open point left, the
-Operator approves stage one and stage two, and the task is sent. Had the forklift driver been the requester's whole
-question, the Operator could instead have stopped the document.
+**Settling it.** The Operator reads the whole package carefully, as the warning asks. "wi" is a false alarm and needs
+no action. For point 1 the Operator clicks "Show original", sees that Blake is a colleague, and clicks "Replace it",
+keeps the span and picks "person": the span is already the gate's own person placeholder, so this confirms it as it is.
+Nothing changes, the package stays ready and no new trip-wire check runs. ("Not personal" would also have left the
+placeholder in place: it never sends an original.) Point 2 is a real name. "Replace it" on "Ng" alone is refused
+(`REPLACEMENT_TOO_SHORT`: two letters in the codebook would make the next send fail), so the Operator widens the span to
+"Ask Ng" and picks "person". That adds a placeholder, so the package goes back to building. The requester sends again;
+the package is rebuilt with the new placeholder and the trip-wire loop runs again on it (one round, clean; the earlier
+loop is folded below on the card). With no open point left, the Operator approves stage one and stage two, and the task
+is sent with every value above as a placeholder. Had Ng's name been the requester's whole question, the Operator could
+instead have stopped the document.
 
 ## Quick reference
 

@@ -44,6 +44,12 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   such a value alone is refused when the Operator acts (`REPLACEMENT_TOO_SHORT`, as FAB-07 does): in the codebook its
   letters made the next send fail the exact-value check and the job be refused (found while checking the guide's
   example); a span widened to a neighbouring word ("Ask Ng") is accepted.
+- **RC-07** `docs/OPERATOR-GUIDE.md`: the worked example is rewritten to match the code (the first version had a
+  quasi-identifier hold the default policy does not make, a fragment inside text that was already a placeholder, a
+  "confirm as it is" described as a rebuild with a second loop, and the wrong line). It now holds the job on a
+  disagreement placeholder, ends the loop on a short name and a fragment, and walks the settlement the console really
+  takes; `tests/test_operator_guide_example.py` runs it step by step. "Every point action is refused" after an undo is
+  reworded: Stop and Undo of another point still work.
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 
