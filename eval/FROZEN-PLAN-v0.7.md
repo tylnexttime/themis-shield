@@ -3,7 +3,10 @@
 **Pass rule written 13/11/2026, before split H was written.** Split H is authored after this commit by a pipeline
 that the gate's designer does not read: the designer sees counts, rule codes, hashes and costs only, until every arm
 has run. This rule is committed first; the sealed files' sha256 values and the actual counts are added at sealing, in
-a commit that changes nothing else. Nothing below may change after a test result is seen. Earlier plans:
+a commit that changes nothing else. Nothing below may change after a test result is seen. **Amended 13/11/2026, before
+sealing and before any case was read: one more targeted top-up per half, and sealing with a stated small shortfall; see
+"Amendment of 13/11/2026" at the end. It overrides the Convergence row and the "at most one top-up" sentence of the
+Checks row, and nothing else.** Earlier plans:
 [`FROZEN-PLAN-v0.6.md`](FROZEN-PLAN-v0.6.md) (split G: FAIL), [`FROZEN-PLAN-v0.5.md`](FROZEN-PLAN-v0.5.md) (split F:
 FAIL), [`FROZEN-PLAN-v0.4.md`](FROZEN-PLAN-v0.4.md) (split E: FAIL), [`FROZEN-PLAN-v0.3.md`](FROZEN-PLAN-v0.3.md)
 (split D: FAIL), [`FROZEN-PLAN-v0.2.md`](FROZEN-PLAN-v0.2.md), [`FROZEN-PLAN.md`](FROZEN-PLAN.md).
@@ -135,3 +138,69 @@ cost per authoring model.
 
 **Blindness:** until every arm has run on every half, the designer reads only the numeric fields of each arm's
 `score.json` (the scorer's text report prints leaked values), and no case, value, profile term or description.
+
+## Amendment of 13/11/2026 (before sealing): one targeted top-up per half
+
+**Decided by Alder on 13/11/2026 at 00:00 UTC, on counts only, before anything was sealed and without reading a case,
+a value, a profile term or a description of split H.** The thresholds, the arms, the instrument check, the ratchet, the
+crash policy and the pass rule are unchanged. Only the authoring rule of the Convergence row changes, as set out here.
+
+**What happened (counts and rule codes only; the orchestrator's report `w50-splith-REPORT.md`).** Each half was
+planned, authored, pointer-checked and given one repair round, then one top-up as the plan allows.
+
+| half | planned | valid after author and one repair round | top-up entries | top-up valid | valid at the convergence check | validator failures / denylist hits |
+|---|---|---|---|---|---|---|
+| A | 86 | 69 (80%) | 18 | 3 (17%) | 72 | 0 / 0 |
+| B | 82 | 74 (90%) | 10 | 5 (50%) | 79 | 0 / 0 |
+
+At the convergence check half A was short in four coverage rows (gold spans: ABN 5 of 7, PASSPORT 6 of 7,
+FAMILY_VIOLENCE 9 of 10; long documents 2 of 3) and half B in one (gold spans DISABILITY 8 of 10); every other row
+passed. Both halves were therefore dropped under the Convergence row and nothing was sealed. After the informational
+labelling and review of the valid cases (not the sealed numbers) the same rows were short, with FAMILY_VIOLENCE at 7
+in A and DISABILITY at 7 in B: the review's quota guard rejects only a fix that makes a new row fail, so the review
+removed three gold spans from those two rows, which were already short (A FAMILY_VIOLENCE 9 to 7, B DISABILITY 8 to 7).
+
+**Why the top-up missed.** The plan said top-up documents are dropped when they fail, without the repair round that the
+planned entries get. Planned entries, with that round, survived at 80% and 90%; top-up entries, without it, at 17% and
+50%, against the 62% that the 1.6x sizing assumed. The shortfalls are small, in coverage rows only, with no validator
+failure and no denylist hit; the cause is a procedural omission (no repair for top-up documents), not a defect of a
+model, of the validator or of the documents that were kept.
+
+**Decision.** Each half gets **one more top-up, for the short rows only, with the same single repair round as the
+planned entries**, and the sealing rule below. The amendment was made before sealing and before any arm; it is the
+only change to the authoring rule.
+
+**Rule for the second top-up** (counts only are reported; the same pipeline, prompts and models):
+
+1. **Which rows and how many.** Run the validator (`--quotas`) and `extra_quotas.py` on the half's current valid cases
+   (after the first review) at the start of the step. For every coverage row that fails, shortfall = its minimum minus
+   its count. Plan **ceil(2.5 x shortfall)** gold spans of that label or category (at most three per entry), or that
+   many documents for the long-documents row. No entry for any row that passes, and no margin rows. Measured on
+   13/11/2026 before this commit, counts only: A ABN 2, PASSPORT 1, FAMILY_VIOLENCE 3, long documents 1, i.e. 5, 3 and
+   8 gold spans and 3 long documents; B DISABILITY 3, i.e. 8 gold spans. Never beyond 88 cases in a half. Entries are for
+   other workplaces, except those needed to keep the profiled share at 40% or more; safe values are drawn fresh from the
+   shared used-set, so they stay unique across both halves, the plan and every top-up.
+2. **The same repair.** Each half's own author writes the new documents. They go through the pointer check, **one
+   repair round** (validator rule codes and pointer flags, as for the planned entries) and a pointer recheck of what
+   was repaired. A document still failing is dropped, not hand-edited, and there is no second repair or third top-up.
+3. **Labelling and review of the new documents only.** The half's blind labeller labels them (kimi-k3.1-pro in full for
+   half A: its stop-on-exhaust is off), one review round for them under the same script rules (a fix is applied only if
+   the validator stays clean and no row newly fails); the documents already labelled and reviewed are not touched.
+   Then the validator (`--quotas`), the denylist and the extra quotas on the half; agreement before and after review
+   is recomputed on the whole half and published with the hashes.
+4. **Sealing.** A half that now passes every row is sealed: `sealed/half-a.jsonl` / `half-b.jsonl` with their sha256,
+   profiles and finder contexts converted, in a sealing commit that carries the sha256 values and the actual counts only.
+   A half that is **still short is sealed anyway, with the shortfall written into the sealing commit** (as split G's
+   half T was accepted at 88 cases), **if it is short on at most two coverage rows and by at most two units in each**
+   (a unit is a gold span; a document for the long-documents row). A coverage row is a minimum number of gold spans per
+   label or per sensitive category, or of documents of one kind (clean, long, tables, hard-to-spot formats, scripts,
+   other workplaces). The validator's failures, the denylist, the case band of 72 to 88, the injection band and
+   positions, the indirect share, the negative-statement row and the profiled share must pass in full. A half outside
+   this limit is dropped, and then, as before, there is no verdict.
+5. **Not in this step.** The kit is not tagged and no arm is run. The candidate's tag is named later, in the commit that
+   the plan already provides, before any arm runs.
+
+**Limits, stated in advance.** The shortfall written at sealing, if any, is a known gap in coverage of one or two
+sensitive or identifier rows; the verdict is pooled and the rows' per-category counts are reported with it. The review's
+quota guard is unchanged, so the review of the new documents can again remove a span of a row that is short; that is
+counted and reported, not corrected by hand.
