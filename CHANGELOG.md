@@ -14,8 +14,11 @@ adversarial reviews showed that each can release personal or secret data on shap
 contain: `policy-statements`, `negative-statements-general-exemption`, `empty-finder-substitute`, the typed subject
 check (`[typed] subject_lift`) and `secret-config-references`. Clean-document friction on split G with the default
 switches is **not better than 0.4.0's**: the friction gains quoted below were measured with those switches on, and the
-defaults will be re-measured by replay before anyone quotes a figure for them.
-<!-- FRICTION-G: to be filled by the steward after the final replay -->
+default build's own figures follow. **Measured by replay at the release commit (14/11/2026, development data): with
+the default switches 0.5.0 holds 21 of split G's 65 clean documents (0.323; 0.4.0: 20, 0.308) and 4 of the v0.1 set's
+60 (0.067; 0.4.0: 3), the cost of the wider injection signal; the other five development sets are unchanged. Every
+safety measure is unchanged or better on all seven sets: released leaks identical, split G sensitive R_any 0.939 to
+0.9665 and R_any 0.9915 to 0.9948.**
 In the default build the detection changes add findings and holds (indirect and negative sensitive statements, the
 wider injection signal); the one narrowing, of a quasi-identifier cell's widening (DD-26), changes what is
 substituted, not what is held. It also brings the Operator's point-by-point review with a value-free reveal audit

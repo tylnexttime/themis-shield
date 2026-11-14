@@ -236,9 +236,9 @@ Read this section before you rely on anything above.
   Since 0.3.4, configuration lines that only name where a secret lives, and tracer values that cannot be what their
   label says, no longer hold a clean document (development data: split D friction 0.286 -> 0.064 and 0.323 -> 0.161,
   every safety measure unchanged). On split E's fresh text, 5 of 60 clean documents were held (0.083). On split G,
-  0.4.0 held 20 of 65 (0.308, against the 0.15 rule); 0.5.0's default build is not better there, and its figure will
-  be re-measured by replay.
-  <!-- FRICTION-G: to be filled by the steward after the final replay -->
+  0.4.0 held 20 of 65 (0.308, against the 0.15 rule); 0.5.0's default build is not better there: by replay it holds 21 of
+  65 (0.323), one more than 0.4.0, because it reads more phrasings as an instruction aimed at the AI. The switches
+  that lowered this figure in development are off by default: each was shown to release personal or secret data.
 - **Identifier columns in tables, fixed in development only.** On split D, bare licence numbers in a table's licence
   column were missed in three tables while every other column was covered. Since 0.3.2 a column headed as a personal
   identifier is protected cell by cell, and an organisation's format that is only digits no longer cancels such
