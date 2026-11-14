@@ -204,3 +204,14 @@ only change to the authoring rule.
 sensitive or identifier rows; the verdict is pooled and the rows' per-category counts are reported with it. The review's
 quota guard is unchanged, so the review of the new documents can again remove a span of a row that is short; that is
 counted and reported, not corrected by hand.
+
+## Kit named (14/11/2026, before any arm ran)
+
+**Written on 14/11/2026 at 08:30 UTC, after sealing and before any arm of split H ran on either half**, as the Kit row
+provides. Nothing above changes; the thresholds, arms, pass rule and crash policy are as written.
+
+| Arm | Code and switches |
+|---|---|
+| **Candidate** | **Release 0.5.0** (tag `v0.5.0`, commit `59df76b`, public), every default detection switch on: the 31 of its `DEFAULT_DETECTION_FIXES`; the five opt-in switches (`finder-whitespace-trust`, `policy-statements`, `negative-statements-general-exemption`, `empty-finder-substitute`, `secret-config-references`) off. Run from the kit tag `eval-kit-v0.7-frozen`, which is this commit: release 0.5.0's code with this plan and its sealing on top, and no other change. |
+| **Previous release** | **Release 0.4.0 as released** (tag `v0.4.0`, commit `14dd8fc`), its own code with its own default switches, from a detached worktree of `v0.4.0`, as arm 2 says. Replay of the candidate's finder capture if no call is refused, otherwise live with its own capture. |
+| **Control** | **0.3.0's switch list as in plan v0.6** (the 15 switches: `secret-placeholders`, `organisation-contacts`, `checksum-context`, `rule-completeness`, `table-role-words`, `title-tokens`, `contact-brackets`, `secret-url-components`, `secret-prose-values`, `secret-auth-codes`, `secret-document-ids`, `secret-org-codes`, `secret-mrz`, `finder-whitespace`, `address-line-numbers`) on the kit's code, live, with its own capture. |
