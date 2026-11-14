@@ -2,7 +2,12 @@
 
 Only the INJECTION expression is used here; tier selection is a separate design decision. The expression is two
 lists joined: the injection phrases (``INJECTION_CORE``) and the claims that a text is already de-identified or holds
-nothing personal (``DEIDENTIFIED_CLAIM``, added after the hold-lift review HL-04). A match can only add a hold.
+nothing personal (``DEIDENTIFIED_CLAIM``, added after the hold-lift review HL-04). In the default configuration a
+match only adds a hold (``ASK:injection-signal``): no hold is removed and no finding changes. With the opt-in typed tier
+on and Q-I among its families, the injection hold stands in for Q-I's own: Q-I is not asked beside it, so a sentence it
+would have flagged (``ASK:typed-indirect``) and substituted stays in clear, and goes out so on the Operator's approval
+of the injection hold (final review FR-03). It is still a hold, never a release; this was already so for the older
+injection phrases in 0.4.0, and the wider expression makes it apply to an ordinary export header as well.
 """
 
 from __future__ import annotations
@@ -36,8 +41,8 @@ INJECTION_CORE = (
 # anonymised", "contains no personal data", "there is nothing personal to list in it", "nothing to redact"
 # (independent review HL-04, 13/11/2026). Such a note asks the finders for silence without any of the phrases above,
 # and it is also what a careless export header says about a file that still holds a name. Either way a person should
-# look. Like every alternative here it can only ADD the injection hold (ASK:injection-signal); it never removes a
-# hold and never changes a finding. The cost is friction: a clean notice that says it "contains no personal
+# look. Like every alternative here it ADDS the injection hold (ASK:injection-signal); in the default configuration it
+# never removes a hold and never changes a finding (with the opt-in typed tier and Q-I on, see the module text: FR-03). The cost is friction: a clean notice that says it "contains no personal
 # information" is held too (one clean FAQ on the development sets).
 _DONE = r"(?:de-?identified|anonymi[sz]ed|pseudonymi[sz]ed|redacted|saniti[sz]ed|scrubbed)"
 _KIND = r"(?:pii|personal|sensitive|identifying|private|confidential)"
