@@ -2,7 +2,25 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
-## Unreleased
+## 0.5.0 (14/11/2026)
+
+**Preview, like every release before it, and untested on a fresh split.** No fresh split has tested 0.5.0: split H,
+its test, is written and sealed and has not been run. Every number for 0.5.0 below is a development replay on splits
+that were already open (several of them the splits the changes were written from), not a test result. The last frozen
+result is 0.4.0's on split G, which failed its rule ([results](eval/RESULTS-v0.6.md)). The cloud trip-wire's correction
+loop, the Operator's point-by-point review and the subject check are tested by the suite but **not measured** on any
+split. Five switches written this week that remove a hold are **opt-in and off by default**, because independent
+adversarial reviews showed that each can release personal or secret data on shapes the development sets do not
+contain: `policy-statements`, `negative-statements-general-exemption`, `empty-finder-substitute`, the typed subject
+check (`[typed] subject_lift`) and `secret-config-references`. Clean-document friction on split G with the default
+switches is **not better than 0.4.0's**: the friction gains quoted below were measured with those switches on, and the
+defaults will be re-measured by replay before anyone quotes a figure for them.
+<!-- FRICTION-G: to be filled by the steward after the final replay -->
+In the default build the detection changes add findings and holds (indirect and negative sensitive statements, the
+wider injection signal); the one narrowing, of a quasi-identifier cell's widening (DD-26), changes what is
+substituted, not what is held. It also brings the Operator's point-by-point review with a value-free reveal audit
+([Operator guide](docs/OPERATOR-GUIDE.md)), the trip-wire's two toggles (both off by default) and the fixes from the
+review rounds (FAB, RC and HL on 13/11/2026; FR on 14/11/2026).
 
 ### Steward's decision after the final review (FR-01 to FR-03, 14/11/2026)
 

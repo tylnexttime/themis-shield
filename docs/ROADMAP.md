@@ -6,7 +6,7 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
 [awesome-pii-tools](https://github.com/henrikaronsson/awesome-pii-tools) list, and evaluation data), all listed in
 [SOURCES.md](SOURCES.md#roadmap-research-27102026). Dates are day-first.
 
-## Where we are (12/11/2026)
+## Where we are (14/11/2026)
 
 - **v0.3.0 shipped on 27/10/2026 and failed its frozen test** (split D: 28 released spans, sensitive-statement recall
   0.740, friction 0.248 against a 0.15 rule; [results](../eval/RESULTS-v0.3.md)). Its friction changes worked; detection
@@ -39,11 +39,25 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   written and labelled by non-Claude families: sensitive recall 0.939 (limit 0.95), friction 0.308 (limit 0.15),
   over-redaction two look-alikes above the control. Released leaks 0 in every arm; R_any 0.992; quasi-identifiers
   1.000; every ratchet condition against 0.3.4 holds. Split G is now development data.
-- **Next:** friction on clean documents, the largest gap on split G (fiction about invented people held for
-  sensitive statements; configuration files blocked as secrets), and sensitive recall on union, family-violence,
-  criminal and negative statements, measured on development sets (splits F and G now among them); split F's
-  remaining misses that need finder-prompt changes (R-09) and the last released date cell (R-10); then the
-  placeholder legend's utility measurement; then a new split under its own plan and the same thresholds.
+- **13-14/11/2026: three independent review rounds, and a rule about removing holds.** The work written from split
+  G (friction on clean documents, sensitive recall, the trip-wire's correction loop, the Operator's point-by-point
+  review, the subject check) was read by three adversarial reviews: FAB-01 to FAB-14 and RC-01 to RC-08 (13/11), the
+  hold-lift review HL-01 to HL-10 (13/11) and a final read FR-01 to FR-04 (14/11). Each round found a change that
+  removes a hold and that, on shapes the development sets do not contain, released a person's sensitive statement or
+  a literal credential. All five such switches are opt-in and off by default (`policy-statements`,
+  `negative-statements-general-exemption`, `empty-finder-substitute`, the subject check and
+  `secret-config-references`), and "Removing a hold needs an adversary" is now part of the rule we keep (below).
+  Split H, the next fresh split, is written and sealed and has not been run.
+- **0.5.0 (14/11/2026), preview:** everything above, development measurements only. No fresh split has tested it;
+  the trip-wire's correction loop, the Operator review and the subject check are tested but not measured; friction
+  on split G with the default switches is not better than 0.4.0's and will be re-measured by replay
+  ([changelog](../CHANGELOG.md)).
+- **Next:** run split H against 0.5.0 under its frozen plan; re-measure the default build's friction on the
+  development sets; friction on clean documents, still the largest gap on split G, and sensitive recall on union,
+  family-violence, criminal and negative statements, measured on development sets (splits F and G now among them),
+  with any change that removes a hold reviewed adversarially before adoption; split F's remaining misses that need
+  finder-prompt changes (R-09) and the last released date cell (R-10); then the placeholder legend's utility
+  measurement.
 - **Debt** is kept short, in [DEV-DEBT.md](DEV-DEBT.md); two debt items (DD-05, DD-06) are scheduled with the
   detection fixes because they change the finder capture.
 
@@ -191,7 +205,7 @@ document's miss has already left the machine. The job stops, the Operator decide
 known-miss register. It is prompted to flag residual identifiers, never to guess who someone is, and its flag
 precision is tracked so we know whether it earns its round trip. Never on BLOCK or local-only work.
 
-**Built (unreleased, development, unmeasured), 13/11/2026:** the trip-wire now runs before approval as a correction
+**Built (0.5.0, development, unmeasured), 13/11/2026:** the trip-wire now runs before approval as a correction
 loop (Chris's revised design): every finding of a round is replaced by a placeholder, the package is checked again,
 at most three rounds, then the usual approval; a package still flagged after the last round goes to the Operator
 marked NOT CONVERGED, and every finding becomes a pending known-miss proposal. Still off by default. See
@@ -272,7 +286,7 @@ The story behind this part, with its sources: [A codebook, and data that is part
   - **Sensitive statements (decided 30/10/2026, Chris):** generic by default ("a sensitive statement about a
     person"); naming the category ("a statement about a person's health") tells the cloud a special-category fact
     exists, so it is its own switch, off by default. The legend itself is optional.
-  - **Built (unreleased):** `themis_shield/legend.py`, `[legend] enabled` and `sensitive_categories`, both off by
+  - **Built (0.4.0):** `themis_shield/legend.py`, `[legend] enabled` and `sensitive_categories`, both off by
     default. A placeholder first sent in an earlier turn is described by its class only ("an identifier"): the
     vault keeps values, not labels. Whether the legend should be on by default waits for the utility measurement.
   - Measured by the utility measurement below: the same tasks with and without the legend.

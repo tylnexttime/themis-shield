@@ -19,7 +19,15 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.4.0, preview.** What comes next, and how it will be tested: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status: v0.5.0, preview, untested on a fresh split.** What comes next, and how it will be tested:
+[docs/ROADMAP.md](docs/ROADMAP.md).
+- **0.5.0 (14/11/2026):** everything since 0.4.0 is development work; none of it has met a fresh split (split H, its
+  test, is sealed and has not been run), and split G, which 0.4.0 failed, is the last frozen result. New in it, tested
+  by the suite but **not measured** on any split: the Operator's point-by-point review with a value-free reveal audit
+  ([Operator guide](docs/OPERATOR-GUIDE.md)), the cloud trip-wire's correction loop (off by default) and the subject
+  check (off by default). Five switches that remove a hold are opt-in and off by default, because independent reviews
+  showed each can release personal or secret data. Friction on split G with the default switches is not better than
+  0.4.0's and will be re-measured ([changelog](CHANGELOG.md)).
 - **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
   is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
@@ -193,7 +201,18 @@ Read this section before you rely on anything above.
   - a date of birth that falls on one of the organisation's public dates is cancelled;
   - requiring a digit in a USI also drops about 1 in 18 genuine USIs from the rule (the LLM finders remain the
     backstop), in exchange for no longer matching about 1 in 32 ordinary ten-letter words.
-- **`empty-finder-substitute` is opt-in, and not safe as a default** (unreleased, 13/11/2026). With the switch on,
+- **The new features of 0.5.0 are unmeasured.** The Operator's point-by-point review and reveal audit
+  ([Operator guide](docs/OPERATOR-GUIDE.md)), the cloud trip-wire's correction loop (`before_human`) and check after
+  approval (`after_human`), and the subject check (`[typed] subject_lift`) are covered by automated tests on invented
+  text and have not been measured on any split. With `before_human` on, the cloud model reads the de-identified
+  package, held points included, before any person approves it.
+- **Five switches that remove a hold are opt-in and off by default:** `policy-statements`,
+  `negative-statements-general-exemption`, `empty-finder-substitute`, the subject check and
+  `secret-config-references`. Each passed the development sets and was then shown by an independent adversarial
+  review to release personal or secret data on shapes those sets do not contain (a statement about one named
+  person, a sensitive line in structured text, a literal credential dressed as a secret-manager reference). Turn one
+  on only knowing what it releases (the [changelog](CHANGELOG.md) records it for each).
+- **`empty-finder-substitute` is opt-in, and not safe as a default** (0.5.0, 13/11/2026). With the switch on,
   when both finders find nothing and PII-Tracer found only email addresses or phone numbers, in a document where no
   detector found a person and the tracer's sensitivity score is at most 0.01, those values are substituted and the
   document goes on without a person. It was on by default for a few hours (never in a tagged release), on
@@ -216,7 +235,10 @@ Read this section before you rely on anything above.
   limits what a cloud model can do with the output (v0.4's typed placeholders and task profiles address this).
   Since 0.3.4, configuration lines that only name where a secret lives, and tracer values that cannot be what their
   label says, no longer hold a clean document (development data: split D friction 0.286 -> 0.064 and 0.323 -> 0.161,
-  every safety measure unchanged). On split E's fresh text, 5 of 60 clean documents were held (0.083).
+  every safety measure unchanged). On split E's fresh text, 5 of 60 clean documents were held (0.083). On split G,
+  0.4.0 held 20 of 65 (0.308, against the 0.15 rule); 0.5.0's default build is not better there, and its figure will
+  be re-measured by replay.
+  <!-- FRICTION-G: to be filled by the steward after the final replay -->
 - **Identifier columns in tables, fixed in development only.** On split D, bare licence numbers in a table's licence
   column were missed in three tables while every other column was covered. Since 0.3.2 a column headed as a personal
   identifier is protected cell by cell, and an organisation's format that is only digits no longer cancels such
@@ -685,8 +707,9 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
 
 1. **Detection on new authors' text** (from split D): column-aware identifier propagation, finder windows for long
    documents and detection-view readers are in 0.3.2, two sensitive-statement passes in 0.3.3, two friction fixes
-   in 0.3.4, and the fixes written from splits E and F in 0.4.0 (development data only; split F, 0.4.0's frozen
-   test, failed); next is a new split with author and labeller from different families.
+   in 0.3.4, the fixes written from splits E and F in 0.4.0 (split F, 0.4.0's frozen test, failed; so did split G)
+   and those written from split G in 0.5.0 (development data only); next is split H, written and sealed, against
+   0.5.0.
 2. **Keep the work possible** (v0.4): typed placeholders with a codebook by default, optional partially synthetic
    values with per-job date shifting, per-task profiles, and a utility measurement next to the leak measurement
    ([story](docs/CODEBOOK-AND-SYNTHETIC-DATA.md)).
