@@ -3,6 +3,13 @@
 Windows psutil.virtual_memory().used is the Windows CommitTotal counter;
 total is CommitLimit on that platform. Physical available remains available.
 Elsewhere commit is unknown: swap usage must not be mislabelled as commit.
+
+DD-35: on a busy machine ``nvidia-smi`` can take longer than a few seconds. A probe that times out is retried with
+longer, bounded timeouts (``probe_timeouts``, default 3 s, then 10 s, then 20 s; ``gpu_probe_timeouts_seconds`` in
+the runtime settings). Only a timeout is retried. If every attempt times out the snapshot says so
+(``gpu_error = "gpu_probe_timeout"``) and the scheduler refuses with ``GpuProbeTimeout``
+(``stage-failed:gpu-probe``). A missing binary, a non-zero exit or an unreadable answer is not retried and is
+reported as before (``gpu_probe_unavailable``): both fail closed.
 """
 
 from __future__ import annotations
@@ -21,6 +28,27 @@ import psutil
 from ..inference import RuntimeFailure
 
 GIB = 1024 ** 3
+DEFAULT_PROBE_TIMEOUTS = (3.0, 10.0, 20.0)
+MAX_PROBE_ATTEMPTS = 5
+MAX_PROBE_TIMEOUT = 120.0
+GPU_PROBE_TIMEOUT = "gpu_probe_timeout"
+GPU_PROBE_UNAVAILABLE = "gpu_probe_unavailable"
+
+
+class _ProbeTimedOut(RuntimeFailure):
+    """One ``nvidia-smi`` attempt ran past its timeout (internal: the reader retries it)."""
+
+
+def validate_probe_timeouts(value) -> tuple[float, ...]:
+    """Validate a probe timeout schedule: 1 to 5 attempts, each above 0 and at most 120 seconds."""
+    if (
+        not isinstance(value, (list, tuple)) or not 1 <= len(value) <= MAX_PROBE_ATTEMPTS
+        or not all(
+            type(item) in (int, float) and 0 < item <= MAX_PROBE_TIMEOUT for item in value
+        )
+    ):
+        raise ValueError("invalid GPU probe timeouts")
+    return tuple(float(item) for item in value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +86,9 @@ def _nvidia(query: str, gpu_index: int, timeout: float = 3) -> str:
                 subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
             ),
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
+        raise _ProbeTimedOut("GPU resource probe timed out") from None
+    except OSError:
         raise RuntimeFailure("GPU resource probe unavailable") from None
     lines = result.stdout.strip().splitlines()
     if result.returncode != 0 or len(lines) != 1:
@@ -66,11 +96,23 @@ def _nvidia(query: str, gpu_index: int, timeout: float = 3) -> str:
     return lines[0]
 
 
+def _nvidia_bounded(query: str, gpu_index: int, timeouts) -> str:
+    """``_nvidia`` with escalating timeouts: only a timeout is retried; the last timeout is re-raised."""
+    for number, timeout in enumerate(timeouts):
+        try:
+            return _nvidia(query, gpu_index, timeout)
+        except _ProbeTimedOut:
+            if number == len(timeouts) - 1:
+                raise
+    raise _ProbeTimedOut("GPU resource probe timed out")
+
+
 class ResourceReader:
-    def __init__(self, gpu_index: int = 0) -> None:
+    def __init__(self, gpu_index: int = 0, *, probe_timeouts: tuple[float, ...] = DEFAULT_PROBE_TIMEOUTS) -> None:
         if type(gpu_index) is not int or gpu_index < 0:
             raise ValueError("invalid GPU index")
         self.gpu_index = gpu_index
+        self.probe_timeouts = validate_probe_timeouts(probe_timeouts)
 
     def __call__(self) -> ResourceSnapshot:
         try:
@@ -91,7 +133,7 @@ class ResourceReader:
         total = free = None
         error = None
         try:
-            values = _nvidia("memory.total,memory.used", self.gpu_index).split(",")
+            values = _nvidia_bounded("memory.total,memory.used", self.gpu_index, self.probe_timeouts).split(",")
             if len(values) != 2:
                 raise ValueError
             total_mib, used_mib = (float(value.strip()) for value in values)
@@ -99,8 +141,10 @@ class ResourceReader:
                 raise ValueError
             total = total_mib / 1024
             free = (total_mib - used_mib) / 1024
+        except _ProbeTimedOut:
+            error = GPU_PROBE_TIMEOUT
         except (RuntimeFailure, ValueError):
-            error = "gpu_probe_unavailable"
+            error = GPU_PROBE_UNAVAILABLE
         return ResourceSnapshot(
             total, free, available, ram_total,
             max(0.0, ram_total - available),
@@ -158,7 +202,7 @@ def read_identity(gpu_index: int = 0) -> DeviceIdentity:
     snapshot = ResourceReader(gpu_index)()
     if snapshot.vram_total_gb is None:
         raise RuntimeFailure("device GPU identity unavailable")
-    gpu_name = _nvidia("name", gpu_index).strip()
+    gpu_name = _nvidia_bounded("name", gpu_index, DEFAULT_PROBE_TIMEOUTS).strip()
     return DeviceIdentity(
         cpu_name(), gpu_name,
         round(snapshot.ram_total_gb * GIB),

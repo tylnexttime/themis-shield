@@ -490,7 +490,7 @@ def test_runtime_status_reports_both_back_ends(tmp_path, model, profiles, monkey
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "appdata"))
     monkeypatch.setattr(
         settings_module, "ResourceReader",
-        lambda gpu: (lambda: ResourceSnapshot(8.0, 7.5, 20, 32, 12, 10, 64)),
+        lambda gpu, **_: (lambda: ResourceSnapshot(8.0, 7.5, 20, 32, 12, 10, 64)),
     )
     with FakeStrata(model="qwen3.8-flash-next-gyro-s") as strata:
         catalogue_file = tmp_path / "catalogue.json"

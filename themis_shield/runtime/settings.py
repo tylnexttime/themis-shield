@@ -12,6 +12,14 @@ Back-end settings:
   speed) or ``"pp"`` (prompt speed, for read-heavy work).
 - ``strata_api_key_env``: the NAME of the environment variable holding a
   Strata API key, if Strata was started with one (default STRATA_API_KEY).
+
+Probe setting (DD-35):
+
+- ``gpu_probe_timeouts_seconds``: the bounded timeouts of the ``nvidia-smi``
+  memory probe, one per attempt (default ``[3, 10, 20]``: at most 33 seconds;
+  1 to 5 attempts, each above 0 and at most 120 seconds). Only a timeout is
+  retried; when every attempt times out the request is held with
+  ``stage-failed:gpu-probe``.
 """
 
 from __future__ import annotations
@@ -32,7 +40,7 @@ from .catalogue import Catalogue, ModelEntry
 from .children import ChildRegistry
 from .occupancy import OccupancyAwareReader, strata_holders
 from .planning import LaunchPlanner
-from .resources import ResourceReader
+from .resources import DEFAULT_PROBE_TIMEOUTS, ResourceReader, validate_probe_timeouts
 from .scheduler import Scheduler
 from ..paths import app_data_dir, default_engine_path, default_models_dir
 
@@ -55,8 +63,13 @@ class RuntimeSettings:
     marian_profiles_dir: Path | None = None
     marian_objective: str = "tg"
     strata_api_key_env: str = DEFAULT_API_KEY_ENV
+    gpu_probe_timeouts_seconds: tuple[float, ...] = DEFAULT_PROBE_TIMEOUTS
 
     def __post_init__(self) -> None:
+        # A JSON list arrives as a list; the settings stay immutable and hashable as a tuple.
+        object.__setattr__(
+            self, "gpu_probe_timeouts_seconds", validate_probe_timeouts(self.gpu_probe_timeouts_seconds),
+        )
         if type(self.gpu_index) is not int or self.gpu_index < 0:
             raise ValueError("invalid runtime GPU index")
         if (
@@ -176,7 +189,7 @@ def build_runtime(
 
 def resource_reader(settings: RuntimeSettings, catalogue: Catalogue) -> Any:
     """GPU/RAM reader that counts attached external runtimes as occupied."""
-    base = ResourceReader(settings.gpu_index)
+    base = ResourceReader(settings.gpu_index, probe_timeouts=settings.gpu_probe_timeouts_seconds)
     holders = strata_holders(catalogue, api_key_env=settings.strata_api_key_env)
     return OccupancyAwareReader(base, holders) if holders else base
 

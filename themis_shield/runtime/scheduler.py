@@ -22,7 +22,7 @@ import time
 from typing import Any, Callable, Iterator
 
 from ..inference import (
-    InferenceRequest, LocalInferenceTarget, NotEnoughMemory,
+    GpuProbeTimeout, InferenceRequest, LocalInferenceTarget, NotEnoughMemory,
     RuntimeFailure, TargetUnavailable,
 )
 from .catalogue import Catalogue, ModelEntry
@@ -166,6 +166,9 @@ class Scheduler:
         ):
             raise TargetUnavailable("model memory budget unknown; configure estimates")
         if snapshot.vram_total_gb is None or snapshot.vram_free_gb is None:
+            if getattr(snapshot, "gpu_error", None) == "gpu_probe_timeout":
+                # DD-35: every bounded probe attempt timed out (a busy machine), not a missing target.
+                raise GpuProbeTimeout("GPU memory probe timed out; request held")
             raise TargetUnavailable("GPU memory unavailable; request held")
         needed_ram = self.ram_margin_gb + (0 if warm else entry.est_ram_gb)
         needed_vram = self.vram_margin_gb + (0 if warm else entry.est_vram_gb)

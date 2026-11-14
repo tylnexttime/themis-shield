@@ -121,6 +121,15 @@ tokens are restored locally (`restore.py`).
 | `inference/laptop_llamacpp.py` | real | Compatibility client for an independently run llama-server. |
 | `inference/dgx_spark.py` | skeleton | A target that reports itself unavailable until configured. |
 
+**The GPU memory probe (DD-35).** Before a model is admitted the scheduler reads free GPU memory with `nvidia-smi`
+(`runtime/resources.py`). On a busy machine the probe can be slow, so a probe that times out is retried with
+longer, bounded timeouts: by default 3 s, then 10 s, then 20 s (at most 33 s; `gpu_probe_timeouts_seconds` in the
+runtime settings, 1 to 5 attempts of at most 120 s each). Only a timeout is retried. If every attempt times out, the
+request is held with `GpuProbeTimeout`, a `TargetUnavailable`, so it fails closed exactly as before (nothing is
+launched, nothing goes elsewhere) but a failed stage names its real kind, `stage-failed:gpu-probe`, instead of
+`stage-failed:target-unavailable`. A missing `nvidia-smi`, a non-zero exit or an unreadable answer is not retried
+and still reads `stage-failed:target-unavailable` ("GPU memory unavailable; request held").
+
 ## Detector canary
 
 Every stage fails closed when it **crashes**: an exception becomes `Status.FAILED` and the policy blocks. A stage

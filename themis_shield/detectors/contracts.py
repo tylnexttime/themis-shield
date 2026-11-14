@@ -112,6 +112,8 @@ class StageReport:
 # run that failed closed can be diagnosed afterwards without debug logging (docs/DEV-DEBT.md, DD-04).
 _FAILURE_KINDS = (
     ("NotEnoughMemory", "stage-failed:not-enough-memory"),
+    # DD-35: before TargetUnavailable, its base class: a GPU probe that timed out is not a missing target.
+    ("GpuProbeTimeout", "stage-failed:gpu-probe"),
     ("TargetUnavailable", "stage-failed:target-unavailable"),
     ("TypedStageError", "stage-failed:typed-configuration"),
     ("RuntimeFailure", "stage-failed:runtime"),

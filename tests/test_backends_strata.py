@@ -476,7 +476,7 @@ def test_build_runtime_wires_strata_and_occupancy(tmp_path, monkeypatch, strata)
     from themis_shield.runtime.settings import RuntimeSettings, build_runtime
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "appdata"))
-    monkeypatch.setattr(settings_module, "ResourceReader", lambda gpu: base_reader())
+    monkeypatch.setattr(settings_module, "ResourceReader", lambda gpu, **_: base_reader())
     catalogue = Catalogue([*BUILTINS[:3], strata_entry(strata.url)])
     scheduler = build_runtime(
         RuntimeSettings(data_dir=tmp_path / "data", strata_api_key_env="THEMIS_UNSET_KEY_VAR"),

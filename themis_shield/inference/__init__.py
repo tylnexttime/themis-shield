@@ -28,6 +28,12 @@ class NotEnoughMemory(RuntimeFailure):
     pass
 
 
+class GpuProbeTimeout(TargetUnavailable):
+    """DD-35: the GPU memory probe (``nvidia-smi``) did not answer within any of its bounded timeouts. Still a
+    refusal (a ``TargetUnavailable``: the request is held, never sent elsewhere), with its own fixed stage-failure
+    kind (``stage-failed:gpu-probe``) so a slow probe is not read as a missing model."""
+
+
 @dataclass(frozen=True, slots=True)
 class InferenceCapabilities:
     text_chat: bool = True

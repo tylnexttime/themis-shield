@@ -4,6 +4,20 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Live runs no longer lost to a slow GPU probe (DD-35)
+
+- **A slow `nvidia-smi` is retried before a stage fails.** The scheduler's GPU memory probe had one 3-second
+  timeout; on a loaded machine it took 3.2 s and five live typed runs failed closed as
+  `stage-failed:target-unavailable` before llama-server was launched. A probe that times out is now retried with
+  longer, bounded timeouts (3 s, then 10 s, then 20 s by default; `gpu_probe_timeouts_seconds` in the runtime
+  settings, 1 to 5 attempts of at most 120 s). Only a timeout is retried.
+- **A probe timeout names its own kind.** When every attempt times out the request is still held (fail closed, a
+  `TargetUnavailable` subclass, `GpuProbeTimeout`), and the failed stage reads `stage-failed:gpu-probe`, not
+  `target-unavailable`. A missing binary or a failing probe behaves as before.
+- Tests with a fake probe (`tests/test_gpu_probe_retry.py`): slow then answering succeeds on the second attempt;
+  always slow fails closed with `stage-failed:gpu-probe` after exactly three bounded attempts and launches nothing;
+  a missing binary is tried once and reads `stage-failed:target-unavailable`; the settings bounds.
+
 ### A value-free reveal audit (DD-30, steward's decision)
 
 - **Every reveal is recorded, never the original.** Before, an Operator revealing an original left no trace at all.
