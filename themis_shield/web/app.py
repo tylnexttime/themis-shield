@@ -533,7 +533,8 @@ def create_app(
         actor = router.operator_identity
         if kind == "reveal":
             # The original is returned to this response only (no-store): never written to the register or a log.
-            return await operation(reviews.reveal, router, job_id, point_id)
+            # DD-30: the fact of the reveal (who, job, point, when) is recorded first, value-free.
+            return await operation(reviews.reveal, router, job_id, point_id, actor=actor)
         if kind == "replace":
             return await operation(
                 reviews.replace, router, job_id, point_id, value["start"], value["end"], value["category"],

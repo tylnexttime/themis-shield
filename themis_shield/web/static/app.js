@@ -651,8 +651,11 @@ function reviewPoint(id, review, point) {
     if (!original.hidden) { original.textContent = ""; original.hidden = true; reveal.textContent = "Show original"; return; }
     const data = await api(`${base}/reveal`, { method: "POST", body: {} });
     if (typeof data?.original !== "string") throw new GateError("The original could not be shown.");
-    original.textContent = `Original, on this screen only and never recorded: ${data.original}`;
+    original.textContent = `Original, on this screen only and never recorded (the fact that you looked is): ${data.original}`;
     original.hidden = false; reveal.textContent = "Hide original";
+    if (Number.isInteger(data.reveals)) {
+      for (const count of item.closest("article")?.querySelectorAll(".reveal-count") || []) count.textContent = revealCount(data.reveals);
+    }
   }), { disabled: point.kind === "document" || !review.text_available });
   const form = replaceForm(review, point, base);
   const actions = node("div", null, "actions");
@@ -751,6 +754,21 @@ function tripwireSection(id, review) {
   }
   return section;
 }
+const revealCount = count => `${count} original${count === 1 ? "" : "s"} shown (recorded: who and when, never the value)`;
+function revealSection(review) {
+  const reveals = review?.reveals || [];
+  const details = node("details", null, "reveal-audit");
+  const summary = node("summary", "Reveal audit: ");
+  summary.append(node("span", revealCount(reveals.length), "reveal-count"));
+  details.append(summary);
+  if (reveals.length) {
+    const list = node("ul");
+    for (const entry of reveals) list.append(node("li",
+      `${entry.point ? `Point ${entry.point}` : "A point of an earlier package"}: shown to ${entry.by || "the Operator"}, ${date(entry.at)}`));
+    details.append(list);
+  }
+  return details;
+}
 function reviewSection(id, review) {
   const section = node("section", null, "review");
   if (!review) return section;
@@ -774,6 +792,7 @@ function reviewSection(id, review) {
       item.source === "tripwire" && item.round ? `${item.why} (round ${item.round})` : item.why)}`));
     details.append(list); section.append(details);
   }
+  section.append(revealSection(review));
   section.append(tripwireSection(id, review));
   return section;
 }
@@ -784,13 +803,16 @@ async function loadOperator() {
   $("operator-queue").replaceChildren();
   for (const job of queue) {
     const id = jobID(job), card = node("article", null, "card");
+    const facts = fields([
+      ["Marking", markingClass(job.marking ?? job.marking_class)],
+      ["Size", `${numeric(job.size?.documents)} documents · ${numeric(job.size?.words)} words`],
+      ["Major flags", job.major_flags?.length ? job.major_flags.map(why).join(" ") : "None assessed"],
+      ["Due", date(job.due)],
+      ["Originals shown", revealCount((job.review?.reveals || []).length)]
+    ]);
+    facts.lastElementChild.classList.add("reveal-count");
     card.append(node("h3", id || "Missing job ID"), node("p", job.summary || "No clean summary supplied."),
-      counts(job.counts), fields([
-        ["Marking", markingClass(job.marking ?? job.marking_class)],
-        ["Size", `${numeric(job.size?.documents)} documents · ${numeric(job.size?.words)} words`],
-        ["Major flags", job.major_flags?.length ? job.major_flags.map(why).join(" ") : "None assessed"],
-        ["Due", date(job.due)]
-      ]), stageIndicators(job), reviewSection(id, job.review));
+      counts(job.counts), facts, stageIndicators(job), reviewSection(id, job.review));
     const open = job.review?.unresolved > 0;
     if (job.review?.tripwire?.after_human?.pending) { $("operator-queue").append(card); continue; }
     const label = node("label", "Decision reason — controlled safe code"), reason = node("select");

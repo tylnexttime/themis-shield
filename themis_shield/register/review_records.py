@@ -13,6 +13,12 @@ Undo: until stage two of the current package is approved, an Operator may undo a
 settlement (``undo_point``). Nothing is erased: the undo is its own row (``review_undos``, who and when) and the point
 is open again; a later settlement of the same point is a new row (``attempt`` counts them). A stop is never undone.
 
+Reveal audit (DD-30): every original an Operator is shown (``record_reveal``) adds one row to ``review_reveals``
+(job, point, package hash, role, UTC time) and the Operator identity to ``review_reveal_actors``. The original is never
+recorded, nor its length nor any text: the fact that someone looked is. The row is written before the original leaves
+the gate, so a reveal that cannot be recorded is not shown. A refused reveal (no or the wrong credential) is refused at
+the app boundary before any job is read and, like every other refused Operator request, adds no row.
+
 Release rule: while a held point of the current package has no resolution, no stage is approved and an earlier
 approval no longer completes (``_decide_stage`` and ``_stages_valid`` below). Nothing an Operator decides here
 changes the gate itself: "not personal" verdicts are counted per hold reason (``operator_review_stats``), and turning
@@ -154,8 +160,22 @@ class ReviewRecords:
                 undo_id INTEGER PRIMARY KEY REFERENCES review_undos(undo_id),
                 actor_identity TEXT NOT NULL
             )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS review_reveals (
+                reveal_id INTEGER PRIMARY KEY,
+                job_id TEXT NOT NULL REFERENCES jobs(job_id),
+                point_id TEXT NOT NULL,
+                manifest_hash TEXT NOT NULL,
+                actor_role TEXT NOT NULL,
+                occurred_utc TEXT NOT NULL
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS review_reveal_actors (
+                reveal_id INTEGER PRIMARY KEY REFERENCES review_reveals(reveal_id),
+                actor_identity TEXT NOT NULL
+            )""")
+            db.execute("CREATE INDEX IF NOT EXISTS review_reveals_job ON review_reveals(job_id, reveal_id)")
             for table in (
                 "review_points", "review_resolutions", "review_resolution_actors", "review_undos", "review_undo_actors",
+                "review_reveals", "review_reveal_actors",
             ):
                 for action in ("UPDATE", "DELETE"):
                     db.execute(
@@ -410,6 +430,50 @@ class ReviewRecords:
             )
             return S(row["status"])
 
+    # -- the reveal audit (DD-30) -------------------------------------------------------------------------------------
+
+    def record_reveal(self, job_id, point_id, *, actor_identity, manifest_hash, now=None):
+        """Record, value-free, that the Operator was shown the original of one held point: who, job, point, when.
+
+        Called before the original is returned; if this raises, the original is not shown. Returns the job's reveal
+        count after this one."""
+        from .sqlite_store import stamp, utc
+        now = utc(now)
+        if not isinstance(manifest_hash, str) or not _HASH.fullmatch(manifest_hash):
+            raise ValueError("invalid manifest hash")
+        with self._transaction() as db:
+            row = self._row(db, job_id)
+            actor = self._actor(db, row, actor_identity)
+            self._held_point(db, row, point_id, manifest_hash)
+            cursor = db.execute(
+                "INSERT INTO review_reveals (job_id,point_id,manifest_hash,actor_role,occurred_utc) VALUES (?,?,?,?,?)",
+                (job_id, point_id, manifest_hash, "operator", stamp(now)),
+            )
+            db.execute("INSERT INTO review_reveal_actors VALUES (?,?)", (cursor.lastrowid, actor))
+            return self._reveal_count(db, job_id)
+
+    @staticmethod
+    def _reveal_count(db, job_id):
+        return db.execute("SELECT COUNT(*) FROM review_reveals WHERE job_id=?", (job_id,)).fetchone()[0]
+
+    def reveal_records(self, job_id):
+        """Every reveal of one job, oldest first: point, who, role, when. Never a value."""
+        with self._transaction() as db:
+            self._row(db, job_id)
+            return [{
+                "point_id": item["point_id"], "by": item["actor_identity"], "role": item["actor_role"],
+                "at": item["occurred_utc"], "manifest_hash": item["manifest_hash"],
+            } for item in db.execute(
+                "SELECT r.*, a.actor_identity FROM review_reveals r "
+                "LEFT JOIN review_reveal_actors a ON a.reveal_id=r.reveal_id WHERE r.job_id=? ORDER BY r.reveal_id",
+                (job_id,),
+            )]
+
+    def reveal_counts(self):
+        """Reveals per job (value-free), for ``themis operator``."""
+        with self._transaction() as db:
+            return dict(db.execute("SELECT job_id, COUNT(*) FROM review_reveals GROUP BY job_id ORDER BY job_id"))
+
     def operator_review_stats(self):
         """Value-free counts per hold reason: points held, and how Operators settled them.
 
@@ -442,7 +506,9 @@ class ReviewRecords:
             gate = db.execute(
                 "SELECT COUNT(*) FROM (SELECT DISTINCT job_id, point_id FROM review_points WHERE settled_by='gate')"
             ).fetchone()[0]
+            reveals = db.execute("SELECT COUNT(*) FROM review_reveals").fetchone()[0]
             return {
                 "by_reason": dict(sorted(held.items())), "gate_settled_placeholders": gate,
+                "originals_shown": reveals,
                 "promotion": "manual only: no verdict changes the gate by itself",
             }

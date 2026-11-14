@@ -21,6 +21,7 @@ from themis_shield import review
 from themis_shield.catalogues.cli import operator_main
 from themis_shield.vault import InMemoryVault, OPERATOR_SOURCE, Vault
 from themis_shield.dpapi import NullProtector
+from themis_shield.register.sqlite_store import stamp
 from themis_shield.web.app import create_app
 
 from catalogue_fakes import plain_harness
@@ -102,7 +103,9 @@ def test_review_shows_each_hold_with_a_plain_reason_and_place_and_no_original(tm
     _run(h, exercise)
 
 
-def test_reveal_needs_the_operator_credential_and_is_never_recorded(tmp_path, caplog):
+def test_reveal_needs_the_operator_credential_and_records_only_that_it_happened(tmp_path, caplog):
+    """DD-30: a reveal adds exactly one value-free audit row (who, job, point, UTC time); the original, its length and
+    any text are in no register table, no log line; a refused reveal (client or no credential) writes nothing."""
     h = _gate(tmp_path)
     caplog.set_level(logging.DEBUG)
 
@@ -110,22 +113,70 @@ def test_reveal_needs_the_operator_credential_and_is_never_recorded(tmp_path, ca
         job, view = await _held(client, operator)
         point = view["points"][0]["id"]
         path = f"/api/operator/{job}/points/{point}/reveal"
+        before = _dump(tmp_path / "register.db")
         refused = await client.post(path, json={})
         assert refused.status_code == 403 and refused.json()["error"]["code"] == "OPERATOR_CREDENTIAL_REQUIRED"
         assert (await anonymous.post(path, json={})).status_code == 401
         for response in (refused,):
             assert "Blake" not in response.text
-        before = _dump(tmp_path / "register.db")
-        shown = await operator.post(path, json={})
-        assert shown.status_code == 200 and shown.json() == {"point_id": point, "original": "Blake"}
-        assert shown.headers["cache-control"] == "no-store"
-        # Reveal writes nothing: every register table (audit included) is exactly as before, and no log line has it.
+        # A refused reveal is refused at the boundary, like every refused Operator request: nothing is written.
         assert _dump(tmp_path / "register.db") == before
-        assert b"Blake" not in (tmp_path / "register.db").read_bytes()
+        shown = await operator.post(path, json={})
+        assert shown.status_code == 200 and shown.json() == {"point_id": point, "original": "Blake", "reveals": 1}
+        assert shown.headers["cache-control"] == "no-store"
+        after = _dump(tmp_path / "register.db")
+        changed = {table for table in after if after[table] != before.get(table)}
+        assert changed == {"review_reveals", "review_reveal_actors"}
+        (row,) = after["review_reveals"]
+        (actor,) = after["review_reveal_actors"]
+        reveal_id, row_job, row_point, manifest, role, occurred = row
+        assert (row_job, row_point, role) == (job, point, "operator")
+        assert manifest == view["manifest_hash"] and actor == (reveal_id, "synthetic-operator")
+        assert occurred == stamp(h.router.clock())  # UTC
+        # Never the value, its length or any text: every table, every row, compared to the original.
+        dump = repr(after)
+        assert "Blake" not in dump and b"Blake" not in (tmp_path / "register.db").read_bytes()
+        assert set(row) - {reveal_id} <= {job, point, manifest, "operator", occurred}
         assert "Blake" not in caplog.text
         assert h.fake.requests == []
 
     _run(h, exercise)
+
+
+def test_reveal_audit_survives_a_restart_and_is_shown_in_the_console_and_the_cli(tmp_path, capsys):
+    h = _gate(tmp_path)
+
+    async def exercise(client, operator, anonymous):
+        job, view = await _held(client, operator)
+        point = view["points"][0]["id"]
+        for expected in (1, 2):
+            shown = await operator.post(f"/api/operator/{job}/points/{point}/reveal", json={})
+            assert shown.json()["reveals"] == expected
+        queue = (await operator.get("/api/operator/queue")).json()["jobs"]
+        (reveals,) = [row["review"]["reveals"] for row in queue if row["job_id"] == job]
+        assert [(item["point"], item["by"]) for item in reveals] == [(1, "synthetic-operator")] * 2
+        assert "Blake" not in json.dumps(queue)
+
+    _run(h, exercise)
+    # A restart: a fresh register on the same file reads the same rows (nothing was held in memory).
+    from themis_shield.register.sqlite_store import SqliteRegister
+    fresh = SqliteRegister(tmp_path / "register.db")
+    (job,) = fresh.reveal_counts()
+    assert fresh.reveal_counts() == {job: 2}
+    assert [item["by"] for item in fresh.reveal_records(job)] == ["synthetic-operator"] * 2
+    assert fresh.operator_review_stats()["originals_shown"] == 2
+    with pytest.raises(sqlite3.DatabaseError):
+        db = sqlite3.connect(tmp_path / "register.db")
+        try:
+            db.execute("DELETE FROM review_reveals")
+        finally:
+            db.close()
+    assert operator_main(["reveals"], register=fresh) == 0
+    assert json.loads(capsys.readouterr().out) == {"originals_shown_per_job": {job: 2}}
+    assert operator_main(["reveals", "--job", job], register=fresh) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert [item["by"] for item in listed["reveals"]] == ["synthetic-operator"] * 2
+    assert "Blake" not in json.dumps(listed)
 
 
 def test_replace_it_adds_an_operator_placeholder_and_restores_exactly(tmp_path):

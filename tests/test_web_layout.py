@@ -189,7 +189,7 @@ def test_operator_review_highlights_points_and_reveals_one_original_only_on_requ
                 if path == f"/api/operator/{job['job_id']}/points/{point['id']}/reveal":
                     revealed.append(route.request.method)
                     route.fulfill(content_type="application/json",
-                                  body=json.dumps({"point_id": point["id"], "original": "Synthetic Blake"}))
+                                  body=json.dumps({"point_id": point["id"], "original": "Synthetic Blake", "reveals": 1}))
                 elif path in responses:
                     route.fulfill(content_type="application/json", body=json.dumps(responses[path]))
                 else:
@@ -207,9 +207,13 @@ def test_operator_review_highlights_points_and_reveals_one_original_only_on_requ
             assert "paragraph 2, line 3: The detectors disagreed on whether this is a name." in item
             assert page.get_by_role("button", name="Approve stage 1").is_disabled()
             assert "Synthetic Blake" not in page.content() and revealed == []
+            counts = page.locator(".reveal-count")
+            assert counts.count() == 2 and all(text.startswith("0 originals shown") for text in counts.all_inner_texts())
             page.get_by_role("button", name="Show original").click()
             page.locator(".original").wait_for(state="visible")
             assert revealed == ["POST"] and "Synthetic Blake" in page.locator(".original").inner_text()
+            # DD-30: the card and the job's reveal audit show the count the server recorded (never the value).
+            assert all(text.startswith("1 original shown") for text in counts.all_inner_texts())
             page.get_by_role("button", name="Hide original").click()
             assert "Synthetic Blake" not in page.content()
             assert page.evaluate("localStorage.length + sessionStorage.length") == 0

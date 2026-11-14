@@ -14,7 +14,8 @@ How it fits the request path:
    originals. Nothing of the draft is written anywhere else.
 3. The Operator, with the Operator credential only (``/api/operator/*``), sees the text with each point highlighted
    and a one-line reason, may reveal the original of a point (``reveal``: read from the vault on request, returned to
-   that request only, never recorded), and settles each point: ``not-personal`` (leave it as shown), ``replace``
+   that request only; the original is never recorded, but the fact that the Operator looked is, value-free: DD-30),
+   and settles each point: ``not-personal`` (leave it as shown), ``replace``
    (a placeholder the Operator adds to the job's codebook, marked ``de-identified-by-operator``; the clean package
    is rebuilt on the next send) or stop (the job is refused).
 4. No stage is approved while a point is unsettled (the register enforces it for every approval path).
@@ -383,8 +384,16 @@ def view(router, job_id):
         "status": row["status"], "end_state": end_state(row), "text": text,
         "text_available": text is not None, "points": held, "gate_settled": gate,
         "unresolved": len(recorded["unresolved"]), "total": len(held), "stopped": recorded["stopped"],
-        "categories": list(CATEGORIES), "tripwire": trip,
+        "categories": list(CATEGORIES), "tripwire": trip, "reveals": reveal_log(router, job_id, held),
     }
+
+
+def reveal_log(router, job_id, held=()):
+    """DD-30: the job's reveal audit as the console shows it: each reveal's point number, who and when (never a
+    value). Points of an earlier package have no number here."""
+    records = router.register.reveal_records(job_id) if hasattr(router.register, "reveal_records") else []
+    numbers = {point["id"]: point["number"] for point in held}
+    return [{"point": numbers.get(item["point_id"]), "by": item["by"], "at": item["at"]} for item in records]
 
 
 # -- the cloud trip-wire in the review ------------------------------------------------------------------------
@@ -561,11 +570,13 @@ def _original(router, state, start, end):
     return "".join(parts)
 
 
-def reveal(router, job_id, point_id):
+def reveal(router, job_id, point_id, *, actor):
     """The original text of one held point, for the signed-in Operator's screen only.
 
-    Read from the vault on request and returned to this request only: no register row, audit row or log line is
-    written, and the response is marked no-store by the app.
+    Read from the vault on request and returned to this request only, marked no-store by the app; no log line has
+    it. DD-30: the fact of the reveal is recorded, value-free (``register.record_reveal``: who, job, point, UTC time,
+    never the value, its length or any text), before the original is returned; a reveal that cannot be recorded is
+    not shown.
     """
     from .router import GateFailure
     state = _state(router, job_id)
@@ -578,7 +589,11 @@ def reveal(router, job_id, point_id):
     point = _held(state, point_id)
     if point["kind"] == "document":
         raise ValueError("a whole-document point has no single place to reveal")
-    return {"point_id": point_id, "original": _original(router, state, point["start"], point["end"])}
+    original = _original(router, state, point["start"], point["end"])
+    count = router.register.record_reveal(
+        job_id, point_id, actor_identity=actor, manifest_hash=state.manifest_hash, now=router.clock(),
+    )
+    return {"point_id": point_id, "original": original, "reveals": count}
 
 
 def _span_ok(state, point, start, end):

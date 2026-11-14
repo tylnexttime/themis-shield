@@ -42,7 +42,8 @@ In scope, for example:
   with the client's credential (the gate token or the chat session), or the
   Operator token accepted as a client credential on `/v1` or the hooks API;
 - an original shown by the Operator review's reveal reaching the register, an audit record, a log, browser storage,
-  or any caller without the Operator credential; or a held point's original reaching the cloud through an
+  or any caller without the Operator credential (or its length or any of its text reaching the reveal audit row);
+  an original shown with no reveal audit row written; or a held point's original reaching the cloud through an
   Operator action;
 - a secret or credential being read from configuration files instead of the
   named environment variables.
@@ -91,5 +92,8 @@ Behaviour that is known and documented, so that nobody relies on the opposite. S
   see the original text of a highlighted point (one point per request). This is deliberate: some points can only be
   judged by reading them. The original is read from the local vault, returned to that request only and shown on that
   screen; it is not written to the register, the audit trail or a log, and the page does not keep it after it
-  re-renders or reloads. It is still on the Operator's screen while shown, so treat the Operator credential like the
+  re-renders or reloads. The fact of each reveal is recorded (DD-30): one append-only, value-free row per reveal
+  (`review_reveals` and `review_reveal_actors`: Operator identity, job, point, UTC time; never the value, its length
+  or any text), written before the original is returned, so a reveal that cannot be recorded is not shown. Refused
+  requests (wrong or missing credential) are refused at the boundary and leave no row. It is still on the Operator's screen while shown, so treat the Operator credential like the
   vault key it opens.

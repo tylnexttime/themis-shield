@@ -4,6 +4,19 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### A value-free reveal audit (DD-30, steward's decision)
+
+- **Every reveal is recorded, never the original.** Before, an Operator revealing an original left no trace at all.
+  Now each successful reveal adds one append-only row (`review_reveals`, `review_reveal_actors`): the Operator
+  identity the credential maps to, the job, the point and the UTC time; never the value, its length or any text.
+  The row is written before the original is returned: a reveal that cannot be recorded is not shown. Refused
+  requests (the client credential, or none) are refused at the boundary before any job is read and, like every
+  refused Operator request, write nothing. The Operator card shows "Originals shown" per job, the job's review lists
+  each reveal (point, who, when), `themis operator reveals [--job ID]` and `themis register show` print them, and
+  `themis operator stats` adds `originals_shown`. The reveal response carries the job's new count (`reveals`).
+  Tests: one reveal adds exactly one row in exactly the two reveal tables, every register table compared before and
+  after for the original; the rows survive a restart and refuse DELETE; the console shows the count.
+
 ### Steward's decision after the hold-lift review (HL-01 to HL-10, 13/11/2026 17:50 UTC)
 
 An independent adversarial review of the three changes below that remove a hold ran the real PII-Tracer on invented

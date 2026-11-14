@@ -105,6 +105,8 @@ def main(argv=None) -> int:
                 ("Tier", row["tier"]), ("Approver role", row["approver_role"]),
                 ("Operator due", display_time(row["due_utc"])),
                 ("Expiry", display_time(row["expiry_utc"])),
+                # DD-30: how many times an Operator was shown an original (value-free; themis operator reveals).
+                ("Originals shown", len(store.reveal_records(args.job_id))),
             ):
                 print(f"{label}: {value if value is not None else '—'}")
         elif args.command in {"approve", "refuse", "escalate", "withdraw"}:

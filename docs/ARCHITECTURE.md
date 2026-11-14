@@ -283,8 +283,14 @@ expires, the requester sends again to rebuild it.
 **Originals, carefully.** For a highlighted point only, the signed-in Operator may ask for the original text
 (`POST /api/operator/{job}/points/{point}/reveal`), because some points can only be judged that way (is "Blake" a
 person or a product?). The value is read from the vault for that request, returned in that response only (no-store),
-and shown inside that point on the page; re-rendering the queue, reloading or leaving the page drops it. No register
-row, audit row or log line is written by a reveal. A reveal is refused once the job is closed (stopped, refused or completed:
+and shown inside that point on the page; re-rendering the queue, reloading or leaving the page drops it. The original
+is never recorded, but the fact of the reveal is (DD-30): `register.record_reveal` adds one append-only row to
+`review_reveals` (job, point, package hash, role, UTC time) and the Operator identity to `review_reveal_actors`, in
+the same transaction, before the original is returned; if that write fails the reveal is refused. No value, length or
+text, and no log line. The Operator card shows the count ("Originals shown"), the job's review lists the rows (point,
+who, when: `reveals` in the review view), and `themis operator reveals [--job ID]` and `themis register show` print
+them. A refused request never reaches the job (the boundary refuses it, as for every Operator route) and writes
+nothing. A reveal is refused once the job is closed (stopped, refused or completed:
 `REVIEW_CLOSED`, FAB-10). Like every `/api/operator/*` route it needs the Operator
 credential; the client token and the chat session are refused.
 

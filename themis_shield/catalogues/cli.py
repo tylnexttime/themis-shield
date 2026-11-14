@@ -374,6 +374,10 @@ def operator_parser() -> argparse.ArgumentParser:
     parser.add_argument("--register-db", type=Path, default=None, help="job register (default: from config)")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("stats", help="points held and settled, per hold reason")
+    reveals = commands.add_parser(
+        "reveals", help="the reveal audit (DD-30): originals shown per job, or one job's reveals (who, point, when)",
+    )
+    reveals.add_argument("--job", default=None, help="list this job's reveals one by one")
     return parser
 
 
@@ -385,6 +389,16 @@ def operator_main(argv=None, *, register=None) -> int:
             config = _config(args.config)
             path = args.register_db or (config.get("register") or {}).get("path") or None
             register = SqliteRegister(Path(path).expanduser() if path else None)
+        if args.command == "reveals":
+            # Value-free: who was shown which point's original, and when; never the original.
+            value = (
+                {"job_id": args.job, "reveals": [
+                    {key: item[key] for key in ("point_id", "by", "role", "at")}
+                    for item in register.reveal_records(args.job)
+                ]} if args.job else {"originals_shown_per_job": register.reveal_counts()}
+            )
+            print(json.dumps(value, indent=2, sort_keys=True))
+            return 0
         print(json.dumps(register.operator_review_stats(), indent=2, sort_keys=True))
         return 0
     except (ValueError, PermissionError, KeyError, OSError, sqlite3.Error) as error:

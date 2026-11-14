@@ -80,8 +80,15 @@ only while its job is open, you may ask for the original:
 
 - it is shown **on your screen only**, inside that point;
 - it is returned **to the signed-in Operator only** (the requester's credential is refused);
-- it is **never recorded**: no register row, audit row or log line, and the response is marked not to be stored.
-  Reloading or leaving the page drops it.
+- **the original is never recorded, but the fact that you looked is**: each reveal adds one append-only audit row
+  with who (the Operator identity your credential maps to), the job, the point and the UTC time; never the value,
+  its length or any text. No log line has the original, and the response is marked not to be stored. Reloading or
+  leaving the page drops it. If the audit row cannot be written, the original is not shown.
+
+The card shows "Originals shown" for the job, and the job's review has a "Reveal audit" list (point, who, when). On
+the command line, `themis operator reveals` gives the count per job and `themis operator reveals --job <ID>` the rows;
+`themis register show <ID>` prints the count. A refused request (the requester's credential, or none) is refused
+before the job is read and, like every refused Operator request, adds no row.
 
 ## The cloud trip-wire
 
@@ -176,6 +183,7 @@ instead have stopped the document.
 
 - Settle every open point, then approve both stages.
 - Use Undo for a mis-click, before stage two.
-- Reveal shows an original on your screen only, and nothing records it.
+- Reveal shows an original on your screen only. The original is never recorded; the fact that you looked is (who,
+  job, point, when).
 - NOT CONVERGED means "read carefully", not "blocked"; a short name the trip-wire flagged is an open point to settle.
 - With `before_human` on, the cloud has read the de-identified package before you see it.
