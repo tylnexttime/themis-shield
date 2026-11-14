@@ -95,5 +95,7 @@ Behaviour that is known and documented, so that nobody relies on the opposite. S
   re-renders or reloads. The fact of each reveal is recorded (DD-30): one append-only, value-free row per reveal
   (`review_reveals` and `review_reveal_actors`: Operator identity, job, point, UTC time; never the value, its length
   or any text), written before the original is returned, so a reveal that cannot be recorded is not shown. Refused
-  requests (wrong or missing credential) are refused at the boundary and leave no row. It is still on the Operator's screen while shown, so treat the Operator credential like the
+  requests (wrong or missing credential) are refused at the boundary and leave no row. "Replace it" over a span
+  that holds a placeholder answers every refusal that depends on the hidden original with one code
+  (`REPLACEMENT_NOT_ACCEPTED`), so it is not a way to learn about a value without a recorded reveal (FR-02). It is still on the Operator's screen while shown, so treat the Operator credential like the
   vault key it opens.

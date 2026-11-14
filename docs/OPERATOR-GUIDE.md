@@ -70,6 +70,10 @@ Some actions are refused with a reason instead of being accepted and failing lat
 - "Replace it" on text that is too short or too common a word to keep in the codebook ("Ng", "Will") is refused
   (`REPLACEMENT_TOO_SHORT`): its letters occur in ordinary words, so the job would be refused on the next send. Widen
   the span to take in a neighbouring word ("Ask Ng"), or settle the point another way.
+- "Replace it" over a span that holds a placeholder, refused for a reason that depends on the hidden original (too
+  short or common a word, too long, or already given a placeholder of another category), answers with one code
+  whatever the reason (`REPLACEMENT_NOT_ACCEPTED`), so the answer tells you nothing about a value you have not
+  revealed. Choose the placeholder's own category, widen the span, or reveal it first if you need to judge it.
 - Undoing the first of two replacements of the same value is refused while the other one still uses its placeholder.
   Undo the other one first.
 

@@ -647,21 +647,31 @@ def _replace(router, job_id, point_id, start, end, category, *, actor):
         if any(CATEGORY_STRENGTH[parse_strict_token(match.group()).token_class] > CATEGORY_STRENGTH[token_class]
                for match in TOKEN.finditer(segment)):
             raise GateFailure("REPLACEMENT_CATEGORY_WEAKER", 400)
+        # FR-02: when the span holds a placeholder, the original behind it is hidden from the Operator until revealed
+        # (and a reveal is recorded). Every refusal below depends on that original (its length, whether it is a short
+        # or common word, whether it already has a placeholder of another category), so for such a span they all
+        # answer with one code: the answer says nothing about a value the Operator has not revealed. A span of plain
+        # text only, which the Operator can read, keeps the specific code.
+        hidden = TOKEN.search(segment) is not None
+
+        def refuse(code):
+            return GateFailure("REPLACEMENT_NOT_ACCEPTED" if hidden else code, 400)
+
         original = _original(router, state, start, end)
         if len(original) > MAX_REPLACEMENT or not original.strip():
-            raise GateFailure("INVALID_REPLACEMENT_SPAN", 400)
+            raise refuse("INVALID_REPLACEMENT_SPAN")
         from .catalogues.tripwire import plausible_value
         if not plausible_value(original.strip()):
             # RC-06: a short or common word ("Ng", "Will") in the codebook would make every later package or answer
             # holding those letters fail the exact-value check, and the job be refused on the next send. Refuse it
             # here instead (as FAB-07 does), so the Operator can widen the span ("Ask Ng") or settle it another way.
-            raise GateFailure("REPLACEMENT_TOO_SHORT", 400)
+            raise refuse("REPLACEMENT_TOO_SHORT")
         created = original not in router.vault.mapping(state.conversation_id).values()
         try:
             token = TokenAllocator(state.conversation_id, router.vault).allocate(original, token_class)
         except Exception:
             # The same value already has a placeholder of another category in this conversation.
-            raise GateFailure("INVALID_REPLACEMENT_SPAN", 400) from None
+            raise refuse("INVALID_REPLACEMENT_SPAN") from None
         if created:
             router.vault.mark_source(state.conversation_id, token, OPERATOR_SOURCE)
         with router._state_lock:

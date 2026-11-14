@@ -21,6 +21,13 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
   BLOCK:secret under the defaults, as on 0.4.0; the same file records what the switch still releases. Cost: the four
   split G configuration files these forms released are held again with the defaults, so the split G friction figures
   from 0.246 on in this section were measured with these forms on and do not describe the default build (DD-28).
+- **FR-02: "Replace it" no longer answers a question about a hidden original.** Replacing a held person placeholder
+  with another category answered `REPLACEMENT_TOO_SHORT` when the hidden original was "Ng" or "Will" and
+  `INVALID_REPLACEMENT_SPAN` when it was "Blake", with no reveal recorded. Over a span that holds a placeholder, every
+  refusal that depends on the original (its length, a short or common word, a placeholder of another category already
+  given to it) now answers with one code, `REPLACEMENT_NOT_ACCEPTED`, and changes nothing; a span of plain text the
+  Operator can read keeps the specific codes. `tests/test_replace_no_oracle_fr02.py`: the same answer for "Ng",
+  "Will" and "Blake" in every category, no register row written.
 
 ### Live runs no longer lost to a slow GPU probe (DD-35)
 

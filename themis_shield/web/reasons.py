@@ -150,6 +150,11 @@ FIXED = {
         "words, so the cloud answer would be refused). Widen the span to take in a neighbouring word, or settle the "
         "point another way."
     ),
+    "REPLACEMENT_NOT_ACCEPTED": (
+        "This span holds a placeholder, and it cannot be replaced with that category. So as to say nothing about the "
+        "hidden original, the gate does not say why. Choose the placeholder's own category, widen the span to take in "
+        "a neighbouring word, or settle the point another way."
+    ),
     "REPLACEMENT_CATEGORY_WEAKER": (
         "The chosen category is weaker than a placeholder inside the span. Pick that placeholder's category or a "
         "stronger one."
