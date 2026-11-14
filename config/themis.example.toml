@@ -125,8 +125,9 @@ institution_profile = ""
 version = "v0.2"
 # v0.3 friction fixes on top of v0.2. Default: every fix except the opt-in
 # ones, "finder-whitespace-trust", "policy-statements",
-# "negative-statements-general-exemption" and "empty-finder-substitute" (not
-# safe for release decisions; see the CHANGELOG); "all" adds them, "none" is
+# "negative-statements-general-exemption", "empty-finder-substitute" and
+# "secret-config-references" (not safe for release decisions; see the
+# CHANGELOG); "all" adds them, "none" is
 # exact v0.2.1 behaviour,
 # or list names: "secret-placeholders", "organisation-contacts",
 # "checksum-context", "rule-completeness", "table-role-words", "title-tokens",

@@ -11,7 +11,7 @@ v0.3 friction fixes (lane 1) are named switches on top of v0.2, each measured al
 development sets. ``[detection] fixes`` (a list of names, ``"all"`` or ``"none"``) or the runner's
 ``--detection-fixes`` selects them; ``version = "v0.1"`` switches every one of them off as well. All are on by
 default except the opt-in ones (``OPT_IN_DETECTION_FIXES``: ``finder-whitespace-trust``, ``policy-statements``,
-``negative-statements-general-exemption`` and ``empty-finder-substitute``);
+``negative-statements-general-exemption``, ``empty-finder-substitute`` and ``secret-config-references``);
 ``fixes = "none"`` reproduces the v0.2.1 behaviour byte for byte and ``"all"`` turns the opt-in ones on too.
 
 - ``secret-placeholders``: a secret assignment whose whole value is a template placeholder or a reference to a
@@ -89,20 +89,28 @@ v0.5 detection fixes (from split F, now development data):
   depot, campus, ward, delivery, return or business location is not one, and neither is a bare ``postcode`` or
   ``suburb`` (often a site's); see ``table_location_spans`` in ``detectors/propagate.py``.
 - ``secret-config-lookalikes``: four shapes in clean configuration files that a SECRET finding (from any detector) took
-  for a credential and that a rule can tell apart with certainty. Two extend ``secret-references`` and act only with it
+  for a credential (0.4.0's four, unchanged). A rule cannot tell them from a credential with certainty: a literal
+  written in the same shape is released too (DD-27). Two extend ``secret-references`` and act only with it
   on: a template call to a secret manager that names a path and at most a field (``"{{ vault 'kv/app/db#password' }}"``,
   ``"{{ vault('kv/app/db', 'password') }}"``), and a URI of a non-web scheme made only of lower-case words under a key
-  that says it is a reference (``credentialRef: "keyhold://kv-prod/edge/syd#admin"``); split G's clean files added a
-  ``${NAME:path}`` lookup (``"${SECRET_MANAGER:prod/app/db/password}"``), a template lookup written with a colon
-  (``{{ vault:kv/app#password }}``), the same URI under a key whose last word names a credential
-  (``broker_password: "sm://org/prod/broker-password"``), and the pieces a finder cuts out of such a reference (a
-  fragment, or the key with its quotes and separator, ``finance_api_key:``). Two are about the span itself: a
+  that says it is a reference (``credentialRef: "keyhold://kv-prod/edge/syd#admin"``). Two are about the span itself: a
   path of lower-case words that is a directory (it ends in ``/``) or a configuration file (a file extension such as
   ``.yaml``, ``.json`` or ``.tf`` follows it), and the key of an assignment that is a camel-case identifier of three or
   more words (``targetCPUUtilizationPercentage: 65``). The same shape as a value (``password: correctHorseBatteryStaple``),
   a key alone that is not such an identifier, a literal in a trailing comment and a lone base64 key keep their label
   (COR-001).
   See ``word_structure`` and ``references_only`` in ``detectors/secret_context.py``.
+- ``secret-config-references`` (from split G's friction; **opt-in, off by default** since 14/11/2026, review FR-01):
+  **not safe as a default: it releases literal credentials that 0.4.0 BLOCKs.** Three more forms of a secret-manager
+  reference, acting only with ``secret-references`` on: a ``${NAME:path}`` lookup of three or more words
+  (``"${SECRET_MANAGER:prod/app/db/password}"``), a template lookup written with a colon
+  (``{{ vault:kv/app#password }}``), a URI of words under a key whose last word names a credential
+  (``broker_password: "sm://org/prod/broker-password"``), and the key of such an assignment with its quotes and
+  separator (``finance_api_key:``). A word here is letters, then after a hyphen or underscore letters only or a number
+  of at most four digits, so a random lower-case token (``pg://main/db-a8f3k2z9q7x1m4w6``) still BLOCKs with the
+  switch on; a literal made of words in these shapes (``${DB_PASSWORD:correct/horse/battery}``,
+  ``pw://winter/sunrise-42``) is released with it on (DD-27). Before it is reconsidered as a default it needs a closed
+  allow-list of secret-manager schemes and an adversarial review.
 - ``propagate-detection-view`` (DD-19, review COR-002): name propagation and the table name, identifier,
   quasi-identifier, location and statement passes read the detection view (invisible characters removed, NFKC per
   character) like the other detectors, and every span they make maps back to the source characters that produced it,
@@ -232,10 +240,13 @@ DETECTION_FIXES = (
     # Friction, 13/11/2026 (policy.py): substitute, don't hold, for an empty-finder hold about values only. Opt-in,
     # see below: not safe as a default (review HL-01, HL-02).
     "empty-finder-substitute",
+    # Split G's secret-manager reference forms, split out of secret-config-lookalikes on 14/11/2026 (review FR-01);
+    # opt-in, see below.
+    "secret-config-references",
 )
 SECRET_CONTEXT_FIXES = (
     "secret-references", "secret-url-components", "secret-auth-codes", "secret-document-ids", "secret-org-codes", "secret-mrz",
-    "secret-config-lookalikes",
+    "secret-config-lookalikes", "secret-config-references",
 )
 # Every fix held the ratchet (released leaks, R_any, sensitive R_any, QUASI_ID R_any) on both development sets
 # (the v0.1 set and split C, replayed from captured finder answers) and is on by default. Three of them
@@ -254,8 +265,13 @@ SECRET_CONTEXT_FIXES = (
 #   and on a sentence diluted in a long document, so a sensitive statement there is released in clear when both
 #   finders are silent. Adopted on development replays alone, on by default for a few hours, withdrawn after an
 #   adversarial review. Needs a statement-level check that reads the text before it is reconsidered (DD-37).
+# - secret-config-references (steward's decision, 14/11/2026; final review FR-01): on by default (inside
+#   secret-config-lookalikes) since 12/11/2026, never in a tagged release. It released configuration lines that 0.4.0
+#   BLOCKs as secrets, a random lower-case token in a URI or template shape among them. Off, every SECRET decision is
+#   0.4.0's. The route back is a closed allow-list of secret-manager schemes and an adversarial review (DD-27).
 OPT_IN_DETECTION_FIXES = (
     "finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption", "empty-finder-substitute",
+    "secret-config-references",
 )
 DEFAULT_DETECTION_FIXES: tuple[str, ...] = tuple(
     name for name in DETECTION_FIXES if name not in OPT_IN_DETECTION_FIXES

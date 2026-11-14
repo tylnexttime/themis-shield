@@ -352,6 +352,8 @@ def test_default_has_every_fix_but_the_ones_still_off():
     # (second review RC-01, RC-02, RC-03): a rule-based genericity test is not safe for release decisions.
     # empty-finder-substitute: off by the steward's decision of 13/11/2026 17:50 UTC (review HL-01, HL-02): it
     # releases on the tracer's document score, which cannot see a sensitive statement in structured or long text.
+    # secret-config-references: off by the steward's decision of 14/11/2026 (final review FR-01): it released literal
+    # credentials that 0.4.0 BLOCKs.
     off = {"finder-whitespace-trust", "policy-statements", "negative-statements-general-exemption",
-           "empty-finder-substitute"}
+           "empty-finder-substitute", "secret-config-references"}
     assert set(selected) == set(DETECTION_FIXES) - off

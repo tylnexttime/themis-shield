@@ -266,7 +266,9 @@ def _bare(value: str) -> str:
 #   names a path and, at most, a field to read; the first argument is a path (it holds a slash), every other argument a
 #   field name, and nothing else stands in the braces;
 # - a URI of any scheme but a web one, whose key says it is a reference ("credentialRef", "db_password_ref"), made only of
-#   lower-case words ("keyhold://kv-prod/edge/syd#admin"): no user, no password, no query, no host with dots.
+#   lower-case words as _WORD reads them ("keyhold://kv-prod/edge/syd#admin"): no user, no password, no query, no host
+#   with dots. These two forms are 0.4.0's and unchanged; the forms added for split G are behind the opt-in switch
+#   "secret-config-references" below.
 _SM_PATH = r"""(?:"[A-Za-z0-9_.:#@\-]{0,100}/[A-Za-z0-9_./:#@\-]{1,200}"|'[A-Za-z0-9_.:#@\-]{0,100}/[A-Za-z0-9_./:#@\-]{1,200}')"""
 _SM_FIELD = r"""(?:"[A-Za-z0-9_.\-]{1,80}"|'[A-Za-z0-9_.\-]{1,80}')"""
 TEMPLATE_LOOKUP = re.compile(
@@ -275,23 +277,37 @@ TEMPLATE_LOOKUP = re.compile(
     r"|\s+" + _SM_PATH + r"(?:\s+" + _SM_FIELD + r")*)"                  # {{ vault 'kv/app/db#password' }}
     r"\s*-?\}\}"
 )
-_WORD = r"[a-z]+(?:[_\-][a-z0-9]+)*"  # a lower-case word, then "-01", "_id", "-prod": never letters run into digits
+# A lower-case word, then "-01", "_id", "-prod". After a hyphen or underscore any run of lower-case letters and digits
+# counts, so "kv-a8f3k2z9" is a word here too (as in 0.4.0; the opt-in path below uses the tighter _REF_WORD, FR-01).
+_WORD = r"[a-z]+(?:[_\-][a-z0-9]+)*"
 REF_KEY = re.compile(r"(?:[a-z0-9](?:Ref|Reference)|(?i:(?:^|[_\-.])(?:ref|reference)))$")
 REF_URI = re.compile(
     r"(?!(?:https?|ftps?|wss?)://)[a-z][a-z0-9+.\-]{1,20}://" + _WORD + r"(?:/" + _WORD + r")+(?:#" + _WORD + r")?"
 )
-# Split G's clean configuration files (development data), the same narrowness: a path of at least two lower-case words.
+# Opt-in switch "secret-config-references" (off by default since 14/11/2026; review FR-01). Split G's clean configuration
+# files (development data) were BLOCKed on three more forms of a secret-manager reference. Under the default switches
+# these lines are judged exactly as in 0.4.0: a literal credential dressed as one of these shapes (a random lower-case
+# token after a hyphen, "pg://main/db-a8f3k2z9q7x1m4w6", or words, "${DB_PASSWORD:correct/horse/battery}") is BLOCKed.
+# A rule cannot tell such a literal from a reference with certainty (DD-27); the route back to a default is a closed
+# allow-list of secret-manager schemes and an adversarial review (docs/ROADMAP.md, "The rule we keep").
 # - "${SECRET_MANAGER:prod/app/db/password}": an upper-case name, a colon, a path (after one word the colon is Spring's
 #   default value, "${DB_PASSWORD:hunter22}", a literal, and so is a two-word default such as "admin/admin": the path
 #   has at least three words); no space, no query, no second colon;
 # - "{{ vault:kv/app#password }}": the template call of the secret managers above, written with a colon, quoted or not;
-# - a URI of words (REF_URI) under a key whose last word names a credential ("broker_password", "signing_key"), not only
-#   under a key that says it is a reference.
-_PATH_WORDS = _WORD + r"(?:/" + _WORD + r")+"
-BRACE_LOOKUP = re.compile(r"\$\{[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*:" + _WORD + r"(?:/" + _WORD + r"){2,}\}")
+# - a URI of words under a key whose last word names a credential ("broker_password", "signing_key"), not only under a
+#   key that says it is a reference.
+# Inside this path a word is tighter than _WORD (review FR-01): after a hyphen or underscore come letters only, or a
+# number of at most four digits, so a lower-case hex or base-36 run ("db-a8f3k2z9q7x1m4w6") is not a word. Words still
+# pass: the switch knowingly releases a word-shaped literal in these shapes (DD-27).
+_REF_WORD = r"[a-z]+(?:[_\-](?:[a-z]+|[0-9]{1,4}))*"
+_REF_PATH_WORDS = _REF_WORD + r"(?:/" + _REF_WORD + r")+"
+BRACE_LOOKUP = re.compile(r"\$\{[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*:" + _REF_WORD + r"(?:/" + _REF_WORD + r"){2,}\}")
 TEMPLATE_COLON_LOOKUP = re.compile(
     r"\{\{-?\s*(?:vault|hashi_vault|secret|secrets|secretsmanager|ssm|kv|keyvault|op):"
-    + _PATH_WORDS + r"(?:#" + _WORD + r")?\s*-?\}\}"
+    + _REF_PATH_WORDS + r"(?:#" + _REF_WORD + r")?\s*-?\}\}"
+)
+SECRET_KEY_REF_URI = re.compile(
+    r"(?!(?:https?|ftps?|wss?)://)[a-z][a-z0-9+.\-]{1,20}://" + _REF_PATH_WORDS + r"(?:#" + _REF_WORD + r")?"
 )
 SECRET_KEY = re.compile(
     r"(?:[a-z0-9](?:Password|Passwd|Pwd|Passphrase|Passcode|Secret|Token|Key|Credentials?)"
@@ -299,7 +315,7 @@ SECRET_KEY = re.compile(
 )
 
 
-def _reference(value: str, key: str = "", lookalikes: bool = False) -> bool:
+def _reference(value: str, key: str = "", lookalikes: bool = False, references: bool = False) -> bool:
     from .rules import PLACEHOLDER
 
     value = _bare(value)
@@ -307,19 +323,21 @@ def _reference(value: str, key: str = "", lookalikes: bool = False) -> bool:
         return True  # a key with no value carries no secret
     if ENV_REFERENCE.fullmatch(value) or PLACEHOLDER.fullmatch(value):
         return True
-    if lookalikes and (
-        TEMPLATE_LOOKUP.fullmatch(value) or BRACE_LOOKUP.fullmatch(value) or TEMPLATE_COLON_LOOKUP.fullmatch(value)
-        or ((REF_KEY.search(key) or SECRET_KEY.search(key)) and REF_URI.fullmatch(value))
-    ):
+    if lookalikes and (TEMPLATE_LOOKUP.fullmatch(value) or (REF_KEY.search(key) and REF_URI.fullmatch(value))):
         return True
+    if references and (
+        BRACE_LOOKUP.fullmatch(value) or TEMPLATE_COLON_LOOKUP.fullmatch(value)
+        or (SECRET_KEY.search(key) and SECRET_KEY_REF_URI.fullmatch(value))
+    ):
+        return True  # opt-in "secret-config-references": see the comment above BRACE_LOOKUP
     url = _URL_PASSWORD.match(value)
-    return bool(url) and _reference(url.group("password"), "", lookalikes)
+    return bool(url) and _reference(url.group("password"), "", lookalikes, references)
 
 
 _KEY_END = re.compile(r"""["']?(?::|=)?""")  # what follows a key with no space between: its closing quote, its separator
 
 
-def _in_reference(assignment: re.Match, start: int, end: int, lookalikes: bool = False) -> bool:
+def _in_reference(assignment: re.Match, start: int, end: int, references: bool = False) -> bool:
     """True when the span ``[start, end)`` of the line does not leave the assignment's reference for something else.
 
     A span that reaches into a trailing comment ("... # old: sk_live_...") holds text no reference test has read. A
@@ -331,8 +349,9 @@ def _in_reference(assignment: re.Match, start: int, end: int, lookalikes: bool =
     identifier by ``_ASSIGNMENT`` (letters, digits, underscore, hyphen, dot). The caller has already tested the value as
     a reference, so this never reaches a literal value, and an empty value is answered above.
 
-    With ``lookalikes`` (split G, development data) the key's own quotes and its separator, when nothing separates them
-    from the key, belong to it: a finder cuts out ``finance_api_key:``, and ``"api_key":`` with its quotes.
+    With ``references`` (opt-in ``secret-config-references``; split G, development data) the key's own quotes and its
+    separator, when nothing separates them from the key, belong to it: a finder cuts out ``finance_api_key:``, and
+    ``"api_key":`` with its quotes.
     """
     if start >= end:
         return True  # the span only touches this line at its line break
@@ -346,7 +365,7 @@ def _in_reference(assignment: re.Match, start: int, end: int, lookalikes: bool =
     key_start, key_end = assignment.span("key")
     if key_start <= start and end <= key_end:
         return True  # the name of a variable that holds a reference
-    if lookalikes:
+    if references:
         line = assignment.string
         opening = 1 if key_start and line[key_start - 1] in "\"'" else 0
         if key_start - opening <= start and end <= _KEY_END.match(line, key_end).end():
@@ -354,14 +373,18 @@ def _in_reference(assignment: re.Match, start: int, end: int, lookalikes: bool =
     return end > value_start
 
 
-def references_only(text: str, start: int, end: int, lookalikes: bool = True) -> bool:
+def references_only(text: str, start: int, end: int, lookalikes: bool = True, references: bool | None = None) -> bool:
     """True when every non-blank line the span touches is a reference-only assignment or holds no value at all.
 
     On an assignment the span must also sit in the reference: not in a trailing comment, and not in the key unless the
     value is a non-empty reference (the name of a variable that holds one is not a secret).
     ``lookalikes`` adds the reference forms of ``secret-config-lookalikes`` (a template call to a secret manager, a
     URI under a key that says it is a reference); it is on here so that every caller, the DD-16 guard first, tests them.
+    ``references`` adds those of the opt-in ``secret-config-references`` (``None``: the same as ``lookalikes``, so the
+    DD-16 guard tests them too); ``relabel_secrets`` passes the switch itself.
     """
+    if references is None:
+        references = lookalikes
     line_start = max(text.rfind("\n", 0, start), text.rfind("\r", 0, start)) + 1
     ends = [i for i in (text.find("\n", max(start, end - 1)), text.find("\r", max(start, end - 1))) if i >= 0]
     line_end = min(ends) if ends else len(text)
@@ -374,9 +397,9 @@ def references_only(text: str, start: int, end: int, lookalikes: bool = True) ->
             continue
         assignment = _ASSIGNMENT.match(line)
         if assignment:
-            if not _reference(assignment.group("value"), assignment.group("key"), lookalikes) or not _in_reference(
-                assignment, max(start - offset, 0), min(end - offset, len(line)), lookalikes
-            ):
+            if not _reference(
+                assignment.group("value"), assignment.group("key"), lookalikes, references
+            ) or not _in_reference(assignment, max(start - offset, 0), min(end - offset, len(line)), references):
                 return False
             continue
         # Not an assignment: passes only when it plainly holds no value ("import os", a lone brace).
@@ -431,10 +454,11 @@ def relabel_secrets(text: str, findings, fixes) -> tuple:
     from .contracts import FindingEvidence
 
     lookalikes = "secret-config-lookalikes" in fixes
+    references = "secret-config-references" in fixes  # opt-in, off by default (FR-01)
     out = []
     for item in findings:
         if Label.SECRET in item.labels and (
-            ("secret-references" in fixes and references_only(text, item.start, item.end, lookalikes))
+            ("secret-references" in fixes and references_only(text, item.start, item.end, lookalikes, references))
             or (lookalikes and word_structure(text, item.start, item.end))
         ):
             # Not a secret, and nothing personal either: keep any other label the finding carries, else drop it.

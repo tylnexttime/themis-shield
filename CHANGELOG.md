@@ -4,6 +4,24 @@ All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
 ## Unreleased
 
+### Steward's decision after the final review (FR-01 to FR-03, 14/11/2026)
+
+- **FR-01: split G's secret-manager reference forms are opt-in (`secret-config-references`, off by default).** The
+  three forms added for split G inside `secret-config-lookalikes` (a `${NAME:path}` lookup, a `{{ vault:path }}`
+  lookup, a URI of words under a key that names a credential, and the key of such a line with its separator) released,
+  with no finding left, configuration lines that 0.4.0 BLOCKs as secrets: a random lower-case token after a hyphen
+  (`db_password: "pg://main/db-a8f3k2z9q7x1m4w6"`, a 36-character token in a `ghp://` URI, `{{ secret:live/sk-... }}`),
+  even when no finder marked it, as well as the word-shaped literals already recorded as DD-27. The section on them
+  below said the opposite ("a path with a high-entropy segment ... still BLOCK"); it was wrong. They are not narrowed
+  again: they move to a new switch, off by default, so that **with the default switches every SECRET decision is
+  0.4.0's** (0.4.0's own four look-alikes of `secret-config-lookalikes` are unchanged). Inside the opt-in path a word
+  after a hyphen or underscore is letters only or a number of at most four digits, so the reviewer's random tokens
+  BLOCK with the switch on too; a literal made of words in these shapes is still released with it on (DD-27).
+  `tests/test_secret_config_references_fr01.py`: the reviewer's twelve inputs and the three DD-27 inputs are
+  BLOCK:secret under the defaults, as on 0.4.0; the same file records what the switch still releases. Cost: the four
+  split G configuration files these forms released are held again with the defaults, so the split G friction figures
+  from 0.246 on in this section were measured with these forms on and do not describe the default build (DD-28).
+
 ### Live runs no longer lost to a slow GPU probe (DD-35)
 
 - **A slow `nvidia-smi` is retried before a stage fails.** The scheduler's GPU memory probe had one 3-second
@@ -46,7 +64,8 @@ later. A leak is worse than friction, so:
   switch stay (`[detection] fixes` naming it, or `"all"`). With the defaults every such document is held again for
   `ASK:disagreement-empty-llm`, as in candidate 0.5, and the four clean documents the switch had released are held
   again too (clean documents held, as in candidate 0.5 and before the injection change below: split C 13 of 95,
-  split E 5 of 60, split F 12 of 80, split G 16 of 65, 0.246).
+  split E 5 of 60, split F 12 of 80, split G 16 of 65, 0.246; split G measured with the secret reference forms on,
+  which are opt-in since FR-01).
   It is listed as DD-37 with what it would need before anyone reconsiders it: a statement-level check that reads
   the text, not a document score.
 - **The guard behind that default handed the tracer every gold name (HL-03).** It played PII-Tracer with the gold
@@ -223,8 +242,8 @@ worse than friction, so the passes that remove a hold on that judgement are off 
   memory-only review state (DD-31), the stale-undo console text (DD-34). The console's Stop dialog no longer says
   "nothing is sent" (FAB-04 corrected it everywhere else): with `before_human` on, the cloud has read the package.
 - **The split G friction figures quoted for the fifth push** (0.308 -> 0.246 -> 0.200 -> 0.185, in the sections below)
-  pre-date these defaults (and the FAB-01/FAB-02 narrowing) and will be re-measured; they do not describe the default
-  build (DD-28).
+  pre-date these defaults (and the FAB-01/FAB-02 narrowing, and the move of the secret reference forms to the opt-in
+  `secret-config-references`, FR-01) and will be re-measured; they do not describe the default build (DD-28).
 
 ### Fixes from the independent review of this candidate (FAB-01 to FAB-14, 13/11/2026)
 
@@ -349,23 +368,28 @@ accepted at 88 cases, both recorded in the plan before any arm ran. Split G (`ev
 
 ### Secret-manager references in clean configuration files (split G friction)
 
-- `secret-config-lookalikes` (no new switch): on split G, six of the 65 clean documents were configuration files BLOCKed
-  for `secret` although every secret-looking value in them is a reference to a secret manager. Three more reference
-  forms are no longer read as secrets (from any detector): a `${NAME:path}` lookup (`"${SECRET_MANAGER:prod/app/db/password}"`),
-  a template lookup written with a colon (`{{ vault:kv/app#password }}`, quoted or not), and a URI of a non-web scheme
-  made only of lower-case words under a key whose last word names a credential (`broker_password: "sm://org/prod/broker-password"`;
-  before, only under a key that says it is a reference, such as `credentialRef`). So are the pieces the finders cut out
-  of such a reference: a fragment wholly inside it (`prod/app/db/password}"`, `:org/prod`, `vault:kv/x#password`) and the
-  key of the assignment with its quotes and `:` or `=` (`finance_api_key:`). Written as narrowly as the existing forms:
-  a path of lower-case words (at least three after a `${NAME:`, so a two-word Spring default such as `admin/admin`
-  stays a literal; at least two otherwise), no user, password, query, host with dots or letters
-  run into digits, and a web scheme never counts. A literal after the same keys, `user:pass@`, an `https://` URI, a path
-  with a high-entropy segment, a literal beside a reference on the same line or on another line, a literal in a trailing
-  comment (when a detector marks that literal; FAB-08: the look-alike itself no longer blocks the line), a value-less key line and a lone padded base64 key still BLOCK (COR-001), and no gold SECRET span in
-  `eval/cases` passes the rule. `--detection-fixes` without the switch restores the previous behaviour byte for byte.
-  Measured by replay as development evidence only (written from split G's six documents): split G friction
-  0.308 -> 0.246 (four of the six released; GR-083 is now held only for a sensitive finding and GR-098 still for
-  fourteen `code:` values PII-Tracer alone reads as secrets and for its injection signal), every safety measure unchanged.
+- `secret-config-references` (**opt-in, off by default since 14/11/2026, FR-01 above**; written on 12/11/2026 inside
+  `secret-config-lookalikes` and on by default until 14/11/2026, never in a tagged release): on split G, six of the 65
+  clean documents were configuration files BLOCKed for `secret` although every secret-looking value in them is a
+  reference to a secret manager. With the switch on, three more reference forms are not read as secrets (from any
+  detector): a `${NAME:path}` lookup (`"${SECRET_MANAGER:prod/app/db/password}"`), a template lookup written with a
+  colon (`{{ vault:kv/app#password }}`, quoted or not), and a URI of a non-web scheme under a key whose last word names
+  a credential (`broker_password: "sm://org/prod/broker-password"`; 0.4.0 accepts it only under a key that says it is a
+  reference, such as `credentialRef`). So are the pieces the finders cut out of such a reference: a fragment wholly
+  inside it (`prod/app/db/password}"`, `:org/prod`, `vault:kv/x#password`) and the key of the assignment with its
+  quotes and `:` or `=` (`finance_api_key:`). **A rule cannot tell these shapes from a credential with certainty.** As
+  first written (a "word" took any run of lower-case letters and digits after a hyphen) they released a random
+  lower-case token such as `pg://main/db-a8f3k2z9q7x1m4w6` with no finding left (FR-01); since 14/11/2026 a word after a
+  hyphen or underscore is letters only or a number of at most four digits, so such tokens BLOCK with the switch on too.
+  A literal made of lower-case words in these shapes (`${DB_PASSWORD:correct/horse/battery}`, `pw://winter/sunrise-42`)
+  and a secret in a trailing comment that no detector marked are released with the switch on (DD-27). Still BLOCK with
+  it on: a literal after the same keys, `user:pass@`, an `https://` URI, a path segment with upper-case letters or a
+  random lower-case run, a literal beside a reference on the same line or on another line, a value-less key line and a
+  lone padded base64 key (COR-001); no gold SECRET span in `eval/cases` passes the rule. With the defaults the
+  behaviour is 0.4.0's. Measured by replay as development evidence only, with the forms on (written from split G's six
+  documents): split G friction 0.308 -> 0.246 (four of the six released; GR-083 is now held only for a sensitive
+  finding and GR-098 still for fourteen `code:` values PII-Tracer alone reads as secrets and for its injection signal),
+  every safety measure unchanged. That gain is not in the default build.
 
 ### General policy statements are not sensitive statements (split G friction)
 

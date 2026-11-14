@@ -23,6 +23,8 @@ from themis_shield.types import Decision, Label, ReasonCode
 from test_secret_references import LIVE_KEY, PADDED_KEY, _detect_secret, _detect_secret_names, _secret_kept
 
 OFF = [name for name in DEFAULT_DETECTION_FIXES if name != "secret-config-lookalikes"]
+# Split G's reference forms are the opt-in switch secret-config-references (review FR-01, 14/11/2026).
+REFS_ON = list(DEFAULT_DETECTION_FIXES) + ["secret-config-references"]
 
 
 def _released(text, value):
@@ -223,13 +225,15 @@ def test_random_base64_is_not_a_word_path_or_a_camel_case_key():
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Split G friction (development data): secret-manager references in clean configuration files. Every value below is
-# invented. Three more reference forms, and the fragments of a reference that the finders return as SECRET.
+# invented. Three more reference forms, and the fragments of a reference that the finders return as SECRET. Since
+# 14/11/2026 (review FR-01) they are the opt-in switch secret-config-references: with the default switches each of
+# them BLOCKs, as in 0.4.0.
 # ----------------------------------------------------------------------------------------------------------------------
 HIGH_ENTROPY_PATH = "kv/prod/9fQ2xL7vT0aB3mZ8"  # a path with a segment that is no word
 
 
-def _refs(line, start=0, end=None, lookalikes=True):
-    return secret_context.references_only(line, start, len(line) if end is None else end, lookalikes)
+def _refs(line, start=0, end=None, lookalikes=True, references=None):
+    return secret_context.references_only(line, start, len(line) if end is None else end, lookalikes, references)
 
 
 @pytest.mark.parametrize("line, value", [
@@ -251,9 +255,11 @@ def _refs(line, start=0, end=None, lookalikes=True):
 ])
 def test_a_secret_manager_reference_in_a_configuration_file_is_not_a_secret(line, value):
     text = "stage:\n" + line + "\n  retries: 3\n"
-    assert _released(text, value)
+    assert _blocked(text, value)  # the default switches: as in 0.4.0
+    configure_detection_fixes(REFS_ON)
+    assert _released(text, value)  # the opt-in switch
     configure_detection_fixes(OFF)
-    assert _blocked(text, value)  # switch off: the previous behaviour
+    assert _blocked(text, value)
 
 
 @pytest.mark.parametrize("line", [
@@ -262,7 +268,7 @@ def test_a_secret_manager_reference_in_a_configuration_file_is_not_a_secret(line
     "  cache_password: sm://platform/stage/cache/admin-password",
 ])
 def test_the_new_reference_forms_need_the_switch(line):
-    assert _refs(line) and not _refs(line, lookalikes=False)
+    assert _refs(line) and not _refs(line, lookalikes=False) and not _refs(line, references=False)
 
 
 # The fragments the finders cut out of a reference, and the key of the assignment with its separator.
@@ -281,7 +287,10 @@ def test_a_fragment_wholly_inside_a_reference_is_not_a_secret(line, fragments):
         start = line.index(fragment)
         assert _refs(line, start, start + len(fragment)), fragment
         assert not _refs(line, start, start + len(fragment), lookalikes=False), fragment
+        assert not _refs(line, start, start + len(fragment), references=False), fragment
         text = "stage:\n" + line + "\n  retries: 3\n"
+        assert _blocked(text, fragment)  # the defaults
+        configure_detection_fixes(REFS_ON)
         assert _released(text, fragment)
         configure_detection_fixes(OFF)
         assert _blocked(text, fragment)
@@ -305,6 +314,7 @@ def test_the_key_of_a_reference_only_assignment_is_not_a_secret_with_or_without_
     if line.lstrip().startswith('"'):
         assert _refs(line, start - 1, with_separator)  # the key's opening quote belongs to the key
     assert not _refs(line, start, with_separator, lookalikes=False)  # the switch gates it
+    assert not _refs(line, start, with_separator, references=False)  # the opt-in switch secret-config-references
 
 
 @pytest.mark.parametrize("line", [
@@ -312,6 +322,7 @@ def test_the_key_of_a_reference_only_assignment_is_not_a_secret_with_or_without_
     '  db_password: "${CRED_STORE:billing/prod/ledger/db-password}"',
 ])
 def test_the_key_with_its_colon_is_released_end_to_end_and_a_literal_beside_it_still_blocks(line):
+    configure_detection_fixes(REFS_ON)
     key = line.split(":")[0].strip() + ":"
     literal = "Xk9pL2mQ8vR4"
     text = "stage:\n" + line + "\n  smtp_secret: " + literal + "\n  retries: 3\n"
@@ -400,6 +411,7 @@ def test_a_reference_form_cannot_cover_a_span_that_leaves_it():
 
 
 def test_a_literal_on_another_line_still_holds_the_document_beside_the_new_forms():
+    configure_detection_fixes(REFS_ON)
     for ref in (
         '  db_password: "${CRED_STORE:billing/prod/ledger/db-password}"',
         "  api_token: {{ vault:kv/billing#gateway-token }}",
