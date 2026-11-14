@@ -1,0 +1,12 @@
+{
+ "cases_with_a_fix": 52,
+ "edits_applied": 324,
+ "fix_applied": 34,
+ "fix_rejected_overlap": 1,
+ "fix_rejected_quota": 1,
+ "fix_rejected_validator": 16,
+ "items_decided": 648,
+ "items_fix": 508,
+ "items_keep": 140,
+ "items_total": 648
+}

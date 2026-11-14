@@ -1,0 +1,31 @@
+{
+ "call_stats": {
+  "model:deepseek-v4.1-flash": 82
+ },
+ "cases_clean_of_issues": 53,
+ "cases_in_round": 82,
+ "cases_with_issues": 29,
+ "cases_with_wrong_closer_accepted": 16,
+ "fence_stripped": 1,
+ "issue_case_counts_by_code": {
+  "FORMAT": 1,
+  "NEG_GENRE": 2,
+  "PHONE": 7,
+  "PROFILE_HN": 6,
+  "P_CLEAN": 2,
+  "P_DENYLIST": 2,
+  "P_INJ": 2,
+  "P_LANG": 1,
+  "P_PARSE": 5,
+  "REPEAT": 10
+ },
+ "requests": 82,
+ "round": "author",
+ "status_totals": {
+  "invalid": 29,
+  "valid": 53
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 0,
+ "wrong_closers_accepted": 220
+}

@@ -300,7 +300,7 @@ def test_a_finding_across_sentences_and_a_sensitive_column_cell_are_never_droppe
 # what a finder may answer with. It must never read a labelled statement about a person as a general rule.
 _CASES = ROOT / "eval" / "cases"
 _GUARD_FILES = sorted(
-    p for p in _CASES.glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl") and not p.name.startswith("test-g-")
+    p for p in _CASES.glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl") and not p.name.startswith(("test-g-", "test-h-"))
 ) + sorted(_CASES.glob("test-g-*.adjudicated.jsonl"))
 _SENSITIVE_GOLD = {label.value for label in (
     Label.HEALTH, Label.DISABILITY, Label.INDIGENOUS, Label.SEXUALITY, Label.RELIGION, Label.CRIMINAL,

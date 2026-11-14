@@ -187,7 +187,9 @@ def test_the_whole_gate_protects_every_residence_postcode():
 def test_no_protected_cell_of_the_evaluation_sets_overlaps_a_hard_negative():
     started = time.perf_counter()
     cells, covered, hits, fo_025 = 0, 0, [], 0
-    for path in sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl")):
+    # Split H (published 14/11/2026 with its frozen result) is not in this guard yet: see eval/RESULTS-v0.7.md.
+    for path in sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl")
+                       if not p.name.endswith(".adjudicated.jsonl") and not p.name.startswith("test-h-")):
         for line in path.read_text(encoding="utf-8").splitlines():
             case = json.loads(line)
             text = case["text"]

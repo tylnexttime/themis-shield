@@ -84,6 +84,22 @@ differs from the authoring workspace). sha256 `5c4dce5c26264df8c748054b58627d0df
 and `02fb925125d19621aebaa1b9095d8430833ffee8d4d23b93d586285e1bb69bac` (T), identical to the sealed files. Plan:
 [`FROZEN-PLAN-v0.6.md`](FROZEN-PLAN-v0.6.md); results: [`RESULTS-v0.6.md`](RESULTS-v0.6.md).
 
+## Split H: the test of 0.5.0
+
+`cases/test-h-a.jsonl` (76 cases, 1,514 gold spans, 27 clean, 1,468 hard negatives, 9 injection cases) and
+`cases/test-h-b.jsonl` (82 cases, 1,074 gold spans, 27 clean, 1,102 hard negatives, 10 injection cases): 346 sensitive
+statements between them (230 indirect, 41 negative). Built like splits F and G, with four families: half A written by
+`mistralai/mistral-large-2512` (Mistral, through OpenRouter with zero-data-retention routing) about an invented regional
+airline and airport operator, labelled blind by `kimi-k3.1-pro` (Moonshot); half B written by `deepseek-v4.1-flash`
+(DeepSeek) about an invented independent school group, labelled blind by `openai/gpt-oss-120b` (OpenAI), which also ran
+the pointer check on both halves. Label agreement (exact recall / precision before review): A 0.795 / 0.639, B 0.736 /
+0.631. Neither half converged under the original rule; a targeted top-up with a repair round was added to the plan
+before sealing, and half A was sealed one PASSPORT span short (6 of 7). Pipeline, inputs, validator, profiles, plans,
+manifest, provenance, agreement and usage: [`generator_h/`](generator_h). sha256
+`3f29c5735b4a5113396a961cde10d110ac6eebda21af4c9f960b7cdbca97fe0f` (A) and
+`5544671eb45323179b45588461b6b96e266bb668a62cd6b1c33c504991c20069` (B), identical to the sealed files. Plan:
+[`FROZEN-PLAN-v0.7.md`](FROZEN-PLAN-v0.7.md); results: [`RESULTS-v0.7.md`](RESULTS-v0.7.md).
+
 ## How it was built
 
 **Two independent generators.** A and B share no templates, no name pools (the build fails if a name token appears

@@ -1,0 +1,14 @@
+{
+ "entries": 3,
+ "multiplier": 2.5,
+ "planned_spans_or_documents": {
+  "sens DISABILITY": 8
+ },
+ "profiled_entries": 0,
+ "seed_choices": 20261307,
+ "seed_values": 20261308,
+ "shortfalls": {
+  "sens DISABILITY": 3
+ },
+ "valid_cases_before": 79
+}

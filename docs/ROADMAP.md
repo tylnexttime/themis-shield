@@ -47,13 +47,18 @@ pieces of research (typed-decision models, pipeline prior art, a sweep of the
   a literal credential. All five such switches are opt-in and off by default (`policy-statements`,
   `negative-statements-general-exemption`, `empty-finder-substitute`, the subject check and
   `secret-config-references`), and "Removing a hold needs an adversary" is now part of the rule we keep (below).
-  Split H, the next fresh split, is written and sealed and has not been run.
-- **0.5.0 (14/11/2026), preview:** everything above, development measurements only. No fresh split has tested it;
-  the trip-wire's correction loop, the Operator review and the subject check are tested but not measured; friction
-  on split G with the default switches is not better than 0.4.0's and will be re-measured by replay
-  ([changelog](../CHANGELOG.md)).
-- **Next:** run split H against 0.5.0 under its frozen plan; re-measure the default build's friction on the
-  development sets; friction on clean documents, still the largest gap on split G, and sensitive recall on union,
+- **0.5.0 (14/11/2026), preview:** everything above, development measurements only; the trip-wire's correction loop,
+  the Operator review and the subject check are tested but not measured ([changelog](../CHANGELOG.md)).
+- **14/11/2026: split H run: 0.5.0 FAILS its frozen rule** ([results](../eval/RESULTS-v0.7.md)), on text written by
+  Mistral and DeepSeek models and labelled blind by Moonshot and OpenAI models: sensitive recall 0.913 (limit 0.95),
+  friction 0.278 (limit 0.15), over-redaction 27 look-alikes above the control. Released leaks 0 in every arm; R_any
+  0.982; every ratchet condition against 0.4.0 holds. Replayed through 0.4.0's own code, the candidate's finder
+  answers give identical detection: the work written from split G found nothing more on split H, and the wider
+  injection signal held two more clean documents. Split H is now development data.
+- **Next:** sensitive recall on fresh text (union, criminal, religious and negative statements; split G's gains did
+  not carry to split H), then friction (fiction about invented people, configuration files blocked as secrets, the
+  wider injection signal) and the over-redaction of role titles, sites and references; a new fresh split under its
+  own plan for the next exam; friction on clean documents, still the largest gap on split G, and sensitive recall on union,
   family-violence, criminal and negative statements, measured on development sets (splits F and G now among them),
   with any change that removes a hold reviewed adversarially before adoption; split F's remaining misses that need
   finder-prompt changes (R-09) and the last released date cell (R-10); then the placeholder legend's utility

@@ -19,15 +19,17 @@ then does one of three things:
 > advises. Justitia wears a blindfold; Themis doesn't, and that's the point. The gate is the one part that has to see
 > everything. The cloud is the part that ends up blindfolded.
 
-**Status: v0.5.0, preview, untested on a fresh split.** What comes next, and how it will be tested:
+**Status: v0.5.0, preview; it failed its fresh split (split H).** What comes next, and how it will be tested:
 [docs/ROADMAP.md](docs/ROADMAP.md).
-- **0.5.0 (14/11/2026):** everything since 0.4.0 is development work; none of it has met a fresh split (split H, its
-  test, is sealed and has not been run), and split G, which 0.4.0 failed, is the last frozen result. New in it, tested
+- **0.5.0 (14/11/2026):** everything since 0.4.0 is development work. **Split H, its fresh test, was run on
+  14/11/2026 and 0.5.0 fails its rule** on the same three conditions as 0.4.0 on split G: sensitive recall 0.913
+  (limit 0.95), friction 0.278 (limit 0.15) and over-redaction 27 look-alikes above the control; nothing was released
+  in any arm ([results](eval/RESULTS-v0.7.md)). On split H it detects exactly what 0.4.0 detects. New in it, tested
   by the suite but **not measured** on any split: the Operator's point-by-point review with a value-free reveal audit
   ([Operator guide](docs/OPERATOR-GUIDE.md)), the cloud trip-wire's correction loop (off by default) and the subject
   check (off by default). Five switches that remove a hold are opt-in and off by default, because independent reviews
   showed each can release personal or secret data. Friction on split G with the default switches is not better than
-  0.4.0's and will be re-measured ([changelog](CHANGELOG.md)).
+  0.4.0's (by replay, 21 of 65 clean documents held against 20; [changelog](CHANGELOG.md)).
 - **Evaluation:** every release is tested once on a fresh held-out split, under a pass rule written before the split
   is opened. **v0.3 failed its rule** on split D, the first test text written by authors outside the gate's own model
   families (half Qwen, half Claude, written blind): it released **28 personal spans in 404 documents** (21 of them
@@ -478,6 +480,8 @@ themis-shield ships synthetic evaluation data ([`eval/`](eval/README.md)), all a
   per-case specification and labelled blind by another Claude model ([`eval/generator_f/`](eval/generator_f)).
 - **Split G:** 180 cases in two halves, the test of 0.4.0 as released, written the same way by a Moonshot Kimi model
   and a Zhipu GLM model and labelled blind by DeepSeek models ([`eval/generator_g/`](eval/generator_g)).
+- **Split H:** 158 cases in two halves, the test of 0.5.0, written by a Mistral model and a DeepSeek model and
+  labelled blind by a Moonshot Kimi model and an OpenAI gpt-oss model ([`eval/generator_h/`](eval/generator_h)).
 
 `eval/run_eval.py` runs the real detection and policy (rules, PII-Tracer, Gemma 4 E4B and 26B-A4B through llama.cpp,
 union, allow-list, policy), and `eval/score.py` scores it. Each release follows the same discipline:
@@ -485,6 +489,28 @@ union, allow-list, policy), and `eval/score.py` scores it. Each release follows 
 2. Write a pass rule and a negative control into a frozen plan.
 3. Open the test split once.
 4. Change nothing afterwards.
+
+### v0.7 kit, split H: 0.5.0 (14/11/2026)
+
+**Verdict: FAIL** (details: [`eval/RESULTS-v0.7.md`](eval/RESULTS-v0.7.md); plan:
+[`eval/FROZEN-PLAN-v0.7.md`](eval/FROZEN-PLAN-v0.7.md)). The candidate is release 0.5.0; the previous release is 0.4.0's
+own code, by replay of the candidate's finder answers.
+
+| Split H (158 cases, 2,588 gold spans, 54 clean) | 0.3.0 control | 0.4.0 | 0.5.0 |
+|---|---|---|---|
+| Released leaks (limit 3) | 0 | 0 | **0** |
+| R_any / R_full | 0.976 / 0.915 | 0.982 / 0.951 | **0.982 / 0.951** |
+| Sensitive statements, R_any (limit 0.95) | 0.873 | 0.913 | **0.913** |
+| Quasi-identifiers, R_any | 0.962 | 0.962 | **0.962** |
+| Clean documents held (of 54; limit 8) | 16 | 13 | **15** |
+| Over-redaction (hard negatives touched, of 2,570) | 594 | 621 | **621** |
+
+- **Where it failed:** sensitive recall (13 statements short; union, criminal and religious statements found least,
+  most misses in one half), friction (fiction held for sensitive statements, configuration files blocked as secrets,
+  injection signals; the two extra holds against 0.4.0 come from the wider injection signal) and over-redaction (27
+  look-alikes more than the control, all already in 0.4.0).
+- **What held:** nothing was released in any arm, no injection case released anything, and every ratchet condition
+  against 0.4.0 holds. The detection work since 0.4.0 found nothing more on this fresh text.
 
 ### v0.6 kit, split G: 0.4.0 as released (12/11/2026)
 
@@ -708,8 +734,8 @@ The full plan, with the reasoning, the prior art we looked at and how each part 
 1. **Detection on new authors' text** (from split D): column-aware identifier propagation, finder windows for long
    documents and detection-view readers are in 0.3.2, two sensitive-statement passes in 0.3.3, two friction fixes
    in 0.3.4, the fixes written from splits E and F in 0.4.0 (split F, 0.4.0's frozen test, failed; so did split G)
-   and those written from split G in 0.5.0 (development data only); next is split H, written and sealed, against
-   0.5.0.
+   and those written from split G in 0.5.0, which failed split H (sensitive recall 0.913, friction 0.278); split H
+   is now development data, and the next exam needs a new split.
 2. **Keep the work possible** (v0.4): typed placeholders with a codebook by default, optional partially synthetic
    values with per-job date shifting, per-task profiles, and a utility measurement next to the leak measurement
    ([story](docs/CODEBOOK-AND-SYNTHETIC-DATA.md)).

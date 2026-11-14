@@ -1,0 +1,31 @@
+{
+ "after": {
+  "any_r": 908,
+  "ex_p": 853,
+  "ex_r": 853,
+  "gold": 1074,
+  "lab": 1155,
+  "ov_p": 891,
+  "ov_r": 891
+ },
+ "before": {
+  "any_r": 812,
+  "ex_p": 729,
+  "ex_r": 729,
+  "gold": 990,
+  "lab": 1155,
+  "ov_p": 792,
+  "ov_r": 791
+ },
+ "extra_after": {
+  "documents compared": 82,
+  "documents with at least one disagreement item left": 62,
+  "review: cases changed by script": 29,
+  "review: cases with a disagreement item": 65,
+  "review: fixes rejected by the script (overlap / text changed / validator / quota)": 10,
+  "review: items": 600,
+  "review: items decided fix": 200,
+  "review: items decided keep": 400,
+  "review: requests that failed": 0
+ }
+}

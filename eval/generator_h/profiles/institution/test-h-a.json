@@ -1,0 +1,297 @@
+{
+  "_about": "Institution profile for split H half A, converted from that half's profile by eval/convert_profile.py (do not edit by hand). Every value is institutional and invented.",
+  "institution": "Horizon Regional Aviation Group",
+  "institution_forms": [
+    "HRA",
+    "The Horizon Group",
+    "horizon regional"
+  ],
+  "email_domain": "horizonregional.example",
+  "campuses": [
+    {
+      "town": "Barkly Gateway Airport",
+      "forms": [
+        "Barkly Gateway",
+        "Barkly",
+        "Airport Road, Tennant Creek NT 0860"
+      ],
+      "reception": "(08) 5550 1200"
+    },
+    {
+      "town": "Kimberley Skyport",
+      "forms": [
+        "Kimberley Skyport",
+        "KSP",
+        "Great Northern Highway, Broome WA 6725"
+      ],
+      "reception": "(08) 5550 1201"
+    },
+    {
+      "town": "Gulf Coast Terminal",
+      "forms": [
+        "Gulf Coast",
+        "GCT",
+        "Burketown Road, Normanton QLD 4890"
+      ],
+      "reception": "(07) 5550 1202"
+    },
+    {
+      "town": "Top End Operations Centre",
+      "forms": [
+        "Top End Ops",
+        "TEOC",
+        "McMillans Road, Darwin NT 0810"
+      ],
+      "reception": "(08) 5550 1203"
+    },
+    {
+      "town": "Central Maintenance Base",
+      "forms": [
+        "Central Maintenance",
+        "CMB",
+        "Stuart Highway, Alice Springs NT 0870"
+      ],
+      "reception": "(08) 5550 1204"
+    },
+    {
+      "town": "Cargo and Ground Handling Hub",
+      "forms": [
+        "Cargo Hub",
+        "CGH",
+        "Airport Drive, Mount Isa QLD 4825"
+      ],
+      "reception": "(07) 5550 1205"
+    },
+    {
+      "town": "Horizon Flight Academy",
+      "forms": [
+        "Flight Academy",
+        "HFA",
+        "Aerodrome Road, Kununurra WA 6743"
+      ],
+      "reception": "(08) 5550 1206"
+    },
+    {
+      "town": "Horizon Head Office",
+      "forms": [
+        "Head Office",
+        "HQ",
+        "12 Aviation Way, Cairns QLD 4870"
+      ],
+      "reception": "(07) 5550 1207"
+    }
+  ],
+  "buildings": [
+    "Terminal A",
+    "Terminal B",
+    "Operations Tower",
+    "Maintenance Hangar North",
+    "Maintenance Hangar South",
+    "Cargo Shed Alpha",
+    "Ground Handling Annex",
+    "Flight Training Centre",
+    "Administration Wing",
+    "Crew Accommodation Block"
+  ],
+  "role_mailboxes": [
+    "enquiries@horizonregional.example",
+    "privacy@horizonregional.example",
+    "servicedesk@horizonregional.example",
+    "flightops@horizonregional.example",
+    "maintenance@horizonregional.example",
+    "cargo@horizonregional.example",
+    "training@horizonregional.example",
+    "rostering@horizonregional.example",
+    "security@horizonregional.example",
+    "community@horizonregional.example"
+  ],
+  "main_lines": [
+    {
+      "purpose": "main",
+      "number": "1300 975 707"
+    },
+    {
+      "purpose": "main",
+      "number": "(07) 5550 1000"
+    },
+    {
+      "purpose": "main",
+      "number": "(08) 5550 1001"
+    }
+  ],
+  "reception_numbers": [
+    "(08) 5550 1200",
+    "(08) 5550 1201",
+    "(07) 5550 1202",
+    "(08) 5550 1203",
+    "(08) 5550 1204",
+    "(07) 5550 1205",
+    "(08) 5550 1206",
+    "(07) 5550 1207"
+  ],
+  "role_titles": [
+    "Pilot in Command",
+    "First Officer",
+    "Cabin Crew Member",
+    "Flight Dispatcher",
+    "Aircraft Maintenance Engineer",
+    "Licensed Aircraft Maintenance Engineer",
+    "Baggage Handler",
+    "Ground Operations Coordinator",
+    "Security Screening Officer",
+    "Airport Duty Manager",
+    "Customer Service Agent",
+    "Rostering Officer",
+    "Cargo Operations Supervisor",
+    "Ground Handling Supervisor",
+    "Airport Operations Manager",
+    "Flight Training Instructor",
+    "Chief Pilot",
+    "Head of Maintenance",
+    "Head of Ground Operations",
+    "Head of Customer Experience",
+    "Safety and Compliance Manager",
+    "Community Engagement Officer",
+    "Aboriginal and Torres Strait Islander Liaison Officer",
+    "Disability Access Coordinator",
+    "Environmental Compliance Officer"
+  ],
+  "programmes": [
+    {
+      "code": "HRA-FF",
+      "title": "Horizon Frequent Flyer Programme"
+    },
+    {
+      "code": "HRA-CC",
+      "title": "Community Charter Flights"
+    },
+    {
+      "code": "HRA-CP",
+      "title": "Cadet Pilot Programme"
+    },
+    {
+      "code": "HRA-PP",
+      "title": "Airport Car Park Permits"
+    },
+    {
+      "code": "HRA-RS",
+      "title": "Regional Student Travel Scheme"
+    },
+    {
+      "code": "HRA-CS",
+      "title": "Cargo Subscription Service"
+    },
+    {
+      "code": "HRA-AM",
+      "title": "Aircraft Maintenance Apprenticeship"
+    },
+    {
+      "code": "HRA-SP",
+      "title": "Skyport Volunteers Programme"
+    }
+  ],
+  "projects": [
+    {
+      "code": "HRA-RP-01",
+      "title": "Regional Air Mobility and Community Connectivity Study"
+    },
+    {
+      "code": "HRA-RP-02",
+      "title": "Sustainable Aviation Fuels in Remote Operations"
+    },
+    {
+      "code": "HRA-RP-03",
+      "title": "Indigenous Employment Pathways in Aviation"
+    }
+  ],
+  "committees": [
+    "Horizon Health and Wellbeing Committee",
+    "Horizon Disability Access and Inclusion Network",
+    "Horizon Pride and Allies Staff Network",
+    "Horizon Aboriginal and Torres Strait Islander Advisory Group",
+    "Horizon Environmental Sustainability Committee",
+    "Horizon Safety and Compliance Review Board",
+    "Horizon Union Consultative Committee"
+  ],
+  "initiatives": [
+    "Horizon Harmony Week",
+    "NAIDOC at Horizon",
+    "Horizon Mental Health Awareness Month",
+    "Disability Accessibility Action Week",
+    "Horizon Pride Month",
+    "Sustainable Skies Initiative",
+    "Community Open Day",
+    "Annual Safety Stand-down"
+  ],
+  "code_formats": {
+    "programme_code": "HRA-@@",
+    "project_code": "HRA-RP-##",
+    "training_module": "TM-####"
+  },
+  "reference_number_formats": {
+    "ticket_number": "TKT-########",
+    "case_number": "CASE-######",
+    "reference_number": "REF-########",
+    "order_number": "ORD-#######",
+    "invoice_number": "INV-#######",
+    "asset_id": "AST-HRA-######",
+    "cost_centre": "CC-#####",
+    "form_number": "FRM-#####",
+    "provider_number": "PROV-######",
+    "client_account": "CL-########",
+    "software_version": "v#.#.#",
+    "build_number": "BLD-####",
+    "payroll_group": "PG-###"
+  },
+  "public_dates": [
+    {
+      "event": "Australia Day Public Holiday",
+      "date": "26 January 2026"
+    },
+    {
+      "event": "NAIDOC Week",
+      "date": "5 July 2026"
+    },
+    {
+      "event": "Horizon Community Open Day",
+      "date": "15 August 2026"
+    },
+    {
+      "event": "R U OK? Day",
+      "date": "10 September 2026"
+    },
+    {
+      "event": "Horizon Annual General Meeting",
+      "date": "20 October 2026"
+    },
+    {
+      "event": "Christmas Day Public Holiday",
+      "date": "25 December 2026"
+    },
+    {
+      "event": "New Year's Day Public Holiday",
+      "date": "1 January 2027"
+    },
+    {
+      "event": "Horizon Harmony Week",
+      "date": "15 March 2027"
+    }
+  ],
+  "abn": "88 331 544 236",
+  "abn_forms": [
+    "88 331 544 236",
+    "88331544236"
+  ],
+  "finder_do_not_flag": [
+    "the organisation's own name (Horizon Regional Aviation Group, HRA, The Horizon Group)",
+    "site and campus names used as places of work (Barkly Gateway, Kimberley Skyport)",
+    "building and room names (Terminal A, Terminal B)",
+    "programme, course and project codes and titles (HRA-FF, Horizon Frequent Flyer Programme)",
+    "committee, staff-network and initiative names, even when they contain words such as health, pride, faith or union (Horizon Safety and Compliance Review Board, Horizon Union Consultative Committee, Horizon Harmony Week)",
+    "role titles without a person's name (Pilot in Command, First Officer)",
+    "shared role mailboxes (enquiries@horizonregional.example, privacy@horizonregional.example)",
+    "reception, switchboard and enquiry numbers",
+    "the organisation's own business number",
+    "dates of public events (open days, ceremonies, closures)"
+  ]
+}

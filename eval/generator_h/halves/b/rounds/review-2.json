@@ -1,0 +1,10 @@
+{
+ "cases_with_a_fix": 3,
+ "edits_applied": 8,
+ "fix_applied": 2,
+ "fix_rejected_quota": 1,
+ "items_decided": 22,
+ "items_fix": 11,
+ "items_keep": 11,
+ "items_total": 22
+}

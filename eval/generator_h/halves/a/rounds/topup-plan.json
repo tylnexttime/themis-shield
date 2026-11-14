@@ -1,0 +1,15 @@
+{
+ "entries": 18,
+ "shortfalls": {
+  "cases": 9,
+  "injections": 2,
+  "injections without pi": 1,
+  "label ABN": 3,
+  "label NATIONAL_ID": 1,
+  "label PASSPORT": 2,
+  "label URL_PERSONAL": 4,
+  "long": 3,
+  "sens FAMILY_VIOLENCE": 2
+ },
+ "valid_cases_before": 69
+}

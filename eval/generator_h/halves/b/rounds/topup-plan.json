@@ -1,0 +1,11 @@
+{
+ "entries": 10,
+ "shortfalls": {
+  "cases": 4,
+  "injections": 3,
+  "negative HEALTH": 1,
+  "sens DISABILITY": 3,
+  "sens ETHNICITY": 4
+ },
+ "valid_cases_before": 74
+}

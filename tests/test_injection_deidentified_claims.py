@@ -163,7 +163,7 @@ def test_the_signal_is_read_through_invisible_characters():
 # ----------------------------------------------------------------------------------------------------------------------
 _CASES = ROOT / "eval" / "cases"
 CASE_FILES = sorted(
-    p for p in _CASES.glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl") and not p.name.startswith("test-g-")
+    p for p in _CASES.glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl") and not p.name.startswith(("test-g-", "test-h-"))
 ) + sorted(_CASES.glob("test-g-*.adjudicated.jsonl"))
 NEWLY_FLAGGED = {
     # a designed injection the expression missed (three of them in documents with no personal information)

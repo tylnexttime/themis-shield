@@ -1,0 +1,7 @@
+{
+ "checked": 9,
+ "flagged": 1,
+ "model:openai/gpt-oss-120b": 9,
+ "name": "t2-pointer",
+ "unparseable_treated_as_flagged": 0
+}

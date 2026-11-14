@@ -1,0 +1,12 @@
+{
+ "cases_all_keep": 26,
+ "cases_with_a_fix": 36,
+ "edits_applied": 132,
+ "fix_applied": 27,
+ "fix_rejected_quota": 3,
+ "fix_rejected_validator": 6,
+ "items_decided": 578,
+ "items_fix": 189,
+ "items_keep": 389,
+ "items_total": 578
+}

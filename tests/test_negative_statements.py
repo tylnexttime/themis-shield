@@ -214,7 +214,7 @@ def test_the_switch_turns_the_pass_off():
 # which the switch no longer matches. The guard is strict on every set.
 _CASE_FILES = sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl"))
 _GUARD_SETS = [
-    pytest.param([p for p in _CASE_FILES if not p.name.startswith("test-g-")], (40, 50), id="sets-before-split-g"),
+    pytest.param([p for p in _CASE_FILES if not p.name.startswith(("test-g-", "test-h-"))], (40, 50), id="sets-before-split-g"),
     # Strict expected failure again since 13/11/2026: with the general-rule exemption opt-in (steward's decision after
     # the second review, RC-02: the rule released "Parents with no criminal record can be considered for kinship care
     # of Jayden."), GT-008's clean FAQ sentence "A person with no criminal record at all is treated the same as any

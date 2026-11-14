@@ -1,0 +1,348 @@
+{
+ "all_total": 3167759,
+ "models": {
+  "deepseek-v4.1-flash": {
+   "cumulative": {
+    "cached": 581632,
+    "calls": 203,
+    "completion": 142720,
+    "http_ok": 203,
+    "prompt": 781449,
+    "reasoning": 0,
+    "total": 924169
+   },
+   "free_quota_at_start": 1000000,
+   "phases": {
+    "author": {
+     "cached": 344576,
+     "calls": 82,
+     "completion": 82370,
+     "http_ok": 82,
+     "prompt": 385631,
+     "reasoning": 0,
+     "total": 468001
+    },
+    "probe": {
+     "cached": 28928,
+     "calls": 10,
+     "completion": 6111,
+     "http_ok": 10,
+     "prompt": 36306,
+     "reasoning": 0,
+     "total": 42417
+    },
+    "profile": {
+     "cached": 0,
+     "calls": 1,
+     "completion": 1888,
+     "http_ok": 1,
+     "prompt": 1781,
+     "reasoning": 0,
+     "total": 3669
+    },
+    "repair": {
+     "cached": 66304,
+     "calls": 32,
+     "completion": 41538,
+     "http_ok": 32,
+     "prompt": 135563,
+     "reasoning": 0,
+     "total": 177101
+    },
+    "review": {
+     "cached": 89088,
+     "calls": 62,
+     "completion": 2431,
+     "http_ok": 62,
+     "prompt": 159612,
+     "reasoning": 0,
+     "total": 162043
+    },
+    "t2-review": {
+     "cached": 3072,
+     "calls": 3,
+     "completion": 96,
+     "http_ok": 3,
+     "prompt": 7106,
+     "reasoning": 0,
+     "total": 7202
+    },
+    "topup": {
+     "cached": 40448,
+     "calls": 10,
+     "completion": 6342,
+     "http_ok": 10,
+     "prompt": 44240,
+     "reasoning": 0,
+     "total": 50582
+    },
+    "topup2": {
+     "cached": 9216,
+     "calls": 3,
+     "completion": 1944,
+     "http_ok": 3,
+     "prompt": 11210,
+     "reasoning": 0,
+     "total": 13154
+    }
+   },
+   "provider": "alibaba",
+   "serving_providers": []
+  },
+  "kimi-k3.1-pro": {
+   "cumulative": {
+    "cached": 2048,
+    "calls": 80,
+    "completion": 81742,
+    "http_ok": 80,
+    "prompt": 203506,
+    "reasoning": 0,
+    "total": 285248
+   },
+   "free_quota_at_start": 393000,
+   "phases": {
+    "label": {
+     "cached": 0,
+     "calls": 72,
+     "completion": 69647,
+     "http_ok": 72,
+     "prompt": 178266,
+     "reasoning": 0,
+     "total": 247913
+    },
+    "probe": {
+     "cached": 2048,
+     "calls": 4,
+     "completion": 620,
+     "http_ok": 4,
+     "prompt": 8949,
+     "reasoning": 0,
+     "total": 9569
+    },
+    "t2-label": {
+     "cached": 0,
+     "calls": 4,
+     "completion": 11475,
+     "http_ok": 4,
+     "prompt": 16291,
+     "reasoning": 0,
+     "total": 27766
+    }
+   },
+   "provider": "alibaba",
+   "serving_providers": []
+  },
+  "mistralai/mistral-large-2512": {
+   "cumulative": {
+    "cached": 661888,
+    "calls": 248,
+    "completion": 311068,
+    "cost_usd": 0.747198,
+    "http_ok": 243,
+    "prompt": 1102445,
+    "reasoning": 0,
+    "total": 1413513
+   },
+   "free_quota_at_start": null,
+   "phases": {
+    "author": {
+     "cached": 327808,
+     "calls": 91,
+     "completion": 123268,
+     "cost_usd": 0.249576,
+     "http_ok": 86,
+     "prompt": 410912,
+     "reasoning": 0,
+     "total": 534180
+    },
+    "probe": {
+     "cached": 19200,
+     "calls": 10,
+     "completion": 7666,
+     "cost_usd": 0.022805,
+     "http_ok": 10,
+     "prompt": 38872,
+     "reasoning": 0,
+     "total": 46538
+    },
+    "profile": {
+     "cached": 0,
+     "calls": 1,
+     "completion": 2359,
+     "cost_usd": 0.004458,
+     "http_ok": 1,
+     "prompt": 1839,
+     "reasoning": 0,
+     "total": 4198
+    },
+    "repair": {
+     "cached": 125568,
+     "calls": 54,
+     "completion": 95171,
+     "cost_usd": 0.249741,
+     "http_ok": 54,
+     "prompt": 307319,
+     "reasoning": 0,
+     "total": 402490
+    },
+    "review": {
+     "cached": 79872,
+     "calls": 52,
+     "completion": 3832,
+     "cost_usd": 0.04993,
+     "http_ok": 52,
+     "prompt": 157273,
+     "reasoning": 0,
+     "total": 161105
+    },
+    "t2-repair": {
+     "cached": 16128,
+     "calls": 9,
+     "completion": 22583,
+     "cost_usd": 0.051598,
+     "http_ok": 9,
+     "prompt": 45912,
+     "reasoning": 0,
+     "total": 68495
+    },
+    "t2-review": {
+     "cached": 1664,
+     "calls": 4,
+     "completion": 266,
+     "cost_usd": 0.006146,
+     "http_ok": 4,
+     "prompt": 12605,
+     "reasoning": 0,
+     "total": 12871
+    },
+    "topup": {
+     "cached": 66688,
+     "calls": 18,
+     "completion": 37572,
+     "cost_usd": 0.074115,
+     "http_ok": 18,
+     "prompt": 88422,
+     "reasoning": 0,
+     "total": 125994
+    },
+    "topup2": {
+     "cached": 24960,
+     "calls": 9,
+     "completion": 18351,
+     "cost_usd": 0.038828,
+     "http_ok": 9,
+     "prompt": 39291,
+     "reasoning": 0,
+     "total": 57642
+    }
+   },
+   "provider": "openrouter",
+   "serving_providers": [
+    "Mistral"
+   ]
+  },
+  "openai/gpt-oss-120b": {
+   "cumulative": {
+    "cached": 133838,
+    "calls": 282,
+    "completion": 118575,
+    "cost_usd": 0.065477,
+    "http_ok": 282,
+    "prompt": 426254,
+    "reasoning": 42045,
+    "total": 544829
+   },
+   "free_quota_at_start": null,
+   "phases": {
+    "label": {
+     "cached": 97160,
+     "calls": 79,
+     "completion": 99027,
+     "cost_usd": 0.043581,
+     "http_ok": 79,
+     "prompt": 186197,
+     "reasoning": 32914,
+     "total": 285224
+    },
+    "pointer": {
+     "cached": 31235,
+     "calls": 168,
+     "completion": 12723,
+     "cost_usd": 0.015539,
+     "http_ok": 168,
+     "prompt": 187669,
+     "reasoning": 6243,
+     "total": 200392
+    },
+    "pointer2": {
+     "cached": 2283,
+     "calls": 11,
+     "completion": 748,
+     "cost_usd": 0.000742,
+     "http_ok": 11,
+     "prompt": 11543,
+     "reasoning": 327,
+     "total": 12291
+    },
+    "probe": {
+     "cached": 244,
+     "calls": 5,
+     "completion": 1583,
+     "cost_usd": 0.001511,
+     "http_ok": 5,
+     "prompt": 5423,
+     "reasoning": 802,
+     "total": 7006
+    },
+    "t2-label": {
+     "cached": 112,
+     "calls": 3,
+     "completion": 3123,
+     "cost_usd": 0.001491,
+     "http_ok": 3,
+     "prompt": 6645,
+     "reasoning": 1101,
+     "total": 9768
+    },
+    "t2-pointer": {
+     "cached": 1108,
+     "calls": 12,
+     "completion": 1035,
+     "cost_usd": 0.001851,
+     "http_ok": 12,
+     "prompt": 17888,
+     "reasoning": 484,
+     "total": 18923
+    },
+    "t2-pointer2": {
+     "cached": 1696,
+     "calls": 4,
+     "completion": 336,
+     "cost_usd": 0.000762,
+     "http_ok": 4,
+     "prompt": 10889,
+     "reasoning": 174,
+     "total": 11225
+    }
+   },
+   "provider": "openrouter",
+   "serving_providers": [
+    "AkashML",
+    "CoreWeave",
+    "Crusoe",
+    "DeepInfra",
+    "DekaLLM",
+    "DigitalOcean",
+    "Groq",
+    "Mancer 2",
+    "Near AI",
+    "Parasail",
+    "PrimeIntellect",
+    "Sail Research",
+    "SiliconFlow",
+    "Venice"
+   ]
+  }
+ },
+ "openrouter_cost_usd": 0.812674
+}

@@ -323,7 +323,7 @@ PERSON_BOUND_GOLD = {"PERSON", "ADDRESS", "DATE_OF_BIRTH", "QUASI_ID", "HEALTH",
                      "RELIGION", "CRIMINAL", "FAMILY_VIOLENCE", "ETHNICITY", "UNION"}
 _CASES = ROOT / "eval" / "cases"
 CASE_FILES = sorted(
-    p for p in _CASES.glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl") and not p.name.startswith("test-g-")
+    p for p in _CASES.glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl") and not p.name.startswith(("test-g-", "test-h-"))
 ) + sorted(_CASES.glob("test-g-*.adjudicated.jsonl"))
 
 

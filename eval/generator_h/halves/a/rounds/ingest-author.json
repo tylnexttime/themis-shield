@@ -1,0 +1,34 @@
+{
+ "call_stats": {
+  "model:mistralai/mistral-large-2512": 86
+ },
+ "cases_clean_of_issues": 32,
+ "cases_in_round": 86,
+ "cases_with_issues": 54,
+ "cases_with_wrong_closer_accepted": 19,
+ "fence_stripped": 7,
+ "issue_case_counts_by_code": {
+  "CHECKSUM": 2,
+  "EMAIL": 7,
+  "FORMAT": 1,
+  "LONG": 1,
+  "PHONE": 9,
+  "PHONE_SCAN": 12,
+  "PROFILE_HN": 25,
+  "P_DENYLIST": 3,
+  "P_INJ": 3,
+  "P_LEN": 1,
+  "P_PARSE": 8,
+  "P_URL": 5,
+  "REPEAT": 17
+ },
+ "requests": 86,
+ "round": "author",
+ "status_totals": {
+  "invalid": 54,
+  "valid": 32
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 2,
+ "wrong_closers_accepted": 104
+}

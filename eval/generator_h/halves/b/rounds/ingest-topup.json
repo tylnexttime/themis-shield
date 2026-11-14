@@ -1,0 +1,25 @@
+{
+ "call_stats": {
+  "model:deepseek-v4.1-flash": 10
+ },
+ "cases_clean_of_issues": 5,
+ "cases_in_round": 10,
+ "cases_with_issues": 5,
+ "cases_with_wrong_closer_accepted": 1,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {
+  "PHONE": 3,
+  "PROFILE_HN": 1,
+  "P_INJ": 1,
+  "REPEAT": 2
+ },
+ "requests": 10,
+ "round": "topup",
+ "status_totals": {
+  "dropped": 13,
+  "valid": 79
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 0,
+ "wrong_closers_accepted": 1
+}

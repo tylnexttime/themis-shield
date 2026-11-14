@@ -1,0 +1,20 @@
+{
+ "entries": 9,
+ "multiplier": 2.5,
+ "planned_spans_or_documents": {
+  "label ABN": 5,
+  "label PASSPORT": 3,
+  "long documents": 3,
+  "sens FAMILY_VIOLENCE": 8
+ },
+ "profiled_entries": 3,
+ "seed_choices": 20261306,
+ "seed_values": 20261307,
+ "shortfalls": {
+  "label ABN": 2,
+  "label PASSPORT": 1,
+  "long": 1,
+  "sens FAMILY_VIOLENCE": 3
+ },
+ "valid_cases_before": 72
+}

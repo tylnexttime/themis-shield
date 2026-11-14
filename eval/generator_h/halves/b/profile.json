@@ -1,0 +1,373 @@
+{
+ "_about": "Institutional deployment profile for one invented independent school group, for privacy-gate allow-list construction.",
+ "organisation": "Yarrowee Grammarians Education Trust",
+ "organisation_forms": [
+  "Yarrowee Grammarians",
+  "YGET",
+  "The Grammarians",
+  "yarrowee grammarians education trust"
+ ],
+ "description": "Yarrowee Grammarians Education Trust operates six learning sites and a head office across regional Victoria. The trust runs a junior school, senior college, boarding house, early learning centre, outdoor education centre and sports precinct, employing classroom teachers, counsellors, boarding supervisors, learning support coordinators, nurses and grounds staff.",
+ "business_identifier": {
+  "scheme": "ABN",
+  "value": "46 151 279 735",
+  "forms": [
+   "46 151 279 735",
+   "46151279735"
+  ]
+ },
+ "email_domain": "yarroweegrammarians.example",
+ "sites": [
+  {
+   "name": "Kanyini Junior School",
+   "forms": [
+    "Kanyini Junior",
+    "KJS"
+   ],
+   "address": "18 Wattlebank Road, Ballarat East VIC 3350",
+   "reception": "(03) 5550 4102"
+  },
+  {
+   "name": "Ballarat Senior College",
+   "forms": [
+    "Senior College",
+    "BSC"
+   ],
+   "address": "4 Sovereign Walk, Ballarat Central VIC 3350",
+   "reception": "(03) 5550 4118"
+  },
+  {
+   "name": "Golden Point Boarding House",
+   "forms": [
+    "Golden Point House",
+    "GPB"
+   ],
+   "address": "77 Barkly Street, Golden Point VIC 3350",
+   "reception": "(03) 5550 4131"
+  },
+  {
+   "name": "Miners Rest Early Learning Centre",
+   "forms": [
+    "Miners Rest ELC",
+    "MRELC"
+   ],
+   "address": "9 Howe Street, Miners Rest VIC 3352",
+   "reception": "(03) 5550 4144"
+  },
+  {
+   "name": "Lal Lal Outdoor Education Centre",
+   "forms": [
+    "Lal Lal OEC",
+    "LOEC"
+   ],
+   "address": "2200 Yendon Road, Lal Lal VIC 3352",
+   "reception": "(03) 5550 4157"
+  },
+  {
+   "name": "Mount Clear Sports Precinct",
+   "forms": [
+    "Mount Clear Sports",
+    "MCSP"
+   ],
+   "address": "112 Geelong Road, Mount Clear VIC 3350",
+   "reception": "(03) 5550 4169"
+  },
+  {
+   "name": "Trust Head Office",
+   "forms": [
+    "Head Office",
+    "YGET HO"
+   ],
+   "address": "31 Sturt Street, Ballarat Central VIC 3350",
+   "reception": "(03) 5550 4175"
+  },
+  {
+   "name": "Buninyong Music Annexe",
+   "forms": [
+    "Buninyong Annexe",
+    "BMA"
+   ],
+   "address": "6 Learmonth Street, Buninyong VIC 3357",
+   "reception": "(03) 5550 4188"
+  }
+ ],
+ "site_note": "A site's bare name is also the suburb or town where staff, students and families live; it does not identify a person.",
+ "buildings": [
+  {
+   "name": "Wattle Wing"
+  },
+  {
+   "name": "Federation Hall"
+  },
+  {
+   "name": "Pyrenees Library Block"
+  },
+  {
+   "name": "Sovereign Science Centre"
+  },
+  {
+   "name": "Barkly Boarders' Wing"
+  },
+  {
+   "name": "Howe Cottage"
+  },
+  {
+   "name": "Yendon Field Studies Shed"
+  },
+  {
+   "name": "Geelong Road Pavilion"
+  },
+  {
+   "name": "Sturt Street Admin Annexe"
+  }
+ ],
+ "role_mailboxes": [
+  "enquiries@yarroweegrammarians.example",
+  "privacy@yarroweegrammarians.example",
+  "servicedesk@yarroweegrammarians.example",
+  "enrolments@yarroweegrammarians.example",
+  "bursar@yarroweegrammarians.example",
+  "boarding@yarroweegrammarians.example",
+  "counselling@yarroweegrammarians.example",
+  "learningsupport@yarroweegrammarians.example",
+  "healthcentre@yarroweegrammarians.example",
+  "outdoored@yarroweegrammarians.example",
+  "music@yarroweegrammarians.example",
+  "careers@yarroweegrammarians.example"
+ ],
+ "main_lines": [
+  "(03) 5550 4100",
+  "(03) 5550 4000",
+  "1800 975 708"
+ ],
+ "reception_numbers": [
+  "(03) 5550 4102",
+  "(03) 5550 4118",
+  "(03) 5550 4131",
+  "(03) 5550 4144",
+  "(03) 5550 4157",
+  "(03) 5550 4169",
+  "(03) 5550 4175",
+  "(03) 5550 4188"
+ ],
+ "role_titles": [
+  "Principal",
+  "Deputy Principal",
+  "Head of Junior School",
+  "Head of Senior College",
+  "Head of Year",
+  "Classroom Teacher",
+  "Teaching Assistant",
+  "Learning Support Coordinator",
+  "School Counsellor",
+  "School Nurse",
+  "Boarding Supervisor",
+  "Boarding House Coordinator",
+  "Enrolment Officer",
+  "Bursar",
+  "Finance Officer",
+  "Groundskeeper",
+  "Facilities Manager",
+  "Outdoor Education Instructor",
+  "Music Tutor",
+  "Careers Adviser",
+  "Human Resources Adviser",
+  "ICT Support Officer",
+  "Risk and Compliance Officer",
+  "Early Learning Educator",
+  "Sports Coordinator",
+  "Canteen Supervisor",
+  "Library Technician",
+  "Aboriginal Education Liaison Officer",
+  "International Student Coordinator",
+  "Payroll Officer"
+ ],
+ "programmes": [
+  {
+   "code": "SCH-OL",
+   "title": "Open Learning Scholarships"
+  },
+  {
+   "code": "OED-CAMP",
+   "title": "Outdoor Education Programme"
+  },
+  {
+   "code": "LSP-IND",
+   "title": "Learning Support Individual Plans"
+  },
+  {
+   "code": "MUS-TUI",
+   "title": "Instrumental Music Tuition"
+  },
+  {
+   "code": "BAC-CARE",
+   "title": "Before and After School Care"
+  },
+  {
+   "code": "BRD-RES",
+   "title": "Boarding Residence Programme"
+  },
+  {
+   "code": "ELC-PLAY",
+   "title": "Early Learning Play-Based Programme"
+  },
+  {
+   "code": "SPT-ACAD",
+   "title": "Sports Academy Programme"
+  },
+  {
+   "code": "VET-SCH",
+   "title": "Vocational Education and Training in Schools"
+  },
+  {
+   "code": "INT-STU",
+   "title": "International Student Programme"
+  }
+ ],
+ "research_projects": [
+  {
+   "code": "RES-LIT",
+   "title": "Regional Literacy Outcomes Study"
+  },
+  {
+   "code": "RES-WELL",
+   "title": "Student Wellbeing Longitudinal Review"
+  },
+  {
+   "code": "RES-BRD",
+   "title": "Boarding Transitions Research Project"
+  }
+ ],
+ "committees": [
+  {
+   "name": "Student Health and Wellbeing Committee"
+  },
+  {
+   "name": "Disability Inclusion Advisory Group"
+  },
+  {
+   "name": "Faith and Values Reference Group"
+  },
+  {
+   "name": "Pride and Belonging Staff Network"
+  },
+  {
+   "name": "Staff Union Consultative Committee"
+  },
+  {
+   "name": "Aboriginal and Torres Strait Islander Education Advisory Group"
+  },
+  {
+   "name": "Finance and Audit Committee"
+  },
+  {
+   "name": "Child Safety Committee"
+  },
+  {
+   "name": "Curriculum and Assessment Committee"
+  }
+ ],
+ "initiatives": [
+  {
+   "name": "Harmony Week Celebrations"
+  },
+  {
+   "name": "National Reconciliation Week Programme"
+  },
+  {
+   "name": "R U OK? Day Activities"
+  },
+  {
+   "name": "Book Week Parade"
+  },
+  {
+   "name": "Open Day and Campus Tours"
+  },
+  {
+   "name": "Annual General Meeting"
+  },
+  {
+   "name": "Winter Sports Carnival"
+  },
+  {
+   "name": "Boarding Family Weekend"
+  },
+  {
+   "name": "Outdoor Education Expo"
+  },
+  {
+   "name": "Staff Wellbeing Fortnight"
+  }
+ ],
+ "committee_note": "These are institutional committee and network names only; they are not statements about any person.",
+ "code_formats": {
+  "programme_code": "###-@@@",
+  "module_code": "MOD-####",
+  "project_code": "RES-@@@",
+  "unit_code": "VCE-U###"
+ },
+ "reference_number_formats": {
+  "ticket_number": "YGT-#####",
+  "case_number": "CS-2026-#####",
+  "reference_number": "REF-########",
+  "order_number": "ORD-@@-#####",
+  "invoice_number": "INV-2026-#####",
+  "asset_id": "AST-@@-#####",
+  "cost_centre": "CC-####-@@",
+  "form_number": "FRM-###-@@",
+  "provider_number": "PRV-########",
+  "client_account": "CA-#######",
+  "software_version": "v#.#.##",
+  "build_number": "BUILD-#####",
+  "payroll_group": "PG-@@-###"
+ },
+ "public_dates": [
+  {
+   "event": "Australia Day public holiday",
+   "date": "26 January 2026"
+  },
+  {
+   "event": "Labour Day public holiday",
+   "date": "9 March 2026"
+  },
+  {
+   "event": "Harmony Week begins",
+   "date": "16 March 2026"
+  },
+  {
+   "event": "Open Day",
+   "date": "18 April 2026"
+  },
+  {
+   "event": "National Reconciliation Week begins",
+   "date": "27 May 2026"
+  },
+  {
+   "event": "Annual General Meeting",
+   "date": "20 August 2026"
+  },
+  {
+   "event": "R U OK? Day",
+   "date": "10 September 2026"
+  },
+  {
+   "event": "Melbourne Cup public holiday",
+   "date": "3 November 2026"
+  },
+  {
+   "event": "Christmas Day public holiday",
+   "date": "25 December 2026"
+  },
+  {
+   "event": "Term 1 commences",
+   "date": "28 January 2027"
+  }
+ ],
+ "personal_identifier_formats_issued": {
+  "staff_number": "YGET-S######",
+  "student_number": "YGET-ST######",
+  "volunteer_number": "YGET-V#####",
+  "boarding_resident_number": "YGET-BR####",
+  "family_account_number": "YGET-FA######"
+ }
+}

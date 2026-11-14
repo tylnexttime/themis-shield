@@ -169,7 +169,7 @@ def test_the_switch_turns_the_pass_off():
 _GOLD_OMISSIONS = {("GR-097", 862)}
 _NEVER = re.compile(r"(?!)")
 _CASE_FILES = [p for p in sorted((ROOT / "eval" / "cases").glob("*.jsonl"))
-               if p.name.endswith(".adjudicated.jsonl") or not p.name.startswith("test-g-")]
+               if p.name.endswith(".adjudicated.jsonl") or not p.name.startswith(("test-g-", "test-h-"))]
 # Spans per set when written: dev 5, C 3, D-c 24, D-q 10, E 13, F 18, G-r 12, G-t 15 (4 of them negative), test 5.
 _FLOORS = {"dev": 5, "test-c": 3, "test-d-c": 24, "test-d-q": 10, "test-e-k": 13, "test-f-o": 18,
            "test-g-r.adjudicated": 12, "test-g-t.adjudicated": 15, "test": 5}

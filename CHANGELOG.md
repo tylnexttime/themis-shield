@@ -2,6 +2,21 @@
 
 All notable changes to themis-shield. Dates are day-first (DD/MM/YYYY).
 
+## Unreleased
+
+### Evaluation: split H run on 0.5.0 (14/11/2026)
+
+- **0.5.0 fails its frozen rule on split H** ([results](eval/RESULTS-v0.7.md); plan
+  [`FROZEN-PLAN-v0.7.md`](eval/FROZEN-PLAN-v0.7.md), kit tag `eval-kit-v0.7-frozen`): sensitive recall 0.913 (316 of
+  346, limit 0.95), clean-document friction 0.278 (15 of 54, limit 0.15) and over-redaction 621 hard negatives against
+  the control's 594. Released leaks 0 in all three arms on both halves; R_any 0.982; every ratchet condition against
+  0.4.0 holds; no stage failed. The previous release (0.4.0's own code, replaying the candidate's finder answers, no
+  call refused) has identical detection and holds two fewer clean documents (the wider injection signal).
+- Split H is published as `eval/cases/test-h-a.jsonl` and `test-h-b.jsonl`, byte-identical to the sealed files, with
+  its pipeline under `eval/generator_h/`; it is now development data. No gate code changed.
+- Seven development guards in the suite leave split H out (`test-h-*`) until development work starts from it; what
+  they report on it is recorded in the results.
+
 ## 0.5.0 (14/11/2026)
 
 **Preview, like every release before it, and untested on a fresh split.** No fresh split has tested 0.5.0: split H,

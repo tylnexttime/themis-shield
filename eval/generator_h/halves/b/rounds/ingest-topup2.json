@@ -1,0 +1,20 @@
+{
+ "call_stats": {
+  "model:deepseek-v4.1-flash": 3
+ },
+ "cases_clean_of_issues": 3,
+ "cases_in_round": 3,
+ "cases_with_issues": 0,
+ "cases_with_wrong_closer_accepted": 0,
+ "fence_stripped": 0,
+ "issue_case_counts_by_code": {},
+ "requests": 3,
+ "round": "topup2",
+ "status_totals": {
+  "dropped": 13,
+  "valid": 82
+ },
+ "trimmed_spans": 0,
+ "unknown_hn_kind_warnings": 0,
+ "wrong_closers_accepted": 0
+}

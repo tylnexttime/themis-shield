@@ -1,0 +1,288 @@
+{
+ "_about": "Institutional deployment profile for a synthetic privacy gate evaluation set: one fictional regional airline and airport operator in Australia.",
+ "organisation": "Horizon Regional Aviation Group",
+ "organisation_forms": [
+  "HRA",
+  "The Horizon Group",
+  "horizon regional"
+ ],
+ "description": "A regional airline and airport operator serving remote and rural communities across northern and central Australia. Horizon Regional Aviation Group operates scheduled passenger services, cargo flights, charter operations, and airport management for six regional hubs, alongside flight training, aircraft maintenance, and ground handling services.",
+ "business_identifier": {
+  "scheme": "ABN",
+  "value": "88 331 544 236",
+  "forms": [
+   "88 331 544 236",
+   "88331544236"
+  ]
+ },
+ "email_domain": "horizonregional.example",
+ "sites": [
+  {
+   "name": "Barkly Gateway Airport",
+   "forms": [
+    "Barkly Gateway",
+    "Barkly"
+   ],
+   "address": "Airport Road, Tennant Creek NT 0860",
+   "reception": "(08) 5550 1200"
+  },
+  {
+   "name": "Kimberley Skyport",
+   "forms": [
+    "Kimberley Skyport",
+    "KSP"
+   ],
+   "address": "Great Northern Highway, Broome WA 6725",
+   "reception": "(08) 5550 1201"
+  },
+  {
+   "name": "Gulf Coast Terminal",
+   "forms": [
+    "Gulf Coast",
+    "GCT"
+   ],
+   "address": "Burketown Road, Normanton QLD 4890",
+   "reception": "(07) 5550 1202"
+  },
+  {
+   "name": "Top End Operations Centre",
+   "forms": [
+    "Top End Ops",
+    "TEOC"
+   ],
+   "address": "McMillans Road, Darwin NT 0810",
+   "reception": "(08) 5550 1203"
+  },
+  {
+   "name": "Central Maintenance Base",
+   "forms": [
+    "Central Maintenance",
+    "CMB"
+   ],
+   "address": "Stuart Highway, Alice Springs NT 0870",
+   "reception": "(08) 5550 1204"
+  },
+  {
+   "name": "Cargo and Ground Handling Hub",
+   "forms": [
+    "Cargo Hub",
+    "CGH"
+   ],
+   "address": "Airport Drive, Mount Isa QLD 4825",
+   "reception": "(07) 5550 1205"
+  },
+  {
+   "name": "Horizon Flight Academy",
+   "forms": [
+    "Flight Academy",
+    "HFA"
+   ],
+   "address": "Aerodrome Road, Kununurra WA 6743",
+   "reception": "(08) 5550 1206"
+  },
+  {
+   "name": "Horizon Head Office",
+   "forms": [
+    "Head Office",
+    "HQ"
+   ],
+   "address": "12 Aviation Way, Cairns QLD 4870",
+   "reception": "(07) 5550 1207"
+  }
+ ],
+ "site_note": "Each site name is also the name of a suburb or town where staff, clients, and community members live.",
+ "buildings": [
+  "Terminal A",
+  "Terminal B",
+  "Operations Tower",
+  "Maintenance Hangar North",
+  "Maintenance Hangar South",
+  "Cargo Shed Alpha",
+  "Ground Handling Annex",
+  "Flight Training Centre",
+  "Administration Wing",
+  "Crew Accommodation Block"
+ ],
+ "role_mailboxes": [
+  "enquiries@horizonregional.example",
+  "privacy@horizonregional.example",
+  "servicedesk@horizonregional.example",
+  "flightops@horizonregional.example",
+  "maintenance@horizonregional.example",
+  "cargo@horizonregional.example",
+  "training@horizonregional.example",
+  "rostering@horizonregional.example",
+  "security@horizonregional.example",
+  "community@horizonregional.example"
+ ],
+ "main_lines": [
+  "1300 975 707",
+  "(07) 5550 1000",
+  "(08) 5550 1001"
+ ],
+ "reception_numbers": [
+  "(08) 5550 1200",
+  "(08) 5550 1201",
+  "(07) 5550 1202",
+  "(08) 5550 1203",
+  "(08) 5550 1204",
+  "(07) 5550 1205",
+  "(08) 5550 1206",
+  "(07) 5550 1207"
+ ],
+ "role_titles": [
+  "Pilot in Command",
+  "First Officer",
+  "Cabin Crew Member",
+  "Flight Dispatcher",
+  "Aircraft Maintenance Engineer",
+  "Licensed Aircraft Maintenance Engineer",
+  "Baggage Handler",
+  "Ground Operations Coordinator",
+  "Security Screening Officer",
+  "Airport Duty Manager",
+  "Customer Service Agent",
+  "Rostering Officer",
+  "Cargo Operations Supervisor",
+  "Ground Handling Supervisor",
+  "Airport Operations Manager",
+  "Flight Training Instructor",
+  "Chief Pilot",
+  "Head of Maintenance",
+  "Head of Ground Operations",
+  "Head of Customer Experience",
+  "Safety and Compliance Manager",
+  "Community Engagement Officer",
+  "Aboriginal and Torres Strait Islander Liaison Officer",
+  "Disability Access Coordinator",
+  "Environmental Compliance Officer"
+ ],
+ "programmes": [
+  {
+   "code": "HRA-FF",
+   "title": "Horizon Frequent Flyer Programme"
+  },
+  {
+   "code": "HRA-CC",
+   "title": "Community Charter Flights"
+  },
+  {
+   "code": "HRA-CP",
+   "title": "Cadet Pilot Programme"
+  },
+  {
+   "code": "HRA-PP",
+   "title": "Airport Car Park Permits"
+  },
+  {
+   "code": "HRA-RS",
+   "title": "Regional Student Travel Scheme"
+  },
+  {
+   "code": "HRA-CS",
+   "title": "Cargo Subscription Service"
+  },
+  {
+   "code": "HRA-AM",
+   "title": "Aircraft Maintenance Apprenticeship"
+  },
+  {
+   "code": "HRA-SP",
+   "title": "Skyport Volunteers Programme"
+  }
+ ],
+ "research_projects": [
+  {
+   "code": "HRA-RP-01",
+   "title": "Regional Air Mobility and Community Connectivity Study"
+  },
+  {
+   "code": "HRA-RP-02",
+   "title": "Sustainable Aviation Fuels in Remote Operations"
+  },
+  {
+   "code": "HRA-RP-03",
+   "title": "Indigenous Employment Pathways in Aviation"
+  }
+ ],
+ "committees": [
+  "Horizon Health and Wellbeing Committee",
+  "Horizon Disability Access and Inclusion Network",
+  "Horizon Pride and Allies Staff Network",
+  "Horizon Aboriginal and Torres Strait Islander Advisory Group",
+  "Horizon Environmental Sustainability Committee",
+  "Horizon Safety and Compliance Review Board",
+  "Horizon Union Consultative Committee"
+ ],
+ "initiatives": [
+  "Horizon Harmony Week",
+  "NAIDOC at Horizon",
+  "Horizon Mental Health Awareness Month",
+  "Disability Accessibility Action Week",
+  "Horizon Pride Month",
+  "Sustainable Skies Initiative",
+  "Community Open Day",
+  "Annual Safety Stand-down"
+ ],
+ "committee_note": "Committee and network names are institutional and do not imply membership, identity, or characteristics of any person.",
+ "code_formats": {
+  "programme_code": "HRA-@@",
+  "project_code": "HRA-RP-##",
+  "training_module": "TM-####"
+ },
+ "reference_number_formats": {
+  "ticket_number": "TKT-########",
+  "case_number": "CASE-######",
+  "reference_number": "REF-########",
+  "order_number": "ORD-#######",
+  "invoice_number": "INV-#######",
+  "asset_id": "AST-HRA-######",
+  "cost_centre": "CC-#####",
+  "form_number": "FRM-#####",
+  "provider_number": "PROV-######",
+  "client_account": "CL-########",
+  "software_version": "v#.#.#",
+  "build_number": "BLD-####",
+  "payroll_group": "PG-###"
+ },
+ "public_dates": [
+  {
+   "event": "Australia Day Public Holiday",
+   "date": "26 January 2026"
+  },
+  {
+   "event": "NAIDOC Week",
+   "date": "5 July 2026"
+  },
+  {
+   "event": "Horizon Community Open Day",
+   "date": "15 August 2026"
+  },
+  {
+   "event": "R U OK? Day",
+   "date": "10 September 2026"
+  },
+  {
+   "event": "Horizon Annual General Meeting",
+   "date": "20 October 2026"
+  },
+  {
+   "event": "Christmas Day Public Holiday",
+   "date": "25 December 2026"
+  },
+  {
+   "event": "New Year's Day Public Holiday",
+   "date": "1 January 2027"
+  },
+  {
+   "event": "Horizon Harmony Week",
+   "date": "15 March 2027"
+  }
+ ],
+ "personal_identifier_formats_issued": {
+  "staff_number": "HRA-S######",
+  "frequent_flyer_number": "HRA-FF#######",
+  "cadet_pilot_number": "HRA-CP#####",
+  "volunteer_number": "HRA-VOL-#####"
+ }
+}

@@ -1,0 +1,962 @@
+{
+ "halves": {
+  "A": {
+   "cases_planned": 113,
+   "counts": {
+    "by_genre": {
+     "case note": 5,
+     "chat log": 3,
+     "clinical note": 1,
+     "config": 5,
+     "csv": 4,
+     "email": 12,
+     "faq": 3,
+     "fiction": 3,
+     "form": 4,
+     "letter": 4,
+     "log": 2,
+     "markdown table": 5,
+     "minutes": 3,
+     "news": 3,
+     "notice": 2,
+     "report": 7,
+     "ticket": 7,
+     "tsv": 3
+    },
+    "by_injection_position": {
+     "after": 3,
+     "before": 3,
+     "inside": 3
+    },
+    "by_label": {
+     "ABN": 8,
+     "ADDRESS": 40,
+     "BANK_ACCOUNT": 12,
+     "CRIMINAL": 13,
+     "DATE_OF_BIRTH": 22,
+     "DISABILITY": 38,
+     "DRIVER_LICENCE": 9,
+     "EMAIL": 47,
+     "ETHNICITY": 17,
+     "FAMILY_VIOLENCE": 12,
+     "HEALTH": 66,
+     "INTERNAL_ID": 116,
+     "MEDICARE": 9,
+     "NATIONAL_ID": 7,
+     "OTHER_DATE": 146,
+     "PASSPORT": 6,
+     "PAYMENT_CARD": 12,
+     "PERSON": 765,
+     "PHONE": 13,
+     "QUASI_ID": 44,
+     "RELIGION": 26,
+     "SECRET": 13,
+     "SEXUALITY": 15,
+     "TFN": 9,
+     "UNION": 28,
+     "URL_PERSONAL": 9,
+     "USERNAME": 12
+    },
+    "by_organisation_kind": {
+     "other_workplace": 44,
+     "other_workplaces_distinct": 7,
+     "profiled": 32
+    },
+    "cases": 76,
+    "characters_total": 292185,
+    "clean_documents": 27,
+    "gold_spans": 1514,
+    "hard_negatives": 1468,
+    "hard_negatives_meeting_letter_case": {
+     "case_number": 22,
+     "letter_date": 9,
+     "meeting_date": 48
+    },
+    "hard_to_spot_cases": 7,
+    "injected_cases": 9,
+    "injected_cases_without_pi": 4,
+    "long_documents": 4,
+    "sensitive_spans": {
+     "indirect": 143,
+     "negative": 22,
+     "total": 215
+    }
+   },
+   "dropped_total": 37,
+   "generator": "A",
+   "half": "A",
+   "id_prefix": "HA-",
+   "models_assigned": {
+    "author": "mistralai/mistral-large-2512",
+    "labeller": "kimi-k3.1-pro",
+    "pointer": "openai/gpt-oss-120b"
+   },
+   "models_final": {
+    "author": "mistralai/mistral-large-2512",
+    "labeller": "kimi-k3.1-pro",
+    "pointer": "openai/gpt-oss-120b"
+   },
+   "organisation_kind": "a regional airline and airport operator",
+   "profile_fixes": {
+    "abn": 1,
+    "abn_forms": 1,
+    "email_domain": 0,
+    "mailboxes": 0,
+    "phones": 0
+   },
+   "profile_name_objects_unwrapped_for_the_converter": {
+    "entries_unwrapped_from_name_objects": {}
+   },
+   "rounds": {
+    "agreement-after": {
+     "any_r": 1115,
+     "documents compared": 72,
+     "documents with at least one disagreement item left": 37,
+     "ex_p": 1070,
+     "ex_r": 1070,
+     "gold": 1241,
+     "lab": 1276,
+     "ov_p": 1104,
+     "ov_r": 1104,
+     "review: cases changed by script": 34,
+     "review: cases with a disagreement item": 52,
+     "review: fixes rejected by the script (overlap / text changed / validator / quota)": 18,
+     "review: items": 648,
+     "review: items decided fix": 508,
+     "review: items decided keep": 140,
+     "review: requests that failed": 0
+    },
+    "agreement-before": {
+     "any_r": 840,
+     "documents compared": 72,
+     "documents where the labeller's echo differed from the text (aligned by diff)": 2,
+     "documents with at least one disagreement item": 52,
+     "documents with no labeller output": 0,
+     "ex_p": 765,
+     "ex_r": 765,
+     "gold": 981,
+     "lab": 1276,
+     "labeller markup errors (lenient parse)": 3,
+     "labeller model:kimi-k3.1-pro": 72,
+     "labeller outputs cut off at max_tokens": 0,
+     "labeller spans dropped in alignment": 1,
+     "ov_p": 824,
+     "ov_r": 824
+    },
+    "agreement-final": {
+     "after": {
+      "any_r": 1380,
+      "ex_p": 1332,
+      "ex_r": 1332,
+      "gold": 1514,
+      "lab": 1544,
+      "ov_p": 1369,
+      "ov_r": 1369
+     },
+     "before": {
+      "any_r": 1089,
+      "ex_p": 986,
+      "ex_r": 986,
+      "gold": 1240,
+      "lab": 1544,
+      "ov_p": 1070,
+      "ov_r": 1070
+     },
+     "extra_after": {
+      "documents compared": 76,
+      "documents with at least one disagreement item left": 40,
+      "review: cases changed by script": 38,
+      "review: cases with a disagreement item": 56,
+      "review: fixes rejected by the script (overlap / text changed / validator / quota)": 18,
+      "review: items": 703,
+      "review: items decided fix": 553,
+      "review: items decided keep": 150,
+      "review: requests that failed": 0
+     }
+    },
+    "convergence": {
+     "cases": 72,
+     "converged": false,
+     "trimmed_by_script": 0
+    },
+    "ingest-author": {
+     "call_stats": {
+      "model:mistralai/mistral-large-2512": 86
+     },
+     "cases_clean_of_issues": 32,
+     "cases_in_round": 86,
+     "cases_with_issues": 54,
+     "cases_with_wrong_closer_accepted": 19,
+     "fence_stripped": 7,
+     "issue_case_counts_by_code": {
+      "CHECKSUM": 2,
+      "EMAIL": 7,
+      "FORMAT": 1,
+      "LONG": 1,
+      "PHONE": 9,
+      "PHONE_SCAN": 12,
+      "PROFILE_HN": 25,
+      "P_DENYLIST": 3,
+      "P_INJ": 3,
+      "P_LEN": 1,
+      "P_PARSE": 8,
+      "P_URL": 5,
+      "REPEAT": 17
+     },
+     "requests": 86,
+     "round": "author",
+     "status_totals": {
+      "invalid": 54,
+      "valid": 32
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 2,
+     "wrong_closers_accepted": 104
+    },
+    "ingest-pointer": {
+     "checked": 86,
+     "flagged": 0,
+     "model:openai/gpt-oss-120b": 86,
+     "name": "pointer",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-pointer2": {
+     "checked": 3,
+     "flagged": 0,
+     "model:openai/gpt-oss-120b": 3,
+     "name": "pointer2",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-repair": {
+     "call_stats": {
+      "model:mistralai/mistral-large-2512": 54
+     },
+     "cases_clean_of_issues": 37,
+     "cases_in_round": 54,
+     "cases_with_issues": 17,
+     "cases_with_wrong_closer_accepted": 12,
+     "fence_stripped": 1,
+     "issue_case_counts_by_code": {
+      "CHECKSUM": 1,
+      "FORMAT": 1,
+      "PHONE": 2,
+      "PHONE_SCAN": 2,
+      "PROFILE_HN": 8,
+      "P_DENYLIST": 1,
+      "P_PARSE": 6,
+      "P_URL": 1,
+      "REPEAT": 4
+     },
+     "requests": 54,
+     "round": "repair",
+     "status_totals": {
+      "dropped": 17,
+      "valid": 69
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 2,
+     "wrong_closers_accepted": 87
+    },
+    "ingest-t2-pointer": {
+     "checked": 9,
+     "flagged": 1,
+     "model:openai/gpt-oss-120b": 9,
+     "name": "t2-pointer",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-t2-pointer2": {
+     "checked": 4,
+     "flagged": 0,
+     "model:openai/gpt-oss-120b": 4,
+     "name": "t2-pointer2",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-t2-repair": {
+     "call_stats": {
+      "model:mistralai/mistral-large-2512": 9
+     },
+     "cases_clean_of_issues": 4,
+     "cases_in_round": 9,
+     "cases_with_issues": 5,
+     "cases_with_wrong_closer_accepted": 2,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "PHONE": 3,
+      "PHONE_SCAN": 1,
+      "PROFILE_HN": 2
+     },
+     "requests": 9,
+     "round": "t2-repair",
+     "status_totals": {
+      "dropped": 37,
+      "valid": 76
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 3,
+     "wrong_closers_accepted": 2
+    },
+    "ingest-topup": {
+     "call_stats": {
+      "model:mistralai/mistral-large-2512": 18
+     },
+     "cases_clean_of_issues": 3,
+     "cases_in_round": 18,
+     "cases_with_issues": 15,
+     "cases_with_wrong_closer_accepted": 6,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "EMAIL": 1,
+      "LONG": 3,
+      "PHONE": 2,
+      "PHONE_SCAN": 1,
+      "PROFILE_HN": 9,
+      "P_INJ": 1,
+      "P_LEN": 3,
+      "P_PARSE": 2,
+      "P_PI": 1,
+      "P_URL": 1,
+      "REPEAT": 4
+     },
+     "requests": 18,
+     "round": "topup",
+     "status_totals": {
+      "dropped": 32,
+      "valid": 72
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 0,
+     "wrong_closers_accepted": 133
+    },
+    "ingest-topup2": {
+     "call_stats": {
+      "model:mistralai/mistral-large-2512": 9
+     },
+     "cases_clean_of_issues": 0,
+     "cases_in_round": 9,
+     "cases_with_issues": 9,
+     "cases_with_wrong_closer_accepted": 4,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "CHECKSUM": 1,
+      "EMAIL": 1,
+      "LONG": 1,
+      "PHONE": 3,
+      "PROFILE_HN": 2,
+      "P_DENYLIST": 1,
+      "P_LEN": 1,
+      "P_PARSE": 2,
+      "REPEAT": 1
+     },
+     "requests": 9,
+     "round": "topup2",
+     "status_totals": {
+      "dropped": 32,
+      "invalid": 9,
+      "valid": 72
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 5,
+     "wrong_closers_accepted": 10
+    },
+    "review-1": {
+     "cases_with_a_fix": 52,
+     "edits_applied": 324,
+     "fix_applied": 34,
+     "fix_rejected_overlap": 1,
+     "fix_rejected_quota": 1,
+     "fix_rejected_validator": 16,
+     "items_decided": 648,
+     "items_fix": 508,
+     "items_keep": 140,
+     "items_total": 648
+    },
+    "review-2": {
+     "cases_with_a_fix": 4,
+     "edits_applied": 45,
+     "fix_applied": 4,
+     "items_decided": 55,
+     "items_fix": 45,
+     "items_keep": 10,
+     "items_total": 55
+    },
+    "review-2-budget": {
+     "review_requests": 4,
+     "skipped_for_budget": 0
+    },
+    "review-budget": {
+     "review_requests": 52,
+     "skipped_for_budget": 0
+    },
+    "topup-plan": {
+     "entries": 18,
+     "shortfalls": {
+      "cases": 9,
+      "injections": 2,
+      "injections without pi": 1,
+      "label ABN": 3,
+      "label NATIONAL_ID": 1,
+      "label PASSPORT": 2,
+      "label URL_PERSONAL": 4,
+      "long": 3,
+      "sens FAMILY_VIOLENCE": 2
+     },
+     "valid_cases_before": 69
+    },
+    "topup2-plan": {
+     "entries": 9,
+     "multiplier": 2.5,
+     "planned_spans_or_documents": {
+      "label ABN": 5,
+      "label PASSPORT": 3,
+      "long documents": 3,
+      "sens FAMILY_VIOLENCE": 8
+     },
+     "profiled_entries": 3,
+     "seed_choices": 20261306,
+     "seed_values": 20261307,
+     "shortfalls": {
+      "label ABN": 2,
+      "label PASSPORT": 1,
+      "long": 1,
+      "sens FAMILY_VIOLENCE": 3
+     },
+     "valid_cases_before": 72
+    }
+   },
+   "seal_decision": "ACCEPT_SHORT",
+   "sealed_short_rows": {
+    "label PASSPORT": 1
+   },
+   "seed_plan": 20261301,
+   "seed_safe_values_plan": 20261302,
+   "seed_safe_values_topup": 20261303,
+   "seed_safe_values_topup2": 20261307,
+   "seed_topup2_choices": 20261306,
+   "seed_topup_choices": 20261304,
+   "settings": {
+    "kimi-k3.1-pro": {
+     "stream": true,
+     "thinking": false
+    },
+    "mistralai/mistral-large-2512": {
+     "author_temperature": 0.7,
+     "stream": false,
+     "thinking": null
+    },
+    "openai/gpt-oss-120b": {
+     "extra": {
+      "reasoning": {
+       "effort": "low"
+      }
+     },
+     "stream": false,
+     "thinking": null
+    }
+   },
+   "sha256": {
+    "agreement_md": "6a33ccb67475eda67926163b2cab1e1eb7bdf3861ca9da2113c0f2ac1026e536",
+    "cases": "3f29c5735b4a5113396a961cde10d110ac6eebda21af4c9f960b7cdbca97fe0f",
+    "context": "18b8cee8f5e890c4ebb922c237474113f7971b07547f42496e0dd8b97173f843",
+    "institution_profile": "2592edea8b3f61a1720f6d943f52120c3283d6cd994f49ee00cb6402b837b9c7",
+    "plan": "5c93351bc472b55957c961cb01d39e936e1b550c522d9cbdfedb2e95d1ecc056",
+    "plan_topup": "2db23d4fae7c196fff10109c5f791427acf282ba7b2c56f50cb74f7e6d454887",
+    "plan_topup2": "6f32062f82985225fb2da7a4e8c3dd6004bf1df6e49baf607a4e70d33fae252a",
+    "profile": "b8ed576de55aea623aef3eaeb02f2350ee0be4e8961056901310983f73e8b539"
+   },
+   "split": "test-h",
+   "status_totals": {
+    "dropped": 37,
+    "valid": 76
+   },
+   "substitutions": []
+  },
+  "B": {
+   "cases_planned": 95,
+   "counts": {
+    "by_genre": {
+     "case note": 6,
+     "chat log": 4,
+     "clinical note": 4,
+     "config": 5,
+     "csv": 4,
+     "email": 7,
+     "faq": 4,
+     "fiction": 3,
+     "form": 4,
+     "letter": 5,
+     "log": 3,
+     "markdown table": 5,
+     "minutes": 6,
+     "news": 3,
+     "notice": 3,
+     "report": 6,
+     "ticket": 7,
+     "tsv": 3
+    },
+    "by_injection_position": {
+     "after": 2,
+     "before": 4,
+     "inside": 4
+    },
+    "by_label": {
+     "ABN": 9,
+     "ADDRESS": 20,
+     "BANK_ACCOUNT": 11,
+     "CRIMINAL": 15,
+     "DATE_OF_BIRTH": 16,
+     "DISABILITY": 11,
+     "DRIVER_LICENCE": 9,
+     "EMAIL": 34,
+     "ETHNICITY": 11,
+     "FAMILY_VIOLENCE": 15,
+     "HEALTH": 30,
+     "INTERNAL_ID": 101,
+     "MEDICARE": 12,
+     "NATIONAL_ID": 8,
+     "OTHER_DATE": 62,
+     "PASSPORT": 10,
+     "PAYMENT_CARD": 10,
+     "PERSON": 534,
+     "PHONE": 26,
+     "QUASI_ID": 34,
+     "RELIGION": 17,
+     "SECRET": 15,
+     "SEXUALITY": 14,
+     "TFN": 13,
+     "UNION": 18,
+     "URL_PERSONAL": 11,
+     "USERNAME": 8
+    },
+    "by_organisation_kind": {
+     "other_workplace": 42,
+     "other_workplaces_distinct": 7,
+     "profiled": 40
+    },
+    "cases": 82,
+    "characters_total": 239786,
+    "clean_documents": 27,
+    "gold_spans": 1074,
+    "hard_negatives": 1102,
+    "hard_negatives_meeting_letter_case": {
+     "case_number": 24,
+     "letter_date": 9,
+     "meeting_date": 15
+    },
+    "hard_to_spot_cases": 11,
+    "injected_cases": 10,
+    "injected_cases_without_pi": 4,
+    "long_documents": 5,
+    "sensitive_spans": {
+     "indirect": 87,
+     "negative": 19,
+     "total": 131
+    }
+   },
+   "dropped_total": 13,
+   "generator": "B",
+   "half": "B",
+   "id_prefix": "HB-",
+   "models_assigned": {
+    "author": "deepseek-v4.1-flash",
+    "labeller": "openai/gpt-oss-120b",
+    "pointer": "openai/gpt-oss-120b"
+   },
+   "models_final": {
+    "author": "deepseek-v4.1-flash",
+    "labeller": "openai/gpt-oss-120b",
+    "pointer": "openai/gpt-oss-120b"
+   },
+   "organisation_kind": "an independent school group",
+   "profile_fixes": {
+    "abn": 1,
+    "abn_forms": 1,
+    "email_domain": 0,
+    "mailboxes": 0,
+    "phones": 0
+   },
+   "profile_name_objects_unwrapped_for_the_converter": {
+    "entries_unwrapped_from_name_objects": {
+     "buildings": 9,
+     "committees": 9,
+     "initiatives": 10
+    }
+   },
+   "rounds": {
+    "agreement-after": {
+     "any_r": 880,
+     "documents compared": 79,
+     "documents with at least one disagreement item left": 60,
+     "ex_p": 830,
+     "ex_r": 830,
+     "gold": 1045,
+     "lab": 1118,
+     "ov_p": 866,
+     "ov_r": 866,
+     "review: cases changed by script": 27,
+     "review: cases with a disagreement item": 62,
+     "review: fixes rejected by the script (overlap / text changed / validator / quota)": 9,
+     "review: items": 578,
+     "review: items decided fix": 189,
+     "review: items decided keep": 389,
+     "review: requests that failed": 0
+    },
+    "agreement-before": {
+     "any_r": 789,
+     "documents compared": 79,
+     "documents where the labeller's echo differed from the text (aligned by diff)": 46,
+     "documents with at least one disagreement item": 62,
+     "documents with no labeller output": 0,
+     "ex_p": 713,
+     "ex_r": 713,
+     "gold": 966,
+     "lab": 1118,
+     "labeller markup errors (lenient parse)": 7,
+     "labeller model:openai/gpt-oss-120b": 79,
+     "labeller outputs cut off at max_tokens": 0,
+     "labeller spans dropped in alignment": 15,
+     "ov_p": 773,
+     "ov_r": 772
+    },
+    "agreement-final": {
+     "after": {
+      "any_r": 908,
+      "ex_p": 853,
+      "ex_r": 853,
+      "gold": 1074,
+      "lab": 1155,
+      "ov_p": 891,
+      "ov_r": 891
+     },
+     "before": {
+      "any_r": 812,
+      "ex_p": 729,
+      "ex_r": 729,
+      "gold": 990,
+      "lab": 1155,
+      "ov_p": 792,
+      "ov_r": 791
+     },
+     "extra_after": {
+      "documents compared": 82,
+      "documents with at least one disagreement item left": 62,
+      "review: cases changed by script": 29,
+      "review: cases with a disagreement item": 65,
+      "review: fixes rejected by the script (overlap / text changed / validator / quota)": 10,
+      "review: items": 600,
+      "review: items decided fix": 200,
+      "review: items decided keep": 400,
+      "review: requests that failed": 0
+     }
+    },
+    "convergence": {
+     "cases": 79,
+     "converged": false,
+     "trimmed_by_script": 0
+    },
+    "ingest-author": {
+     "call_stats": {
+      "model:deepseek-v4.1-flash": 82
+     },
+     "cases_clean_of_issues": 53,
+     "cases_in_round": 82,
+     "cases_with_issues": 29,
+     "cases_with_wrong_closer_accepted": 16,
+     "fence_stripped": 1,
+     "issue_case_counts_by_code": {
+      "FORMAT": 1,
+      "NEG_GENRE": 2,
+      "PHONE": 7,
+      "PROFILE_HN": 6,
+      "P_CLEAN": 2,
+      "P_DENYLIST": 2,
+      "P_INJ": 2,
+      "P_LANG": 1,
+      "P_PARSE": 5,
+      "REPEAT": 10
+     },
+     "requests": 82,
+     "round": "author",
+     "status_totals": {
+      "invalid": 29,
+      "valid": 53
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 0,
+     "wrong_closers_accepted": 220
+    },
+    "ingest-pointer": {
+     "checked": 82,
+     "flagged": 3,
+     "model:openai/gpt-oss-120b": 82,
+     "name": "pointer",
+     "unparseable_treated_as_flagged": 1
+    },
+    "ingest-pointer2": {
+     "checked": 5,
+     "flagged": 0,
+     "model:openai/gpt-oss-120b": 5,
+     "name": "pointer2",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-repair": {
+     "call_stats": {
+      "model:deepseek-v4.1-flash": 32
+     },
+     "cases_clean_of_issues": 24,
+     "cases_in_round": 32,
+     "cases_with_issues": 8,
+     "cases_with_wrong_closer_accepted": 8,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "PHONE": 4,
+      "PROFILE_HN": 3,
+      "P_DENYLIST": 1,
+      "P_LANG": 1
+     },
+     "requests": 32,
+     "round": "repair",
+     "status_totals": {
+      "dropped": 8,
+      "valid": 74
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 0,
+     "wrong_closers_accepted": 107
+    },
+    "ingest-t2-pointer": {
+     "checked": 3,
+     "flagged": 0,
+     "model:openai/gpt-oss-120b": 3,
+     "name": "t2-pointer",
+     "unparseable_treated_as_flagged": 0
+    },
+    "ingest-t2-repair": {
+     "requests": 0,
+     "round": "t2-repair"
+    },
+    "ingest-topup": {
+     "call_stats": {
+      "model:deepseek-v4.1-flash": 10
+     },
+     "cases_clean_of_issues": 5,
+     "cases_in_round": 10,
+     "cases_with_issues": 5,
+     "cases_with_wrong_closer_accepted": 1,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {
+      "PHONE": 3,
+      "PROFILE_HN": 1,
+      "P_INJ": 1,
+      "REPEAT": 2
+     },
+     "requests": 10,
+     "round": "topup",
+     "status_totals": {
+      "dropped": 13,
+      "valid": 79
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 0,
+     "wrong_closers_accepted": 1
+    },
+    "ingest-topup2": {
+     "call_stats": {
+      "model:deepseek-v4.1-flash": 3
+     },
+     "cases_clean_of_issues": 3,
+     "cases_in_round": 3,
+     "cases_with_issues": 0,
+     "cases_with_wrong_closer_accepted": 0,
+     "fence_stripped": 0,
+     "issue_case_counts_by_code": {},
+     "requests": 3,
+     "round": "topup2",
+     "status_totals": {
+      "dropped": 13,
+      "valid": 82
+     },
+     "trimmed_spans": 0,
+     "unknown_hn_kind_warnings": 0,
+     "wrong_closers_accepted": 0
+    },
+    "review-1": {
+     "cases_all_keep": 26,
+     "cases_with_a_fix": 36,
+     "edits_applied": 132,
+     "fix_applied": 27,
+     "fix_rejected_quota": 3,
+     "fix_rejected_validator": 6,
+     "items_decided": 578,
+     "items_fix": 189,
+     "items_keep": 389,
+     "items_total": 578
+    },
+    "review-2": {
+     "cases_with_a_fix": 3,
+     "edits_applied": 8,
+     "fix_applied": 2,
+     "fix_rejected_quota": 1,
+     "items_decided": 22,
+     "items_fix": 11,
+     "items_keep": 11,
+     "items_total": 22
+    },
+    "review-2-budget": {
+     "review_requests": 3,
+     "skipped_for_budget": 0
+    },
+    "review-budget": {
+     "review_requests": 62,
+     "skipped_for_budget": 0
+    },
+    "topup-plan": {
+     "entries": 10,
+     "shortfalls": {
+      "cases": 4,
+      "injections": 3,
+      "negative HEALTH": 1,
+      "sens DISABILITY": 3,
+      "sens ETHNICITY": 4
+     },
+     "valid_cases_before": 74
+    },
+    "topup2-plan": {
+     "entries": 3,
+     "multiplier": 2.5,
+     "planned_spans_or_documents": {
+      "sens DISABILITY": 8
+     },
+     "profiled_entries": 0,
+     "seed_choices": 20261307,
+     "seed_values": 20261308,
+     "shortfalls": {
+      "sens DISABILITY": 3
+     },
+     "valid_cases_before": 79
+    }
+   },
+   "seal_decision": "PASS",
+   "sealed_short_rows": {},
+   "seed_plan": 20261302,
+   "seed_safe_values_plan": 20261303,
+   "seed_safe_values_topup": 20261304,
+   "seed_safe_values_topup2": 20261308,
+   "seed_topup2_choices": 20261307,
+   "seed_topup_choices": 20261305,
+   "settings": {
+    "deepseek-v4.1-flash": {
+     "stream": true,
+     "thinking": false
+    },
+    "openai/gpt-oss-120b": {
+     "extra": {
+      "reasoning": {
+       "effort": "low"
+      }
+     },
+     "stream": false,
+     "thinking": null
+    }
+   },
+   "sha256": {
+    "agreement_md": "428887aa6f44b804a330227c722d81141d34062c7168641d4ad87519ad08c4f8",
+    "cases": "5544671eb45323179b45588461b6b96e266bb668a62cd6b1c33c504991c20069",
+    "context": "cad55bca4b76c6013f6fcefd4bd43eaa9b594c107b5fb3ae3e42dd033c623f63",
+    "institution_profile": "128c88fe125c6ab9ba34ce8dfa2fa9b9aaf31174266b3c1e21534e921ea42055",
+    "plan": "4da7936ad16447d9a98393d9f6bdd00720b6bb5a52a485a602fd679765ad2b66",
+    "plan_topup": "eb28294e890829ac03d4c7fd0e297032247ff6bd175d5194cef84324987ced25",
+    "plan_topup2": "3926a3cde02330984b339a42175f9ac69a02212292caadfaf6bf6eb01396a08d",
+    "profile": "51660b78b0c93d507aeca2e6fa97f90dd75020fb2ef3a98ad1b8d28bd3029b0d"
+   },
+   "split": "test-h",
+   "status_totals": {
+    "dropped": 13,
+    "valid": 82
+   },
+   "substitutions": []
+  }
+ },
+ "halves_not_sealed": [],
+ "halves_sealed": [
+  "A",
+  "B"
+ ],
+ "key_usage": {
+  "before_this_job_at_2026-11-12T21:45Z": 21.3015,
+  "end": {
+   "time": "2026-11-12T22:40:54Z",
+   "usage_usd": 22.013544193
+  },
+  "start": {
+   "time": "2026-11-12T22:04:47Z",
+   "usage_usd": 21.301545758
+  }
+ },
+ "label_prompt_decision": {
+  "avg_planned_chars": 3243,
+  "kimi_tokens_used_so_far": 9569,
+  "mode": "compact",
+  "planned_cases_half_a": 86,
+  "probe_completion_tokens_per_doc_char": 0.2985,
+  "probe_prompt_tokens_compact_taxonomy_trivial_text": 1633,
+  "probe_prompt_tokens_full_taxonomy_trivial_text": 3408,
+  "probe_prompt_tokens_per_doc_char": 0.2383,
+  "projected_tokens_per_case_compact": 3374,
+  "projected_tokens_per_case_full": 5149,
+  "projected_total_compact": 299743,
+  "projected_total_full": 452393,
+  "rule": "compact if the projected kimi-k3.1-pro total for half A with the full taxonomy exceeds 370,000 tokens"
+ },
+ "openrouter_cost_usd": 0.812674,
+ "sha256_common": {
+  "brief": "13675653a08dab899363db8e99a17ba5bffdcf093b13a18395c13634f1446a53",
+  "extra_quotas": "e540f4000aafb771fe7f0b3f3af360d0fe6ddcb22b1c74603a9d842f12041737",
+  "pointer_prompt": "34e8351b82509ab35355f9fd0eb2b4ff5d3c4fb177451e7a8f3127571dcd453e",
+  "taxonomy": "90611d0a05963e08cceea7dbb22f2a32bceec65a957b3765818b53de931a5159",
+  "taxonomy_compact": "147eaebadfe79734759d5e84a756323670f77423650e43c08af00a9196a802b9",
+  "validator": "712c24367b722b55c1da5f78c16f3ab367ed840b1663b09c3ea585e45bff04a6"
+ },
+ "split": "test-h",
+ "substitutions": [],
+ "tokens_all": 3167759,
+ "tokens_by_model": {
+  "deepseek-v4.1-flash": {
+   "cached": 581632,
+   "calls": 203,
+   "completion": 142720,
+   "http_ok": 203,
+   "prompt": 781449,
+   "reasoning": 0,
+   "total": 924169
+  },
+  "kimi-k3.1-pro": {
+   "cached": 2048,
+   "calls": 80,
+   "completion": 81742,
+   "http_ok": 80,
+   "prompt": 203506,
+   "reasoning": 0,
+   "total": 285248
+  },
+  "mistralai/mistral-large-2512": {
+   "cached": 661888,
+   "calls": 248,
+   "completion": 311068,
+   "cost_usd": 0.747198,
+   "http_ok": 243,
+   "prompt": 1102445,
+   "reasoning": 0,
+   "total": 1413513
+  },
+  "openai/gpt-oss-120b": {
+   "cached": 133838,
+   "calls": 282,
+   "completion": 118575,
+   "cost_usd": 0.065477,
+   "http_ok": 282,
+   "prompt": 426254,
+   "reasoning": 42045,
+   "total": 544829
+  }
+ }
+}

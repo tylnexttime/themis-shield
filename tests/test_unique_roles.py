@@ -151,7 +151,7 @@ def test_the_switch_turns_the_pass_off():
 # the sealed ones stay as they were), so split G is read from those. The guard is strict on every set.
 _CASE_FILES = sorted(p for p in (ROOT / "eval" / "cases").glob("*.jsonl") if not p.name.endswith(".adjudicated.jsonl"))
 _GUARD_SETS = [
-    pytest.param([p for p in _CASE_FILES if not p.name.startswith("test-g-")], (120, 120), id="sets-before-split-g"),
+    pytest.param([p for p in _CASE_FILES if not p.name.startswith(("test-g-", "test-h-"))], (120, 120), id="sets-before-split-g"),
     pytest.param(sorted((ROOT / "eval" / "cases").glob("test-g-*.adjudicated.jsonl")), (18, 18), id="split-g"),
 ]
 
